@@ -270,6 +270,11 @@ def official(row, transport, module):
                  "annual_result": ["resultatregnskapResultat", "aarsresultat"], "assets": ["eiendeler", "sumEiendeler"],
                  "equity": ["egenkapitalGjeld", "egenkapital", "sumEgenkapital"]}
         for i, record in enumerate(body):
+            reported_org = str((record.get("virksomhet") or {}).get("organisasjonsnummer", ""))
+            if reported_org != org:
+                row["availability"][module] = "ambiguous"
+                row["errors"].append({"module": module, "message": "Accounts identify a different legal organisation; record withheld"})
+                continue
             # Group and company accounts are kept distinct with original type, currency and period.
             period = record.get("regnskapsperiode")
             if not period:
@@ -280,7 +285,7 @@ def official(row, transport, module):
                     claim(row, "financials." + field, {"amount": value, "currency": record.get("valuta"),
                           "account_type": record.get("regnskapstype")}, snap,
                           {"json_pointer": f"/{i}/" + "/".join(path)}, period)
-        if not any(c["field"].startswith("financials.") for c in row["claims"]):
+        if row["availability"][module] != "ambiguous" and not any(c["field"].startswith("financials.") for c in row["claims"]):
             row["availability"][module] = "not_available"
     elif module == "leadership":
         for i, group in enumerate(body.get("rollegrupper", [])):
@@ -561,7 +566,9 @@ def validate(rows, orgs, snapshots=None):
     return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
 
 
-def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None):
+def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None):
+    if agent and replay:
+        raise ValueError("AI network research is not allowed in offline replay")
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     if replay:
@@ -573,6 +580,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     rows = [envelope(org, run_id) for org in orgs]
     bodies = {}
     prior = {r["organisation_number"]: r for r in previous or []}
+    replay_seeds = {}
+    if replay and (Path(replay) / "envelopes.jsonl").exists():
+        replay_seeds = {r["organisation_number"]: r for r in (json.loads(line) for line in (Path(replay) / "envelopes.jsonl").read_text(encoding="utf-8").splitlines() if line.strip())}
     registry_rows = {}
     if registry:
         if not registry_retrieved_at:
@@ -633,9 +643,17 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 else:
                     body = anchor(row, transport.get(ENTITY + org))
                 if body:
+                    # A previous discovered website is a candidate, never fresh evidence.
+                    seed_row = prior.get(org) or replay_seeds.get(org)
+                    if seed_row and not body.get("hjemmeside"):
+                        seed = next((c["value"] for c in seed_row.get("claims", []) if c["field"] == "official_website"), None)
+                        if isinstance(seed, str):
+                            body = {**body, "hjemmeside": seed}
                     bodies[row["organisation_number"]] = body
             elif module == "website":
                 crawl_site(row, bodies[row["organisation_number"]], transport, pages)
+            elif module == "agent":
+                agent.research(row, bodies[row["organisation_number"]], transport, pages)
             elif module == "discovery":
                 body = bodies[row["organisation_number"]]
                 calls_before = getattr(discovery.local, "calls", 0)
@@ -653,14 +671,15 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 official(row, transport, module)
         except Exception as exc:
             field = "legal_identity" if module == "identity" else "official_website" if module in {"website", "discovery"} else module
-            row["availability"][field] = "failed"
+            if field in FIELDS:
+                row["availability"][field] = "failed"
             row["errors"].append({"module": module, "message": f"{type(exc).__name__}: {exc}"})
         row["operations"]["runtime_ms"] += int((time.monotonic() - began) * 1000)
         row["operations"]["requests"] += getattr(transport.local, "requests", 0) - before_requests
 
     # Breadth before depth prevents early entities consuming every request.
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        for module in ("identity", *modules, *(("discovery",) if discovery else ())):
+        for module in ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ())):
             selected = rows if module == "identity" else [r for r in rows if r["organisation_number"] in bodies]
             if module == "discovery":
                 selected = [r for r in selected if r["availability"].get("official_website") != "available"]
@@ -668,6 +687,14 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             write_rows(output / "checkpoint.jsonl", rows)
     for row in rows:
         finish(row, prior.get(row["organisation_number"]))
+        if row.get("agent", {}).get("selected_claim_ids"):
+            chosen = set(row["agent"]["selected_claim_ids"])
+            statements = []
+            for c in row["claims"]:
+                if c["id"] in chosen:
+                    statements.append({"text": f"{c['field']}: {json.dumps(c['value'], ensure_ascii=False)}" + (f"; reporting period: {json.dumps(c['reporting_period'], ensure_ascii=False)}" if c.get("reporting_period") else ""), "evidence_ids": c["evidence_ids"], "claim_id": c["id"]})
+            row["summary"]["statements"] = statements
+            row["summary"]["method"] = "model_selected_verified_claims; deterministic_fact_rendering"
         # Count all observations including redirects. Fetch failures have run-level accounting.
     write_rows(output / "envelopes.jsonl", rows)
     validation = validate(rows, orgs, output / "snapshots")
@@ -683,6 +710,13 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     report["registry_snapshot"] = {"path": str(registry), "retrieved_at": registry_retrieved_at, "sha256": snapshot_hash} if registry else None
     report["mode"] = "saved_source_replay" if replay else "live"
     report["replay_source"] = str(replay) if replay else None
+    report["agent"] = agent.report() if agent else None
+    if agent:
+        from .costs import estimate_costs
+        report["third_party_cost_usd"] = None
+        report["cost_estimate"] = estimate_costs(report["agent"], len(orgs))
+        report["agent"]["companies_with_model_calls"] = sum(bool(r.get("agent", {}).get("model_calls")) for r in rows)
+        report["agent"]["completed_tool_loops"] = sum(r.get("agent", {}).get("status") == "completed" for r in rows)
     report["discovery"] = {"provider": "Brave Web Search", "queries": discovery.calls, "declared_unit_cost": float(discovery.unit_cost),
                            "max_cost_usd": float(discovery.max_cost), "live_verified": False} if discovery else None
     write_json(output / "run-report.json", report)

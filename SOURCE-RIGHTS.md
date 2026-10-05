@@ -15,3 +15,8 @@ Brave documentation and terms reviewed on 5 October 2026: https://api-dashboard.
 Caches: official snapshots supplied by the evaluator are explicitly declared by path, hash and actual retrieval timestamp in the run report. Live responses are stored only as evidence, not reused to pretend a fresh retrieval occurred. Previous results are used only for diffs and clearly marked last-known values after unsuccessful refreshes.
 
 Models: no LLM or learned model in the default submitted version. Synthesis is generated from accepted claims using fixed templates with evidence references. An LLM key is not a blocker to running the agent.
+# AI provider and search additions (5 October 2026)
+
+Local development sends only public company identity, extracted public facts and candidate URLs to configured model providers. Keys stay server-side; authenticated requests use fixed HTTPS endpoints without redirects. No credential, model response body, search snippet or private account profile is stored in artifacts. API providers may retain/process prompts under their own terms; users must confirm those terms and free/trial eligibility. The MIT application licence does not grant model, search-result or company-content rights.
+
+Tavily basic results are transient URL candidates only. The agent independently fetches source pages under robots and exact-company rules; provider snippets are never claim evidence. Do not assume use of a search API authorizes scraping a restricted platform. Official evaluator use of personal search keys or trial credentials requires organizer agreement; do not submit local keys in the repository or ZIP. A provider success response does not establish licence compliance or free billing.

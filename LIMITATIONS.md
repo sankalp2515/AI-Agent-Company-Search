@@ -13,3 +13,10 @@ This is a reproducible research submission candidate, not a claim of winning or 
 - Prior evidence is preserved in refresh metadata and its original directory. The viewer shows stale last-known facts separately. Earlier snapshot directories must remain available.
 - Company-source terms have not been manually audited for every domain. Do not publicly redistribute raw third-party snapshots before checking rights.
 - Team/contact identity, remote repository URL, final commit and exact organizer budget/schema/deadline acknowledgement remain release inputs.
+# AI upgrade limitations (5 October 2026)
+
+AI mode is implemented and uses live providers and Tavily. This supersedes earlier statements below that no LLM is used. Model reasoning directs tools but published facts are still restricted to deterministic, evidence-checked extraction. This is not a general-purpose browser, PDF/OCR or unrestricted news crawler. Model summaries select verified claims rather than publishing free-form generated prose.
+
+Model/query caps may stop research before every company gets a completed AI loop. This is disclosed separately from terminal envelope completion. Provider pacing/cooldowns are conservative local controls, not guarantees of token-per-minute compliance; real 429s can still occur. All providers failing preserves baseline output but limits discovery. Free-tier credentials may not transfer to the evaluator, and remaining monthly allowances are not verified automatically. No official score, qualification or JBOX bonus eligibility is claimed.
+
+The local simulator is not the organizer harness: hidden union, exact field weights and human rubrics are unavailable. A reviewed reference must be supplied independently before reporting a score. Tests establish operational behavior, not exhaustive semantic accuracy. The original deterministic release and archived reports remain baseline development evidence, not evidence that the new agent was used in those old runs.

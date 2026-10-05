@@ -26,7 +26,7 @@ def test_equal_financial_values_in_different_periods_are_not_deduplicated():
 def test_accounts_without_reporting_period_are_not_published():
     class Fake:
         def get(self, url):
-            return snapshot([{"resultatregnskapResultat": {"aarsresultat": 17}}])
+            return snapshot([{"virksomhet": {"organisasjonsnummer": "123456789"}, "resultatregnskapResultat": {"aarsresultat": 17}}])
     row = envelope("123456789", "x")
     official(row, Fake(), "financials")
     assert row["claims"] == []

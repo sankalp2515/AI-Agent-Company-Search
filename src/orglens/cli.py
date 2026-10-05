@@ -13,6 +13,8 @@ from .viewer import render
 
 
 def main():
+    from .agent import load_env
+    load_env()
     parser = argparse.ArgumentParser(prog="orglens")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="Research an evaluator-supplied company batch")
@@ -31,6 +33,11 @@ def main():
     run.add_argument("--discover-brave", action="store_true", help="Opt-in search; BRAVE_API_KEY and declared costs required")
     run.add_argument("--search-cost-per-request", type=float)
     run.add_argument("--max-api-cost", type=float, default=0)
+    run.add_argument("--ai", action="store_true", help="Model-directed research with Tavily; API usage consumes account allowances")
+    run.add_argument("--providers", default="groq,nvidia,cloudflare,cohere", help="Ordered fallback chain; Mistral opt-in until its quota is available")
+    run.add_argument("--max-model-calls", type=int, default=100)
+    run.add_argument("--max-search-queries", type=int, default=25)
+    run.add_argument("--agent-steps", type=int, default=6)
     sample = sub.add_parser("sample", help="Create a reproducible local test sample, never used in official evaluation")
     sample.add_argument("--universe", required=True)
     sample.add_argument("--count", type=int, default=100)
@@ -43,6 +50,13 @@ def main():
     view = sub.add_parser("view")
     view.add_argument("--envelopes", required=True)
     view.add_argument("--output", required=True)
+    simulate = sub.add_parser("simulate", help="Local contract gates and reviewed-reference scoring; NOT the official evaluator")
+    simulate.add_argument("--input", required=True)
+    simulate.add_argument("--envelopes", required=True)
+    simulate.add_argument("--snapshots", required=True)
+    simulate.add_argument("--report", required=True)
+    simulate.add_argument("--reference", help="Independent reviewed reference JSON, never auto-generated from this run")
+    simulate.add_argument("--output", default="out/simulation.json")
     args = parser.parse_args()
     if args.command == "sample":
         if args.count < 1:
@@ -70,6 +84,15 @@ def main():
             parser.error("Unknown module")
         previous = [json.loads(line) for line in Path(args.previous).read_text(encoding="utf-8").splitlines() if line.strip()] if args.previous else None
         discovery = None
+        agent = None
+        if args.ai:
+            if args.replay or args.discover_brave:
+                parser.error("AI mode cannot be combined with offline replay or Brave discovery")
+            if min(args.max_model_calls, args.max_search_queries, args.agent_steps) < 1 or args.agent_steps > 12:
+                parser.error("AI caps must be positive and steps <=12")
+            from .agent import ModelRouter, TavilySearch, ResearchAgent, providers_from_env
+            agent = ResearchAgent(ModelRouter(providers_from_env(args.providers.split(",")), args.max_model_calls),
+                                  TavilySearch(os.environ.get("TAVILY_API_KEY"), args.max_search_queries), args.agent_steps)
         if args.discover_brave:
             if args.replay:
                 parser.error("Paid discovery cannot be used in offline replay")
@@ -81,7 +104,7 @@ def main():
         rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
                                  requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
                                  previous=previous, pages=args.pages, modules=modules,
-                                 registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery)
+                                 registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent)
         render(rows, Path(args.output) / "index.html")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         raise SystemExit(0 if report["validation"]["passed"] else 1)
@@ -90,6 +113,16 @@ def main():
         report = validate(rows, read_inputs(args.input), args.snapshots)
         print(json.dumps(report, indent=2))
         raise SystemExit(0 if report["passed"] else 1)
+    elif args.command == "simulate":
+        from .simulator import simulate_run
+        from .core import write_json
+        rows = [json.loads(line) for line in Path(args.envelopes).read_text(encoding="utf-8").splitlines() if line.strip()]
+        reference = json.loads(Path(args.reference).read_text(encoding="utf-8")) if args.reference else None
+        result = simulate_run(rows, read_inputs(args.input), args.snapshots,
+                              json.loads(Path(args.report).read_text(encoding="utf-8")), reference)
+        write_json(args.output, result)
+        print(json.dumps(result, indent=2))
+        raise SystemExit(0 if result["operational_gates_passed"] else 1)
     else:
         rows = [json.loads(line) for line in Path(args.envelopes).read_text(encoding="utf-8").splitlines() if line.strip()]
         render(rows, Path(args.output))

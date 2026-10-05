@@ -39,3 +39,6 @@ The default version is reproducible with $0 declared external API cost. External
 `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 1800 --max-seconds 2400`
 
 Use the actual supplied batch and budgets. Include the frozen registry flags when provided. Keep source snapshot folders with the outputs. Read README.md for installation and optional replay/discovery.
+# AI upgrade notice
+
+The deterministic release described below is the earlier baseline. Real multi-provider AI research and Tavily are now implemented; use the new AI build report and `submission/ai-artifacts` when available. Historical baseline tests are not evidence that those old runs used an LLM. Official qualification, source completeness and prize eligibility remain unverified.

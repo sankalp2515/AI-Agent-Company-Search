@@ -1,0 +1,27 @@
+{
+  "kind": "local_simulator_not_official_score",
+  "operational_gates": {
+    "complete_outputs_and_evidence_structure": true,
+    "within_declared_request_budget": true,
+    "within_declared_time_budget": true
+  },
+  "operational_gates_passed": true,
+  "structural_errors": [],
+  "official_qualification": "not_determined",
+  "overall_score": null,
+  "unverified": [
+    "semantic evidence correctness",
+    "exact-company attribution",
+    "hidden reference recall",
+    "official field weights",
+    "manual synthesis and UX review",
+    "official budgets and billing"
+  ],
+  "components": {
+    "coverage_out_of_50": null,
+    "precision_out_of_30": null,
+    "synthesis_out_of_12": null,
+    "ux_out_of_8": null
+  },
+  "note": "No independently reviewed reference; scores intentionally withheld. Structural validity is not precision."
+}

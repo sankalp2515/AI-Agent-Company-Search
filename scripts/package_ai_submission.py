@@ -39,7 +39,7 @@ def main():
             value = match[2].strip().strip("\"'").encode()
             if len(value) > 8:
                 credentials.append(value)
-    files = sorted(p for p in destination.rglob("*") if p.is_file())
+    files = sorted(p for p in destination.rglob("*") if p.is_file() and p.name != "artifact-hashes.json")
     if any(secret in p.read_bytes() for p in files for secret in credentials):
         raise SystemExit("Credential leak detected in package; publication forbidden")
     manifest = {str(p.relative_to(root)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}

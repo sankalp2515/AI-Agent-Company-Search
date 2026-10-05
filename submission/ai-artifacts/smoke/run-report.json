@@ -1,0 +1,126 @@
+{
+  "run_id": "ai-release-smoke",
+  "completed_at": "2026-10-05T12:38:15.638132Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "requests": 635,
+  "bytes": 10634433,
+  "runtime_seconds": 363.375,
+  "third_party_cost_usd": null,
+  "limits": {
+    "requests": 2000,
+    "seconds": 900
+  },
+  "p50_company_ms": 5422,
+  "p95_company_ms": 17964,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 0,
+    "description": 0,
+    "jobs": 0,
+    "activity": 0,
+    "owned_profiles": 0
+  },
+  "states": {
+    "not_available": 405,
+    "failed": 30,
+    "ambiguous": 60,
+    "not_applicable": 0,
+    "available": 400,
+    "blocked": 5
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "live",
+  "replay_source": null,
+  "agent": {
+    "model_usage": {
+      "groq": {
+        "attempts": 28,
+        "successful_calls": 27,
+        "input_tokens": 24740,
+        "output_tokens": 1262,
+        "neurons": 0
+      },
+      "nvidia": {
+        "attempts": 54,
+        "successful_calls": 37,
+        "input_tokens": 41491,
+        "output_tokens": 1969,
+        "neurons": 0
+      },
+      "cloudflare": {
+        "attempts": 26,
+        "successful_calls": 6,
+        "input_tokens": 21680,
+        "output_tokens": 437,
+        "neurons": 104.52766847610474
+      },
+      "cohere": {
+        "attempts": 33,
+        "successful_calls": 32,
+        "input_tokens": 28730,
+        "output_tokens": 660,
+        "neurons": 0
+      }
+    },
+    "models": [
+      {
+        "provider": "groq",
+        "model": "openai/gpt-oss-20b"
+      },
+      {
+        "provider": "nvidia",
+        "model": "openai/gpt-oss-20b"
+      },
+      {
+        "provider": "cloudflare",
+        "model": "@cf/meta/llama-3.1-8b-instruct-fp8-fast"
+      },
+      {
+        "provider": "cohere",
+        "model": "command-r7b-12-2024"
+      }
+    ],
+    "model_attempts": 141,
+    "model_attempt_cap": 200,
+    "search_queries": 20,
+    "search_credit_upper_bound": 20,
+    "search_query_cap": 20,
+    "paid_spend_authorized_usd": 0,
+    "actual_billed_cost_usd": null,
+    "billing_note": "Usage measured; provider invoice and remaining free allowance are not verified. Do not equate tokens with zero cost.",
+    "companies_with_model_calls": 100,
+    "completed_tool_loops": 63
+  },
+  "cost_estimate": {
+    "price_snapshot_date": "2026-10-05",
+    "measured_companies": 100,
+    "conditional_free_allowance_cost_usd": 0,
+    "condition": "Only if every request is within remaining free/trial allocations and paid overage is disabled. Not verified by this app.",
+    "known_retail_component_usd": 0.163384,
+    "unpriced_model_providers": [
+      "nvidia",
+      "cohere"
+    ],
+    "complete_retail_estimate_usd": null,
+    "actual_invoice_cost_usd": null,
+    "hypothetical_same_workload_1000_company_known_component_usd": 1.6338,
+    "extrapolation_warning": "Partial known-price sensitivity only, not an official-run quote. Caps, source mix, model fallbacks, provider quotas and batch size change workload.",
+    "sources": [
+      "https://console.groq.com/docs/models",
+      "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+      "https://docs.tavily.com/documentation/api-credits"
+    ]
+  },
+  "discovery": null
+}

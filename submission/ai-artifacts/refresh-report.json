@@ -1,0 +1,47 @@
+{
+  "run_id": "ai-release-refresh",
+  "completed_at": "2026-10-05T12:40:18.354233Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 5.672,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 2000,
+    "seconds": 120
+  },
+  "p50_company_ms": 47,
+  "p95_company_ms": 186,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 0,
+    "description": 0,
+    "jobs": 0,
+    "activity": 0,
+    "owned_profiles": 0
+  },
+  "states": {
+    "failed": 20,
+    "ambiguous": 25,
+    "available": 400,
+    "not_applicable": 0,
+    "blocked": 5,
+    "not_available": 450
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "saved_source_replay",
+  "replay_source": "out/ai-release-smoke",
+  "agent": null,
+  "discovery": null
+}

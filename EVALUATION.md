@@ -1,5 +1,7 @@
 # Verification and measured evidence
 
+AI upgrade: `--ai` now enables model-directed tool selection and Tavily discovery. New reports under `submission/ai-artifacts` supersede the deterministic baseline as AI submission evidence. The baseline metrics below remain historical and must not be described as LLM-agent runs. Coverage counters in run reports are availability-state counts, not independently measured fact recall. Hidden-label precision, coverage and qualification remain unverified.
+
 The live smoke corpus is selected by seeded reservoir sampling from the organizer's 411,160-company universe. Seed 20261005 selects 100 companies. The independent scale sample uses seed 20261006 and selects 1,000; samples are operational exercises, not an independently labelled recall benchmark.
 
 Regression suite covers wrong-company official responses, strict labelled-number identity, multiple-entity ambiguity, missing-versus-zero facts, unchanged and failed refreshes, duplicate input rejection, exact output membership, 1,100-company failure completion and viewer script-injection prevention. Further tests cover frozen-registry evidence and snapshot validity.

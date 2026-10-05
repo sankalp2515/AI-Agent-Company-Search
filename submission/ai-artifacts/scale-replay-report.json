@@ -1,0 +1,47 @@
+{
+  "run_id": "ai-final-scale-replay",
+  "completed_at": "2026-10-05T12:27:37.467519Z",
+  "companies": 1000,
+  "envelopes": 1000,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1000
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 81.797,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 6000,
+    "seconds": 180
+  },
+  "p50_company_ms": 125,
+  "p95_company_ms": 1153,
+  "coverage": {
+    "legal_identity": 1000,
+    "financials": 997,
+    "leadership": 998,
+    "locations": 998,
+    "official_website": 10,
+    "description": 8,
+    "jobs": 0,
+    "activity": 1,
+    "owned_profiles": 1
+  },
+  "states": {
+    "available": 4013,
+    "ambiguous": 280,
+    "not_available": 4456,
+    "not_applicable": 0,
+    "blocked": 15,
+    "failed": 236
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "saved_source_replay",
+  "replay_source": "out/scale",
+  "agent": null,
+  "discovery": null
+}

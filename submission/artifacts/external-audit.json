@@ -1,0 +1,226 @@
+{
+  "companies": 1000,
+  "mode": "final_policy_on_saved_live_sources",
+  "accepted_websites": [
+    {
+      "organisation_number": "940190738",
+      "legal_name": "LHL, LANDSFORENINGEN FOR HJERTE, LUNGE OG HJERNESLAG",
+      "website": "https://www.lhl.no",
+      "identity_evidence": [
+        {
+          "id": "06846d759f9d6ecbc299bc13",
+          "snapshot_id": "04e31e451a9c8b7c4cd1abc6",
+          "source_url": "https://www.lhl.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:30.768220Z",
+          "content_sha256": "a5bddc7c24afd1fd7f5d81ec4bdaca88b0768b1bf98a9c6781399798a440ea5a",
+          "locator": {
+            "text_quote": "Org.nr: 940 190 738 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "956241308",
+      "legal_name": "ALFRED BERG KAPITALFORVALTNING AS",
+      "website": "https://www.alfredberg.no",
+      "identity_evidence": [
+        {
+          "id": "c41cfbdf4a31e1b76f316bd3",
+          "snapshot_id": "2975413f4eaf2e7487ec8b86",
+          "source_url": "https://www.alfredberg.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:31.617931Z",
+          "content_sha256": "35606beb0d77b5a87b8ce6ce0fd0fef638a53ef029eb979c4327de6a48702b03",
+          "locator": {
+            "text_quote": "Org.nr: 956241308 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "920881610",
+      "legal_name": "FJÆRKROA AS",
+      "website": "https://www.fjerkroa.no",
+      "identity_evidence": [
+        {
+          "id": "8b5f7be954bccc5e02b340b9",
+          "snapshot_id": "4c8c62c29379dbb7ede7097b",
+          "source_url": "https://www.fjerkroa.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:31.647814Z",
+          "content_sha256": "1130d3a863ceb29f4e596a86253ff4912f466819858974345d9f08ed2afa3ccb",
+          "locator": {
+            "text_quote": "Org.nr 920 881 610 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "935892910",
+      "legal_name": "HALDEN BOLIGBYGGELAG",
+      "website": "https://www.habo.no",
+      "identity_evidence": [
+        {
+          "id": "b1badab724778e7e56e54381",
+          "snapshot_id": "b324a66a90db50055f52c3b4",
+          "source_url": "https://www.habo.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:34.494048Z",
+          "content_sha256": "375937115318f6730b8d4d978022a063e84decd6e2da021ae1b76579d6aaf160",
+          "locator": {
+            "text_quote": "org.nr: 935892910 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "918360042",
+      "legal_name": "KLINIKK DAUB AS",
+      "website": "https://www.klinikkdaub.no",
+      "identity_evidence": [
+        {
+          "id": "6fed3ea97045b8caff7aae93",
+          "snapshot_id": "fc4d62d3f55c5bfa04234911",
+          "source_url": "https://www.klinikkdaub.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:39.626316Z",
+          "content_sha256": "f6205ff6792232dc4ab8fe8717e7983944ea2903a67de77c186be85dec117fa3",
+          "locator": {
+            "text_quote": "Org.nr: 918 360 042 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "927860260",
+      "legal_name": "HVLP SPRAY NORGE AS",
+      "website": "https://fujispray.no",
+      "identity_evidence": [
+        {
+          "id": "b26672b2e80ac7c60305bf6f",
+          "snapshot_id": "1a6f528d93c57ba48125e203",
+          "source_url": "https://fujispray.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:43.686534Z",
+          "content_sha256": "6042878be02652032386bc885d526715a02264ced818505fb74f9d2a1b3ecf63",
+          "locator": {
+            "text_quote": "Org.nr. 927 860 260 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "993887595",
+      "legal_name": "BERG MONTESSORISKOLE",
+      "website": "https://www.bergmontessoriskole.no",
+      "identity_evidence": [
+        {
+          "id": "62960e63642e7520c7fea489",
+          "snapshot_id": "8f50f5f2e9933b2cd3020cf1",
+          "source_url": "https://www.bergmontessoriskole.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:51.029101Z",
+          "content_sha256": "ea3ad97b88f5b927a71f2957c71ead5b3ef7ff9cb5667d3c87e29586e41bf46f",
+          "locator": {
+            "text_quote": "Organisasjonsnr 993887595 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "822087612",
+      "legal_name": "SIBILLA AS",
+      "website": "https://www.sibillatravel.com",
+      "identity_evidence": [
+        {
+          "id": "2e2376fe4c1ce6cfee5777d5",
+          "snapshot_id": "3df987fd6f146d57009f320a",
+          "source_url": "https://www.sibillatravel.com",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:56.360438Z",
+          "content_sha256": "f33b100b2bbbdfeb75ac30466f76d89a0abd9e3f332c5f761cbba99fad1dca25",
+          "locator": {
+            "text_quote": "org.nr 822 087 612 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "960016785",
+      "legal_name": "TIME ELEKTRO AS",
+      "website": "https://www.time-elektro.no",
+      "identity_evidence": [
+        {
+          "id": "f25d1a6cf642e4b9a49e53e6",
+          "snapshot_id": "a4bfbc282896d173a0c96a6b",
+          "source_url": "https://www.time-elektro.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:56.543190Z",
+          "content_sha256": "17bf02f7f79717364b14f60b009fb8fb04c8cfceb4b396ebc9c63b4b71f8fa5a",
+          "locator": {
+            "text_quote": "Org nr: 960016785 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    },
+    {
+      "organisation_number": "970895159",
+      "legal_name": "MOLDE NÆRINGSFORUM",
+      "website": "https://www.moldenf.no",
+      "identity_evidence": [
+        {
+          "id": "af126e10de459beb2443d961",
+          "snapshot_id": "003f19cb1136817b3dc2b202",
+          "source_url": "https://www.moldenf.no",
+          "source_class": "company_owned",
+          "retrieved_at": "2026-10-05T06:23:59.833669Z",
+          "content_sha256": "264d22b12e8e8419dca1218e1f41b49cdaf198e0b797684412861a595338dfce",
+          "locator": {
+            "text_quote": "Org.nr. 970 895 159 "
+          },
+          "reporting_period": null,
+          "extraction_method": "deterministic_v1",
+          "identity_method": "labelled_organisation_number"
+        }
+      ]
+    }
+  ],
+  "excluded_preliminary_matches": [
+    "852345632",
+    "911734044",
+    "925251313",
+    "953177226"
+  ],
+  "unchanged_replay_changes": 0,
+  "refresh_idempotent": true,
+  "official_score": null,
+  "manual_audit_note": "Review preserved exact-number quotes and source URLs; no universal wrong-company rate is claimed."
+}

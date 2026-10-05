@@ -1,0 +1,20 @@
+[project]
+name = "orglens"
+version = "0.1.0"
+description = "Evidence-first Norwegian company research agent"
+requires-python = ">=3.12"
+dependencies = ["beautifulsoup4==4.14.3"]
+
+[project.scripts]
+orglens = "orglens.cli:main"
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+

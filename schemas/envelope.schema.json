@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://orglens.local/envelope.schema.json",
+  "title": "OrgLens terminal company envelope",
+  "type": "object",
+  "required": ["schema_version", "organisation_number", "run", "legal_identity", "claims", "evidence", "availability", "source_snapshots", "refresh", "changes", "errors", "operations", "summary"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "organisation_number": {"type": "string", "pattern": "^[0-9]{9}$"},
+    "run": {"type": "object", "required": ["run_id", "started_at", "completed_at", "terminal_status"], "properties": {"terminal_status": {"const": "completed"}}},
+    "legal_identity": {"type": "object"},
+    "claims": {"type": "array", "items": {"type": "object", "required": ["id", "field", "value", "availability", "evidence_ids", "reporting_period"], "properties": {"availability": {"const": "available"}, "evidence_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}}}}},
+    "evidence": {"type": "array", "items": {"type": "object", "required": ["id", "snapshot_id", "source_url", "source_class", "retrieved_at", "content_sha256", "locator", "extraction_method", "identity_method"], "properties": {"content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}},
+    "availability": {"type": "object", "required": ["legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles"], "additionalProperties": {"enum": ["available", "not_available", "blocked", "not_applicable", "ambiguous", "failed"]}},
+    "source_snapshots": {"type": "array"},
+    "changes": {"type": "array"},
+    "errors": {"type": "array"},
+    "refresh": {"type": "object"},
+    "summary": {"type": "object"},
+    "operations": {"type": "object", "required": ["requests", "runtime_ms", "third_party_cost_usd"], "properties": {"requests": {"type": "integer", "minimum": 0}, "third_party_cost_usd": {"type": "number", "minimum": 0}}}
+  }
+}

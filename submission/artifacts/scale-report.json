@@ -1,0 +1,43 @@
+{
+  "run_id": "scale-20261005",
+  "completed_at": "2026-10-05T06:26:38.441668Z",
+  "companies": 1000,
+  "envelopes": 1000,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1000
+  },
+  "requests": 4330,
+  "bytes": 50999300,
+  "runtime_seconds": 683.485,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 6000,
+    "seconds": 1000
+  },
+  "p50_company_ms": 9215,
+  "p95_company_ms": 18138,
+  "coverage": {
+    "legal_identity": 1000,
+    "financials": 997,
+    "leadership": 998,
+    "locations": 998,
+    "official_website": 14,
+    "description": 12,
+    "jobs": 0,
+    "activity": 1,
+    "owned_profiles": 1
+  },
+  "states": {
+    "available": 4021,
+    "ambiguous": 260,
+    "not_applicable": 0,
+    "blocked": 15,
+    "not_available": 4468,
+    "failed": 236
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null
+}

@@ -1,0 +1,46 @@
+{
+  "run_id": "submission-smoke-20261005",
+  "completed_at": "2026-10-05T06:39:26.002071Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "requests": 427,
+  "bytes": 2441987,
+  "runtime_seconds": 60.906,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 1600,
+    "seconds": 1000
+  },
+  "p50_company_ms": 5093,
+  "p95_company_ms": 11403,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 0,
+    "description": 0,
+    "jobs": 0,
+    "activity": 0,
+    "owned_profiles": 0
+  },
+  "states": {
+    "ambiguous": 25,
+    "failed": 20,
+    "blocked": 5,
+    "not_applicable": 0,
+    "available": 400,
+    "not_available": 450
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "live",
+  "replay_source": null,
+  "discovery": null
+}

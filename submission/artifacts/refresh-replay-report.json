@@ -1,0 +1,45 @@
+{
+  "run_id": "replay-refresh",
+  "completed_at": "2026-10-05T06:33:05.952243Z",
+  "companies": 1000,
+  "envelopes": 1000,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1000
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 80.422,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 1800,
+    "seconds": 1000
+  },
+  "p50_company_ms": 46,
+  "p95_company_ms": 810,
+  "coverage": {
+    "legal_identity": 1000,
+    "financials": 997,
+    "leadership": 998,
+    "locations": 998,
+    "official_website": 10,
+    "description": 8,
+    "jobs": 0,
+    "activity": 1,
+    "owned_profiles": 1
+  },
+  "states": {
+    "not_applicable": 0,
+    "not_available": 4456,
+    "blocked": 15,
+    "available": 4013,
+    "failed": 236,
+    "ambiguous": 280
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "saved_source_replay",
+  "replay_source": "out/scale"
+}

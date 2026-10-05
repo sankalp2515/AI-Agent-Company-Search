@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.bin -text
+submission/artifacts/** -text
+submission/artifact-hashes.json -text

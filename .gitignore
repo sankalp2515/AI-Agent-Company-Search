@@ -12,3 +12,4 @@ dist/
 submission/release.json
 submission/*.zip
 PROJECT-READINESS.md
+.claude/

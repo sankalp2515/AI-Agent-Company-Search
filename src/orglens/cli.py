@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 
 from .core import read_inputs, run_batch, validate, write_rows
+from .navjobs import NavJobs
 from .viewer import render
 
 
@@ -25,8 +26,10 @@ def main():
     run.add_argument("--max-requests", type=int, default=1800)
     run.add_argument("--max-seconds", type=int, default=2400)
     run.add_argument("--workers", type=int, default=12)
-    run.add_argument("--pages", type=int, default=4)
-    run.add_argument("--modules", default="financials,leadership,locations,website")
+    run.add_argument("--pages", type=int, default=5)
+    run.add_argument("--modules", default="financials,leadership,locations,jobs,website")
+    run.add_argument("--nav-days", type=int, default=40, help="Window of NAV job-feed changes indexed for active ads")
+    run.add_argument("--no-guess", action="store_true", help="Disable keyless name-derived website candidates")
     run.add_argument("--registry", help="Evaluator frozen BRREG original-object JSONL or semicolon CSV")
     run.add_argument("--registry-retrieved-at", help="Actual timestamp of supplied registry snapshot")
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
@@ -80,7 +83,7 @@ def main():
         if min(args.max_requests, args.max_seconds, args.workers, args.pages) < 1:
             parser.error("Budgets, workers and pages must be positive")
         modules = tuple(m for m in args.modules.split(",") if m)
-        if set(modules) - {"financials", "leadership", "locations", "website"}:
+        if set(modules) - {"financials", "leadership", "locations", "jobs", "website"}:
             parser.error("Unknown module")
         previous = [json.loads(line) for line in Path(args.previous).read_text(encoding="utf-8").splitlines() if line.strip()] if args.previous else None
         discovery = None
@@ -104,7 +107,8 @@ def main():
         rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
                                  requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
                                  previous=previous, pages=args.pages, modules=modules,
-                                 registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent)
+                                 registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent,
+                                 jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess)
         render(rows, Path(args.output) / "index.html")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         raise SystemExit(0 if report["validation"]["passed"] else 1)

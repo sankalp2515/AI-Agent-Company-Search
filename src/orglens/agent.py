@@ -287,7 +287,7 @@ class ResearchAgent:
                     if type(index) is not int or index < 0 or index >= len(candidates) or index in inspected:
                         raise ValueError("Invalid candidate index")
                     inspected.add(index)
-                    crawl_site(row, {**body, "hjemmeside": candidates[index]}, transport, pages)
+                    crawl_site(row, body, transport, pages, origin="search", url=candidates[index])
                     entry["candidate_url"] = candidates[index]
                     entry["verification_state"] = row["availability"].get("official_website")
             except Exception as exc:

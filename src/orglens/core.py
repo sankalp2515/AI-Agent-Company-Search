@@ -7,6 +7,7 @@ import ipaddress
 import json
 import re
 import socket
+import ssl
 import threading
 import time
 import urllib.error
@@ -16,14 +17,22 @@ import urllib.robotparser
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bs4 import BeautifulSoup
+import warnings
+
+import certifi
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 STATES = {"available", "not_available", "blocked", "not_applicable", "ambiguous", "failed"}
 ENTITY = "https://data.brreg.no/enhetsregisteret/api/enheter/"
-FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles")
+FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles", "contact")
+SITE_FIELDS = ("official_website", "description", "activity", "owned_profiles", "contact")
 ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organisation\s+number|organization\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
 UA = "OrgLens/0.1 (Norwegian company research; public sources only)"
 MAX_BYTES = 4_000_000
+TLS = ssl.create_default_context(cafile=certifi.where())  # pinned CA bundle, identical on every OS
+FAST_HOSTS = {"data.brreg.no", "pam-stilling-feed.nav.no"}
 
 
 def now():
@@ -108,7 +117,7 @@ class Transport:
             lock = self.host_locks.setdefault(host, threading.Lock())
         with lock:
             # Respect public hosts with a modest request-start rate.
-            delay = self.host_times.get(host, 0) + self.host_delays.get(host, 0.1 if host == "data.brreg.no" else 0.35) - time.monotonic()
+            delay = self.host_times.get(host, 0) + self.host_delays.get(host, 0.1 if host in FAST_HOSTS else 0.35) - time.monotonic()
             if delay > 0:
                 if delay >= self.deadline - time.monotonic():
                     raise BudgetExceeded("Host crawl delay exceeds remaining time budget")
@@ -120,9 +129,10 @@ class Transport:
                 self.local.requests = getattr(self.local, "requests", 0) + 1
                 self.host_times[host] = time.monotonic()
 
-    def get(self, url, source_class="official_registry"):
+    def get(self, url, source_class="official_registry", headers=None):
         started = time.monotonic()
         requested = url
+        origin_host = urllib.parse.urlsplit(url).hostname
         chain = []
         try:
             for _ in range(6):
@@ -135,8 +145,10 @@ class Transport:
                     def redirect_request(self, *args, **kwargs):
                         return None
 
-                opener = urllib.request.build_opener(NoRedirect())
-                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json,text/html,text/plain;q=0.8"})
+                opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=TLS))
+                extra = headers if headers and urllib.parse.urlsplit(url).hostname == origin_host else {}
+                # Credentials never follow a redirect to another host.
+                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json,text/html,text/plain;q=0.8", **extra})
                 try:
                     response = opener.open(req, timeout=min(self.timeout, max(0.1, self.deadline - time.monotonic())))
                 except urllib.error.HTTPError as exc:
@@ -241,7 +253,47 @@ def anchor(row, snapshot):
         if key in body:
             row["legal_identity"][field] = body[key]
             claim(row, field, body[key], snapshot, {"json_pointer": "/" + key})
+    official_extras(row, body, snapshot)
     return body
+
+
+def official_extras(row, body, snapshot):
+    """Further registry facts that cost no extra request: purpose, capital, phone, group link and dated events."""
+    purpose = body.get("aktivitet") or body.get("vedtektsfestetFormaal")
+    if purpose:
+        key = "aktivitet" if body.get("aktivitet") else "vedtektsfestetFormaal"
+        claim(row, "registered_activity", " ".join(purpose) if isinstance(purpose, list) else str(purpose), snapshot, {"json_pointer": "/" + key})
+    extra = [code for code in (body.get("naeringskode2"), body.get("naeringskode3")) if code]
+    if extra:
+        claim(row, "secondary_industries", extra, snapshot, {"json_pointer": "/naeringskode2"})
+    for field, key in (("founded_on", "stiftelsesdato"), ("municipality", None), ("in_group", "erIKonsern"), ("parent_organisation_number", "overordnetEnhet")):
+        value = (body.get("forretningsadresse") or {}).get("kommune") if field == "municipality" else body.get(key)
+        if value not in (None, ""):
+            row["legal_identity"][field] = value
+            claim(row, field, value, snapshot, {"json_pointer": "/forretningsadresse/kommune" if field == "municipality" else "/" + key})
+    capital = body.get("kapital")
+    if isinstance(capital, dict) and capital.get("belop") is not None:
+        claim(row, "share_capital", {"amount": capital.get("belop"), "currency": capital.get("valuta"), "type": capital.get("type"), "effective": capital.get("innfortDato")},
+              snapshot, {"json_pointer": "/kapital"}, period={"effective": capital.get("innfortDato")})
+    for kind, key in (("phone", "telefon"), ("mobile", "mobil"), ("email", "epostadresse")):
+        if body.get(key):
+            claim(row, "contact", {"type": kind, "value": body[key], "source": "Enhetsregisteret"}, snapshot, {"json_pointer": "/" + key})
+            row["availability"]["contact"] = "available"
+    events = []
+    for date_key, label in (("registreringsdatoEnhetsregisteret", "Registered in the Central Coordinating Register"), ("registreringsdatoForetaksregisteret", "Registered in the Register of Business Enterprises"),
+                            ("registreringsdatoMerverdiavgiftsregisteret", "Registered for VAT"), ("vedtektsdato", "Articles of association dated"),
+                            ("registreringsdatoAntallAnsatteEnhetsregisteret", "Registered employee count updated")):
+        if body.get(date_key):
+            events.append((str(body[date_key])[:10], label, "/" + date_key))
+    if isinstance(capital, dict) and capital.get("innfortDato"):
+        events.append((str(capital["innfortDato"])[:10], f"Share capital registered as {capital.get('belop')} {capital.get('valuta') or ''}".strip(), "/kapital/innfortDato"))
+    for i, old in enumerate(body.get("historiskeNavn") or []):
+        if old.get("tilDato"):
+            events.append((str(old["tilDato"])[:10], f"Changed name from {old.get('navn')}", f"/historiskeNavn/{i}"))
+    for date, label, pointer in sorted(events, reverse=True)[:8]:
+        claim(row, "activity", {"headline": label, "published_at": date, "kind": "official_registry_event"}, snapshot, {"json_pointer": pointer}, period={"date": date})
+    if events:
+        row["availability"]["activity"] = "available"
 
 
 def nested(body, path):
@@ -252,11 +304,30 @@ def nested(body, path):
     return body
 
 
+def fetch_official(transport, url, attempts=3):
+    """Official endpoints: bounded retries on throttling, server errors and transport failures."""
+    for attempt in range(attempts):
+        snap = transport.get(url)
+        if snap.get("budget_exhausted") or snap.get("status") not in {0, 429, 500, 502, 503, 504} or attempt == attempts - 1:
+            return snap
+        lock = getattr(transport, "lock", None)
+        if lock is None:
+            return snap
+        with lock:
+            # Shared retry allowance: a source-wide outage must not stall the whole batch.
+            left = getattr(transport, "retries_left", max(20, getattr(transport, "limit", 0) // 40))
+            if left <= 0:
+                return snap
+            transport.retries_left = left - 1
+        time.sleep(1.5 * (attempt + 1))
+    return snap
+
+
 def official(row, transport, module):
     org = row["organisation_number"]
     urls = {"financials": f"https://data.brreg.no/regnskapsregisteret/regnskap/{org}",
             "leadership": ENTITY + org + "/roller", "locations": f"https://data.brreg.no/enhetsregisteret/api/underenheter?overordnetEnhet={org}&size=100"}
-    snap = transport.get(urls[module])
+    snap = fetch_official(transport, urls[module])
     attach(row, snap)
     row["availability"][module] = availability(snap)
     if availability(snap) != "available":
@@ -354,126 +425,561 @@ def corroborated_identity(body, text):
                 and any(len(s) >= 5 and " " + s + " " in visible for s in streets))
 
 
-def crawl_site(row, body, transport, page_limit=4):
-    raw_url = body.get("hjemmeside")
-    for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-        row["availability"][field] = "not_available"
-    if not raw_url:
-        return
-    url = raw_url if re.match(r"^https?://", raw_url, re.I) else "https://" + raw_url
+RESTRICTED = {"linkedin.com", "facebook.com", "instagram.com", "indeed.com", "glassdoor.com", "tiktok.com", "x.com", "twitter.com"}
+SOCIAL = {"linkedin.com": "linkedin", "facebook.com": "facebook", "instagram.com": "instagram", "x.com": "x", "twitter.com": "x",
+          "youtube.com": "youtube", "tiktok.com": "tiktok", "pinterest.com": "pinterest", "vimeo.com": "vimeo", "github.com": "github"}
+CONTACT_TERMS = ("kontakt", "contact", "om-oss", "om_oss", "omoss", "about", "personvern", "privacy", "vilkar", "salgsbetingelser", "impressum")
+MORE_TERMS = ("career", "karriere", "jobb", "jobs", "stilling", "ledig", "news", "nyhet", "aktuelt", "blogg", "blog", "presse")
+MVA = r"\bNO[\s-]*((?:\d[\s.]*){9})\s*MVA\b"
+TRUSTED_ORIGINS = {"registry", "nav_employer"}
+
+
+def labelled_numbers(text):
+    found = [re.sub(r"\D", "", m.group(1)) for m in re.finditer(ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)", text, re.I)]
+    found += [re.sub(r"\D", "", m.group(1)) for m in re.finditer(MVA, text, re.I)]
+    return [f for f in found if len(f) == 9]
+
+
+def jsonld_nodes(html):
+    nodes = []
+    for script in BeautifulSoup(html, "html.parser").find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            graph = json.loads(script.string or script.get_text())
+        except (ValueError, TypeError):
+            continue
+        for node in graph if isinstance(graph, list) else [graph]:
+            if isinstance(node, dict):
+                nodes.extend(child for child in node.get("@graph", [node]) if isinstance(child, dict))
+    return nodes
+
+
+def node_types(node):
+    typ = node.get("@type")
+    return typ if isinstance(typ, list) else [typ]
+
+
+def jsonld_org_ids(node):
+    values = []
+    for key in ("taxID", "vatID", "identifier", "leiCode", "duns"):
+        raw = node.get(key)
+        for item in raw if isinstance(raw, list) else [raw]:
+            if isinstance(item, dict):
+                item = item.get("value")
+            if item:
+                values.append(re.sub(r"\D", "", str(item))[-9:] if re.sub(r"\D", "", str(item)) else "")
+    return values
+
+
+def social_profile(url):
     p = urllib.parse.urlsplit(url)
-    restricted = {"linkedin.com", "facebook.com", "instagram.com", "indeed.com", "glassdoor.com", "tiktok.com", "x.com", "twitter.com"}
-    host = (p.hostname or "").lower()
-    if any(host == h or host.endswith("." + h) for h in restricted):
-        for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = "blocked"
-        row["errors"].append({"module": "website", "message": "Restricted platform is not enabled as a collection source"})
-        return
-    base = urllib.parse.urlunsplit((p.scheme, p.netloc, "/", "", ""))
+    host = (p.hostname or "").lower().removeprefix("www.").removeprefix("m.").removeprefix("no.")
+    platform = next((v for k, v in SOCIAL.items() if host == k or host.endswith("." + k)), None)
+    path = p.path.rstrip("/")
+    if not platform or p.scheme not in {"http", "https"} or not path or path.count("/") > 3:
+        return None
+    lowered = path.lower()
+    if any(x in lowered for x in ("sharer", "/share", "intent/", "/plugins", "dialog/", "/hashtag", "/watch", "/p/", "/reel", "/status/", "/posts/", "/events/")):
+        return None
+    if lowered in {"/home", "/login", "/privacy", "/legal", "/policies", "/terms"}:
+        return None
+    return {"platform": platform, "url": urllib.parse.urlunsplit(("https", p.netloc.lower().removeprefix("m."), path, "", ""))}
+
+
+def proof_on_pages(org, legal_name, pages):
+    """Return (snapshot, locator, method) proving the exact entity, or a conflict marker."""
+    from .names import text_contains_name, distinctive, name_tokens
+    found = site_identity_proof(org, pages)
+    if found:
+        return found[0], found[1], "labelled_organisation_number"
+    for i, (snapshot, soup, text) in enumerate(pages):
+        numbers = set(labelled_numbers(text))
+        if numbers == {org}:
+            url = snapshot["source_url"].lower()
+            # Subpages count only when they are the company's own contact/about/terms page about itself.
+            names_here = text_contains_name(text, legal_name) or any(t in translit_text(text) for t in distinctive(name_tokens(legal_name)))
+            if i == 0 or (any(t in url for t in CONTACT_TERMS) and names_here):
+                match = re.search(ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)|" + MVA, text, re.I)
+                return snapshot, {"text_quote": match.group(0) if match else org, "page_role": "home" if i == 0 else "contact_or_about"}, "labelled_organisation_number"
+        for node in jsonld_nodes(snapshot["text"]):
+            if any(t in ("Organization", "LocalBusiness", "Corporation", "Store", "ProfessionalService") for t in node_types(node)) and org in jsonld_org_ids(node):
+                return snapshot, {"jsonld": {k: node.get(k) for k in ("@type", "name", "taxID", "vatID", "identifier")}}, "jsonld_organisation_identifier"
+    return None
+
+
+def translit_text(text):
+    from .names import translit
+    return " ".join(re.findall(r"[a-z0-9]+", translit(text)))
+
+
+def conflicting_number(org, pages):
+    numbers = set()
+    for i, (snapshot, soup, text) in enumerate(pages):
+        visible = [text] if i == 0 else [" ".join(f.stripped_strings) for f in soup.select('footer, [role="contentinfo"]')]
+        for chunk in visible:
+            numbers |= set(labelled_numbers(chunk))
+    return bool(numbers) and org not in numbers
+
+
+def leader_names(row):
+    """Registered natural-person roles; external auditor/accountant firms are excluded."""
+    names = []
+    for c in row["claims"]:
+        if c["field"] == "leadership" and isinstance(c["value"], dict):
+            role = str(c["value"].get("role") or "").lower()
+            name = str(c["value"].get("name") or "")
+            if any(x in role for x in ("revisor", "regnskapsf")) or re.search(r"\b(AS|ASA|ANS|DA|SA)\b", name):
+                continue
+            parts = name.split()
+            if len(parts) >= 2 and len(parts[-1]) >= 3:
+                names.append((parts[0], parts[-1], name))
+    return names
+
+
+def leader_on_pages(row, pages):
+    for first, last, full in leader_names(row):
+        pattern = re.compile(r"\b" + re.escape(first) + r"\b(?:\s+\w+\.?){0,2}\s+" + re.escape(last) + r"\b", re.I)
+        for snapshot, soup, text in pages:
+            match = pattern.search(text)
+            if match:
+                return snapshot, {"text_quote": match.group(0), "corroboration": f"registered role holder {full} named on site"}
+    return None
+
+
+def corroborated(body, pages, row=None, domain_named=False):
+    from .names import text_contains_name
+    legal = body.get("navn", "")
+    if row is not None and domain_named:
+        # Domain carries the legal name and the site names a person registered in the company's official roles.
+        found = leader_on_pages(row, pages)
+        if found:
+            return found[0], found[1], "domain_name_and_registered_role_holder"
+    phone = re.sub(r"\D", "", str(body.get("telefon") or body.get("mobil") or ""))[-8:]
+    address = body.get("forretningsadresse") or {}
+    postcode = str(address.get("postnummer", ""))
+    streets = [translit_text(x) for x in address.get("adresse", []) if not str(x).lower().startswith("c/o")]
+    for snapshot, soup, text in pages:
+        if not (text_contains_name(text, legal) or domain_named):
+            continue
+        digits = re.sub(r"\D", "", text)
+        flat = " " + translit_text(text) + " "
+        if len(phone) == 8 and phone in digits:
+            return snapshot, {"text_quote": legal, "corroboration": "exact legal name + registered phone"}, "legal_name_and_registered_phone"
+        if postcode and " " + postcode + " " in flat and any(len(s) >= 5 and " " + s + " " in flat for s in streets):
+            return snapshot, {"text_quote": legal, "corroboration": "exact legal name + registered street and postcode"}, "legal_name_and_registered_address"
+    return None
+
+
+def site_fail(row, state, message=None):
+    for field in SITE_FIELDS:
+        if row["availability"].get(field) != "available":
+            row["availability"][field] = state
+    if message:
+        row["errors"].append({"module": "website", "message": message})
+
+
+def fetch_robots(row, base, host, transport):
     robot_snap = transport.get(urllib.parse.urljoin(base, "robots.txt"), "company_owned")
     attach(row, robot_snap)
     robot = urllib.robotparser.RobotFileParser()
-    if robot_snap["status"] == 200:
+    code = robot_snap["status"]
+    if code == 200:
         robot.parse(robot_snap["text"].splitlines())
         crawl_delay = robot.crawl_delay(UA) or robot.crawl_delay("*") or 0
         request_rate = robot.request_rate(UA) or robot.request_rate("*")
-        gap = max(.35, crawl_delay, request_rate.seconds / request_rate.requests if request_rate else 0)
+        gap = max(.35, min(10, crawl_delay), request_rate.seconds / request_rate.requests if request_rate else 0)
         with transport.lock:
             transport.host_delays[host] = max(transport.host_delays.get(host, 0), gap)
-    elif robot_snap["status"] in {404, 410}:
+        return robot, None
+    if 400 <= code < 500:
+        # RFC 9309: an unavailable (4xx) robots.txt places no restriction.
         robot.parse([])
-    else:
-        for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = availability(robot_snap)
-        return
+        return robot, None
+    return None, availability(robot_snap)
+
+
+def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
+    """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
+    from .names import is_aggregator, registrable, domain_matches_name, text_contains_name, domain_is_full_name, NO_GUESS_FORMS, national_mismatch
+    raw_url = url or body.get("hjemmeside")
+    for field in SITE_FIELDS:
+        row["availability"].setdefault(field, "not_available")
+    if not raw_url:
+        return False
+    url = raw_url if re.match(r"^https?://", raw_url, re.I) else "https://" + raw_url.strip()
+    p = urllib.parse.urlsplit(url)
+    host = (p.hostname or "").lower()
+    if any(host == h or host.endswith("." + h) for h in RESTRICTED):
+        site_fail(row, "blocked", "Restricted platform is not enabled as a collection source")
+        return False
+    if is_aggregator(url):
+        site_fail(row, "ambiguous", f"Candidate {host} is a directory/platform, not a company-owned site")
+        return False
+    base = urllib.parse.urlunsplit((p.scheme, p.netloc, "/", "", ""))
+    robot, state = fetch_robots(row, base, host, transport)
+    if robot is None:
+        site_fail(row, state)
+        return False
     if not robot.can_fetch(UA, url):
-        for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = "blocked"
-        return
+        site_fail(row, "blocked", f"robots.txt disallows {host}")
+        return False
     home = transport.get(url, "company_owned")
     attach(row, home)
-    row["availability"]["official_website"] = availability(home)
     if availability(home) != "available":
-        for field in ("description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = availability(home)
-        return
-    if urllib.parse.urlsplit(home["source_url"]).hostname != p.hostname:
-        # Do not reuse a different host's robots policy or trust redirected brands.
-        for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = "ambiguous"
-        return
+        if home.get("status") == 0 and origin == "registry" and url.startswith("https://"):
+            # Many registry entries are bare hostnames served only over HTTP.
+            home = transport.get("http://" + url[8:], "company_owned")
+            attach(row, home)
+        if availability(home) != "available":
+            site_fail(row, availability(home))
+            return False
+    final_host = (urllib.parse.urlsplit(home["source_url"]).hostname or "").lower()
+    if registrable(final_host) != registrable(host):
+        # A redirect to another registrable domain is a new, untrusted candidate.
+        if is_aggregator(home["source_url"]):
+            site_fail(row, "ambiguous", f"{host} redirects to a directory/platform")
+            return False
+        origin = "redirect"
     soup, text = soup_text(home["text"])
     pages = [(home, soup, text)]
-    links = []
-    terms = ("kontakt", "contact", "om-oss", "about", "career", "karriere", "jobb", "jobs", "news", "nyhet", "aktuelt")
+    links, extra = [], []
+    feed = soup.find("link", attrs={"type": re.compile("rss|atom", re.I), "href": True})
     for a in soup.find_all("a", href=True):
         target = urllib.parse.urljoin(home["source_url"], a["href"]).split("#")[0]
         target_p = urllib.parse.urlsplit(target)
-        if target_p.hostname == p.hostname and target_p.scheme in {"http", "https"} and any(term in (target + " " + a.get_text()).lower() for term in terms):
-            if target not in links and target != home["source_url"]:
-                links.append(target)
-    links.sort(key=lambda x: 0 if any(t in x.lower() for t in ("kontakt", "contact", "about", "om-oss")) else 1)
-    for target in links[:page_limit - 1]:
-        if not robot.can_fetch(UA, target):
+        if registrable(target_p.hostname) != registrable(final_host) or target_p.scheme not in {"http", "https"} or target == home["source_url"]:
             continue
+        label = (target_p.path + " " + a.get_text(" ")).lower()
+        if any(t in label for t in CONTACT_TERMS) and target not in links:
+            links.append(target)
+        elif any(t in label for t in MORE_TERMS) and target not in extra:
+            extra.append(target)
+    links.sort(key=lambda x: 0 if any(t in x.lower() for t in ("kontakt", "contact")) else 1 if any(t in x.lower() for t in ("om-oss", "about", "omoss")) else 2)
+
+    def fetch(target):
+        if not robot.can_fetch(UA, target):
+            return
         snap = transport.get(target, "company_owned")
         attach(row, snap)
-        if availability(snap) == "available" and urllib.parse.urlsplit(snap["source_url"]).hostname == p.hostname:
+        if availability(snap) == "available" and registrable(urllib.parse.urlsplit(snap["source_url"]).hostname) == registrable(final_host) and "html" in snap.get("content_type", "html"):
             parsed, visible = soup_text(snap["text"])
             pages.append((snap, parsed, visible))
-    proof = site_identity_proof(row["organisation_number"], pages)
-    method = "labelled_organisation_number"
+
+    budget = max(1, page_limit - 1)
+    for target in links[:min(2, budget)]:
+        fetch(target)
+    legal = body.get("navn", "")
+    org = row["organisation_number"]
+    proof = proof_on_pages(org, legal, pages)
+    conflict = conflicting_number(org, pages)
+    form = ((body.get("organisasjonsform") or {}).get("kode") or "").upper()
+    # Housing associations and similar entities usually list a property manager's site and phone:
+    # only an exact organisation-number proof is accepted for them.
+    managed = form in NO_GUESS_FORMS or national_mismatch(home["source_url"], legal)
+    if not proof and not conflict and not managed:
+        proof = corroborated(body, pages, row, domain_is_full_name(home["source_url"], legal) or origin in TRUSTED_ORIGINS)
+    if not proof and not conflict and origin in TRUSTED_ORIGINS and not managed:
+        named = domain_matches_name(home["source_url"], legal) or any(text_contains_name(t, legal) for _, _, t in pages)
+        if named:
+            method = "registry_declared_homepage" if origin == "registry" else "nav_orgnr_verified_employer_homepage"
+            proof = home, {"declared_by": "Enhetsregisteret hjemmeside" if origin == "registry" else "NAV job ad employer.homepage with exact employer orgnr",
+                           "declared_value": raw_url, "name_check": "legal name token present in domain or page"}, method
     if not proof:
-        for field in ("official_website", "description", "jobs", "activity", "owned_profiles"):
-            row["availability"][field] = "ambiguous"
-        row["errors"].append({"module": "website", "message": "No unambiguous labelled organisation number on company pages"})
-        return
-    proof_snap, proof_locator = proof
+        site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
+        return False
+    proof_snap, proof_locator, method = proof
+    for field in SITE_FIELDS:
+        if row["availability"].get(field) != "available":
+            row["availability"][field] = "not_available"
     claim(row, "official_website", home["source_url"], proof_snap, proof_locator, identity_method=method)
     row["availability"]["official_website"] = "available"
-    for snap, parsed, visible in pages:
-        # Additional explicit legal entities make a page ambiguous for company facts.
-        if method == "labelled_organisation_number" and re.search(ORG_LABEL, visible, re.I) and not identity_proof(row["organisation_number"], visible):
+    row.setdefault("website_research", {})["verification"] = {"url": home["source_url"], "method": method, "origin": origin}
+    for target in (links[2:] + extra)[: max(0, budget - min(2, len(links)))]:
+        fetch(target)
+    if feed is not None and robot.can_fetch(UA, urllib.parse.urljoin(home["source_url"], feed["href"])):
+        feed_url = urllib.parse.urljoin(home["source_url"], feed["href"])
+        if registrable(urllib.parse.urlsplit(feed_url).hostname) == registrable(final_host) and "comments" not in feed_url:
+            feed_snap = transport.get(feed_url, "company_owned")
+            attach(row, feed_snap)
+            if availability(feed_snap) == "available":
+                extract_feed(row, feed_snap)
+    extract_site_facts(row, body, pages, method)
+    return True
+
+
+def extract_feed(row, snap):
+    try:
+        soup = BeautifulSoup(snap["text"], "html.parser")
+    except Exception:
+        return
+    count = 0
+    for item in soup.find_all(["item", "entry"]):
+        title = item.find("title")
+        date = item.find(["pubdate", "published", "updated", "dc:date"])
+        link = item.find("link")
+        href = (link.get("href") or link.get_text(strip=True)) if link else None
+        if not (title and date and title.get_text(strip=True)):
             continue
-        meta = parsed.find("meta", attrs={"name": "description"})
-        description = meta.get("content", "").strip() if meta else ""
-        if description and snap is home:
-            claim(row, "description", description, snap, {"css_selector": "meta[name=description]", "attribute": "content"}, identity_method="verified_company_site")
-            row["availability"]["description"] = "available"
-        for script in BeautifulSoup(snap["text"], "html.parser").find_all("script", attrs={"type": "application/ld+json"}):
-            try:
-                graph = json.loads(script.string or script.get_text())
-            except (ValueError, TypeError):
-                continue
-            nodes = graph if isinstance(graph, list) else [graph]
-            nodes = [child for node in nodes if isinstance(node, dict) for child in node.get("@graph", [node])]
-            for node in nodes:
-                typ = node.get("@type")
-                types = typ if isinstance(typ, list) else [typ]
-                if "Organization" in types and str(node.get("taxID", "")).replace(" ", "") == row["organisation_number"]:
-                    same_as = node.get("sameAs", [])
-                    same_as = [same_as] if isinstance(same_as, str) else same_as
-                    for linked in same_as:
-                        if isinstance(linked, str) and urllib.parse.urlsplit(linked).scheme in {"http", "https"}:
-                            claim(row, "owned_profiles", {"url": linked, "relation": "company_declared_sameAs; external content not fetched"},
-                                  snap, {"jsonld": node}, identity_method="exact_taxID_on_verified_company_site")
-                            row["availability"]["owned_profiles"] = "available"
-                if "JobPosting" in types and node.get("title") and node.get("datePosted"):
-                    hiring = node.get("hiringOrganization") or {}
-                    legal_name = str(body.get("navn", "")).casefold()
-                    if not isinstance(hiring, dict) or str(hiring.get("name", "")).casefold() != legal_name:
-                        continue
-                    expires = node.get("validThrough")
-                    if expires and str(expires)[:10] < now()[:10]:
-                        continue
-                    claim(row, "jobs", {"title": node["title"], "date_posted": node["datePosted"], "valid_through": expires,
-                          "url": node.get("url", snap["source_url"])}, snap,
-                          {"jsonld": node}, identity_method="verified_site_and_exact_hiring_name")
-                    row["availability"]["jobs"] = "available"
-                if any(t in types for t in ("NewsArticle", "Article", "BlogPosting")) and node.get("headline") and node.get("datePublished"):
-                    claim(row, "activity", {"headline": node["headline"], "published_at": node["datePublished"], "url": snap["source_url"]}, snap,
-                          {"jsonld": node}, identity_method="verified_company_site")
-                    row["availability"]["activity"] = "available"
+        claim(row, "activity", {"headline": title.get_text(strip=True)[:300], "published_at": date.get_text(strip=True), "url": href or snap["source_url"],
+                                "kind": "company_owned_feed_item"}, snap, {"feed_item": count, "title": title.get_text(strip=True)[:120]}, identity_method="verified_company_site_feed")
+        row["availability"]["activity"] = "available"
+        count += 1
+        if count >= 8:
+            break
+
+
+def extract_site_facts(row, body, pages, method):
+    from .names import core_name
+    org = row["organisation_number"]
+    home, home_soup, _ = pages[0]
+    legal_core = core_name(body.get("navn", ""))
+    socials, emails, phones = {}, {}, {}
+    for snap, parsed, visible in pages:
+        numbers = set(labelled_numbers(visible))
+        if numbers and org not in numbers:
+            continue  # page belongs to another legal entity
+        if snap is home:
+            description = None
+            for selector, attr in (('meta[name="description"]', "content"), ('meta[property="og:description"]', "content")):
+                node = parsed.select_one(selector)
+                if node and len(node.get(attr, "").strip()) >= 20:
+                    description = (node.get(attr).strip(), selector)
+                    break
+            if description:
+                claim(row, "description", description[0][:1000], snap, {"css_selector": description[1], "attribute": "content"}, identity_method="verified_company_site")
+                row["availability"]["description"] = "available"
+            site_name = parsed.select_one('meta[property="og:site_name"]')
+            if site_name and site_name.get("content", "").strip() and len(site_name["content"].strip()) <= 80:
+                claim(row, "public_brand", site_name["content"].strip(), snap, {"css_selector": 'meta[property="og:site_name"]', "attribute": "content"}, identity_method="verified_company_site")
+        for a in parsed.find_all("a", href=True):
+            href = a["href"].strip()
+            if href.lower().startswith("mailto:"):
+                email = urllib.parse.unquote(href[7:].split("?")[0]).strip().lower()
+                if re.fullmatch(r"[\w.+-]+@[\w-]+(\.[\w-]+)+", email):
+                    emails.setdefault(email, snap)
+            elif href.lower().startswith("tel:"):
+                digits = re.sub(r"[^\d+]", "", href[4:])
+                if 8 <= len(digits.lstrip("+")) <= 12:
+                    phones.setdefault(digits, snap)
+            else:
+                profile = social_profile(urllib.parse.urljoin(snap["source_url"], href))
+                if profile:
+                    socials.setdefault(profile["url"].lower(), (profile, snap))
+        for node in jsonld_nodes(snap["text"]):
+            types = node_types(node)
+            if any(t in ("Organization", "LocalBusiness", "Corporation") for t in types):
+                same_as = node.get("sameAs", [])
+                for linked in [same_as] if isinstance(same_as, str) else same_as if isinstance(same_as, list) else []:
+                    profile = social_profile(linked) if isinstance(linked, str) else None
+                    if profile:
+                        socials.setdefault(profile["url"].lower(), (profile, snap))
+                if snap is home and node.get("description") and row["availability"].get("description") != "available" and len(str(node["description"])) >= 20:
+                    claim(row, "description", str(node["description"])[:1000], snap, {"jsonld": "Organization.description"}, identity_method="verified_company_site")
+                    row["availability"]["description"] = "available"
+            if "JobPosting" in types and node.get("title") and node.get("datePosted"):
+                hiring = node.get("hiringOrganization") or {}
+                if not isinstance(hiring, dict) or core_name(hiring.get("name", "")) != legal_core:
+                    continue
+                expires = node.get("validThrough")
+                if expires and str(expires)[:10] < now()[:10]:
+                    continue
+                claim(row, "jobs", {"title": node["title"], "date_posted": node["datePosted"], "valid_through": expires,
+                      "url": node.get("url", snap["source_url"]), "source": "company website JobPosting"}, snap,
+                      {"jsonld": {k: node.get(k) for k in ("title", "datePosted", "validThrough")}}, identity_method="verified_site_and_exact_hiring_name")
+                row["availability"]["jobs"] = "available"
+            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished"):
+                claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": node["datePublished"], "url": node.get("url") or snap["source_url"],
+                      "kind": "company_owned_article"}, snap, {"jsonld": {k: node.get(k) for k in ("headline", "datePublished")}}, identity_method="verified_company_site")
+                row["availability"]["activity"] = "available"
+        url = snap["source_url"].lower()
+        if snap is not home and any(t in url for t in ("news", "nyhet", "aktuelt", "blogg", "blog", "presse")):
+            seen = 0
+            for t in parsed.find_all("time", attrs={"datetime": True}):
+                container = t.find_parent(["article", "li"]) or t.parent
+                heading = container.find(["h1", "h2", "h3", "h4", "a"]) if container else None
+                title = heading.get_text(" ", strip=True) if heading else ""
+                if not re.match(r"\d{4}-\d{2}-\d{2}", t["datetime"]) or len(title) < 8:
+                    continue
+                link = heading.get("href") if heading and heading.name == "a" else (heading.find("a", href=True) or {}).get("href") if heading else None
+                claim(row, "activity", {"headline": title[:300], "published_at": t["datetime"], "url": urllib.parse.urljoin(snap["source_url"], link) if link else snap["source_url"],
+                      "kind": "company_news_page_item"}, snap, {"css_selector": "time[datetime]", "datetime": t["datetime"], "text_quote": title[:120]}, identity_method="verified_company_site")
+                row["availability"]["activity"] = "available"
+                seen += 1
+                if seen >= 6:
+                    break
+    for key, (profile, snap) in list(socials.items())[:10]:
+        claim(row, "owned_profiles", {"platform": profile["platform"], "url": profile["url"], "relation": "linked from verified company website; profile content not fetched"},
+              snap, {"link_href": profile["url"]}, identity_method="outbound_link_on_verified_company_site")
+        row["availability"]["owned_profiles"] = "available"
+    for email, snap in list(emails.items())[:3]:
+        claim(row, "contact", {"type": "email", "value": email}, snap, {"link_href": "mailto:" + email}, identity_method="verified_company_site")
+        row["availability"]["contact"] = "available"
+    for phone, snap in list(phones.items())[:3]:
+        claim(row, "contact", {"type": "phone", "value": phone}, snap, {"link_href": "tel:" + phone}, identity_method="verified_company_site")
+        row["availability"]["contact"] = "available"
+
+
+def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2):
+    """Candidate ladder: registry homepage, NAV-verified employer homepage, previous verified site, name guesses."""
+    from .names import guess_domains, resolves, registrable
+    candidates, seen = [], set()
+
+    def add(url, origin):
+        if not url:
+            return
+        url = url if re.match(r"^https?://", url, re.I) else "https://" + url.strip()
+        key = registrable(urllib.parse.urlsplit(url).hostname)
+        if key and key not in seen:
+            seen.add(key)
+            candidates.append((url, origin))
+
+    add(body.get("hjemmeside"), "registry")
+    for url in extra:
+        add(url, "nav_employer")
+    add(body.get("_previous_website"), "previous")
+    research = row.setdefault("website_research", {"candidates": []})
+    for field in SITE_FIELDS:
+        row["availability"].setdefault(field, "not_available")
+    for url, origin in candidates:
+        research["candidates"].append({"url": url, "origin": origin})
+        if crawl_site(row, body, transport, page_limit, origin=origin, url=url):
+            return True
+    if not guesses:
+        return False
+    fetched = 0
+    for url in guess_domains(body.get("navn", ""), (body.get("organisasjonsform") or {}).get("kode")):
+        if fetched >= max_guess_fetches:
+            break
+        key = registrable(urllib.parse.urlsplit(url).hostname)
+        if key in seen or not resolves(url):
+            continue
+        seen.add(key)
+        fetched += 1
+        research["candidates"].append({"url": url, "origin": "name_guess"})
+        before = dict(row["availability"])
+        if crawl_site(row, body, transport, page_limit, origin="name_guess", url=url):
+            return True
+        # An unverified guess is not evidence about the company; restore prior states.
+        for field in SITE_FIELDS:
+            row["availability"][field] = before.get(field, "not_available")
+        row["errors"] = [e for e in row["errors"] if not (e.get("module") == "website" and key in e.get("message", ""))]
+    return False
+
+
+FAMILY = {"public_brand": "official_website", "registered_activity": "legal_identity", "secondary_industries": "legal_identity", "share_capital": "legal_identity"}
+
+
+def family_of(field):
+    return "financials" if field.startswith("financials.") else field if field in FIELDS else FAMILY.get(field, "legal_identity")
+
+
+def fmt_amount(value):
+    amount = value.get("amount")
+    if not isinstance(amount, (int, float)):
+        return str(amount)
+    sign = "-" if amount < 0 else ""
+    amount = abs(amount)
+    for size, unit in ((1e9, " bn"), (1e6, " m"), (1e3, " k")):
+        if amount >= size:
+            return f"{value.get('currency') or ''} {sign}{amount / size:,.1f}{unit}".strip()
+    return f"{value.get('currency') or ''} {sign}{amount:,.0f}".strip()
+
+
+def synthesize(row):
+    """Deterministic, evidence-cited narrative. Every statement renders only verified claims."""
+    by = {}
+    for c in row["claims"]:
+        by.setdefault(c["field"], []).append(c)
+
+    def first(field):
+        return (by.get(field) or [None])[0]
+
+    statements = []
+
+    def say(text, claims, kind):
+        claims = [c for c in claims if c]
+        if claims:
+            statements.append({"text": text, "kind": kind, "evidence_ids": sorted({e for c in claims for e in c["evidence_ids"]}), "claim_ids": [c["id"] for c in claims]})
+
+    name, form, industry, municipality = first("legal_name"), first("legal_form"), first("industry"), first("municipality")
+    if name:
+        lead = f"{name['value']} is a " + (str(form["value"].get("beskrivelse", form["value"].get("kode"))).lower() if form and isinstance(form["value"], dict) else "Norwegian registered entity")
+        details = []
+        if industry and isinstance(industry["value"], dict):
+            details.append(f"in {str(industry['value'].get('beskrivelse', '')).lower()} (NACE {industry['value'].get('kode')})")
+        if municipality:
+            details.append(f"based in {str(municipality['value']).title()}")
+        founded = first("founded_on") or first("registered_on")
+        if founded:
+            details.append(f"{'founded' if founded['field'] == 'founded_on' else 'registered'} {founded['value']}")
+        say(lead + (" " + ", ".join(details) if details else "") + ".", [name, form, industry, municipality, founded], "identity")
+    description, purpose, brand = first("description"), first("registered_activity"), first("public_brand")
+    if description:
+        say(f"Its verified website describes it as: “{description['value'][:280]}”" + (f" Public brand: {brand['value']}." if brand else ""), [description, brand], "what_it_does")
+    if purpose:
+        say(f"Registered activity: {purpose['value'][:280].rstrip('.')}.", [purpose], "what_it_does")
+    flags = [c for c in (first("bankrupt"), first("liquidating")) if c and c["value"] is True]
+    if flags:
+        say("Warning: the registry flags this entity as " + " and ".join("bankrupt" if c["field"] == "bankrupt" else "under liquidation" for c in flags) + ".", flags, "risk")
+    latest = {}
+    for c in row["claims"]:
+        if c["field"].startswith("financials.") and isinstance(c.get("reporting_period"), dict):
+            end = c["reporting_period"].get("tilDato") or ""
+            key = c["field"].split(".", 1)[1]
+            if key not in latest or end > (latest[key].get("reporting_period") or {}).get("tilDato", ""):
+                latest[key] = c
+    if latest:
+        sample = next(iter(latest.values()))
+        period = sample["reporting_period"]
+        bits = [f"{label} {fmt_amount(latest[key]['value'])}" for key, label in (("revenue", "revenue"), ("operating_result", "operating result"), ("annual_result", "net result"), ("assets", "total assets"), ("equity", "equity")) if key in latest]
+        verdict = ""
+        result = latest.get("annual_result", {}).get("value", {}).get("amount") if "annual_result" in latest else None
+        if isinstance(result, (int, float)):
+            verdict = " The period closed with a " + ("profit." if result > 0 else "loss." if result < 0 else "break-even result.")
+        equity = latest.get("equity", {}).get("value", {}).get("amount") if "equity" in latest else None
+        if isinstance(equity, (int, float)) and equity < 0:
+            verdict += " Reported equity is negative."
+        say(f"Latest filed accounts ({period.get('fraDato')} to {period.get('tilDato')}, {sample['value'].get('account_type') or 'company'} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
+    employees = first("employees")
+    if employees is not None:
+        say(f"Registered employees: {employees['value']}.", [employees], "size")
+    leaders = by.get("leadership", [])
+    if leaders:
+        priority = ("daglig leder", "styrets leder", "innehaver", "kontaktperson", "nestleder", "styremedlem")
+        ranked = sorted(leaders, key=lambda c: next((i for i, p in enumerate(priority) if p in str(c["value"].get("role", "")).lower()), 99))
+        shown = ranked[:4]
+        say("Leadership in the official register: " + "; ".join(f"{c['value'].get('name')} ({c['value'].get('role')})" for c in shown) + (f"; plus {len(leaders) - len(shown)} further roles." if len(leaders) > len(shown) else "."), shown, "leadership")
+    places = by.get("locations", [])
+    if places:
+        cities = sorted({str((c["value"].get("address") or {}).get("poststed") or "").title() for c in places} - {""})
+        say(f"{len(places)} registered workplace{'s' if len(places) != 1 else ''}" + (f" in {', '.join(cities[:6])}" + (" and more" if len(cities) > 6 else "") if cities else "") + ".", places[:6], "footprint")
+    site, profiles = first("official_website"), by.get("owned_profiles", [])
+    if site:
+        method = next((e.get("identity_method") for e in row["evidence"] if e["id"] in site["evidence_ids"]), "verified")
+        say(f"Official website {site['value']} (identity check: {str(method).replace('_', ' ')})" + (f"; company-linked profiles on {', '.join(sorted({c['value'].get('platform') for c in profiles}))}." if profiles else "."), [site] + profiles[:5], "footprint")
+    jobs = by.get("jobs", [])
+    if jobs:
+        titles = "; ".join(str(c["value"].get("title"))[:90] for c in jobs[:3])
+        say(f"Appears to be hiring: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} with an exact employer match ({titles}).", jobs[:3], "hiring")
+    activity = by.get("activity", [])
+    news = sorted([c for c in activity if c["value"].get("kind") != "official_registry_event"], key=lambda c: str(c["value"].get("published_at")), reverse=True)
+    events = sorted([c for c in activity if c["value"].get("kind") == "official_registry_event"], key=lambda c: str(c["value"].get("published_at")), reverse=True)
+    if news:
+        say(f"Latest company-published activity: “{news[0]['value'].get('headline')}” ({str(news[0]['value'].get('published_at'))[:10]}).", news[:1], "activity")
+    if events:
+        say(f"Most recent registry event: {events[0]['value'].get('headline')} ({events[0]['value'].get('published_at')}).", events[:1], "activity")
+    if row.get("changes"):
+        changed = sorted({c["field"] for c in row["changes"]})
+        statements.append({"text": f"Since the previous run, {len(row['changes'])} material change(s) were detected in: {', '.join(changed[:8])}.", "kind": "changes",
+                           "evidence_ids": sorted({e for ch in row["changes"] for c in ch.get("current_claims", []) for e in c["evidence_ids"]}), "claim_ids": []})
+    labels = {"official_website": "verified website", "description": "website description", "jobs": "active job ads", "activity": "dated public activity",
+              "owned_profiles": "company-owned social profiles", "contact": "contact details", "financials": "filed accounts", "leadership": "registered roles", "locations": "registered workplaces"}
+    unknown = [(f, s) for f, s in row["availability"].items() if s != "available" and f in labels]
+    if unknown:
+        statements.append({"text": "Not established from checked sources: " + "; ".join(f"{labels[f]} ({s.replace('_', ' ')})" for f, s in unknown) + ". Missing information is not treated as zero.",
+                           "kind": "unknowns", "evidence_ids": [], "claim_ids": []})
+    return {"text": " ".join(s["text"] for s in statements), "statements": statements,
+            "unknowns": [{"field": k, "state": v} for k, v in row["availability"].items() if v != "available"],
+            "changes": len(row.get("changes", [])), "method": "evidence_bounded_templates_v2"}
 
 
 def finish(row, previous=None):
@@ -490,7 +996,7 @@ def finish(row, previous=None):
         after.setdefault(c["field"], []).append(c)
     retained = []
     for field, old in before.items():
-        family = "financials" if field.startswith("financials.") else field if field in FIELDS else "legal_identity"
+        family = family_of(field)
         if row["availability"].get(family) in {"failed", "blocked", "ambiguous"}:
             retained.extend({**c, "stale": True} for c in old)
             continue
@@ -513,22 +1019,7 @@ def finish(row, previous=None):
                                   "latest_filing_covered": bool(latest_end and expected_year and str(latest_end)[:4] == expected_year)}
     if latest_end and expected_year and str(latest_end)[:4] != expected_year:
         row["errors"].append({"module": "financials", "message": f"Accounts retrieved end {latest_end}; registry indicates filing year {expected_year}. Latest filing values remain unverified."})
-    sentences = []
-    for field in ("legal_name", "industry", "employees", "description"):
-        if field in facts:
-            value = facts[field]["value"]
-            if field == "industry" and isinstance(value, dict):
-                value = value.get("beskrivelse", value.get("kode"))
-            sentences.append({"text": f"{field.replace('_', ' ').capitalize()}: {value}",
-                              "evidence_ids": facts[field]["evidence_ids"]})
-    for field in ("financials.revenue", "financials.annual_result"):
-        financial = [c for c in row["claims"] if c["field"] == field]
-        financial.sort(key=lambda c: json.dumps(c.get("reporting_period"), sort_keys=True), reverse=True)
-        if financial:
-            c = financial[0]
-            sentences.append({"text": f"Latest retrieved {field.split('.')[-1].replace('_', ' ')}: {c['value']['amount']:,} {c['value'].get('currency')}; period {json.dumps(c['reporting_period'], ensure_ascii=False)}; account type {c['value'].get('account_type')}", "evidence_ids": c["evidence_ids"]})
-    row["summary"] = {"statements": sentences, "unknowns": [{"field": k, "state": v} for k, v in row["availability"].items() if v != "available"],
-                      "changes": len(row["changes"]), "method": "evidence_bounded_templates"}
+    row["summary"] = synthesize(row)
     row["field_availability"] = {"employees": "available" if "employees" in facts else "not_available",
                                  "latest_filing_values": "available" if row["financial_freshness"]["latest_filing_covered"] else "not_available"}
     for field, state in row["field_availability"].items():
@@ -566,7 +1057,7 @@ def validate(rows, orgs, snapshots=None):
     return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
 
 
-def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None):
+def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True):
     if agent and replay:
         raise ValueError("AI network research is not allowed in offline replay")
     output = Path(output)
@@ -641,17 +1132,31 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                                       "source_row_key": org, "snapshot_format": source.suffix.lstrip("."), "text": json.dumps(raw)}
                     body = anchor(row, local_snapshot)
                 else:
-                    body = anchor(row, transport.get(ENTITY + org))
+                    body = anchor(row, fetch_official(transport, ENTITY + org))
                 if body:
                     # A previous discovered website is a candidate, never fresh evidence.
                     seed_row = prior.get(org) or replay_seeds.get(org)
-                    if seed_row and not body.get("hjemmeside"):
+                    if seed_row:
                         seed = next((c["value"] for c in seed_row.get("claims", []) if c["field"] == "official_website"), None)
                         if isinstance(seed, str):
-                            body = {**body, "hjemmeside": seed}
+                            body = {**body, "_previous_website": seed}
                     bodies[row["organisation_number"]] = body
             elif module == "website":
-                crawl_site(row, bodies[row["organisation_number"]], transport, pages)
+                body = bodies[row["organisation_number"]]
+                remaining = transport.limit - transport.requests
+                pending = max(1, sum(1 for r in rows if r["organisation_number"] in bodies and "website_research" not in r))
+                # Adaptive depth: never let early companies starve later ones of requests.
+                share = remaining / pending
+                depth = max(2, min(pages, int(share) - 2))
+                research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
+                                 guesses=guesses and share >= 6, max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
+            elif module == "jobs":
+                if jobs_source is None:
+                    row["availability"]["jobs"] = row["availability"].get("jobs", "not_available")
+                else:
+                    if nav_thread is not None:
+                        nav_thread.join()
+                    nav_homepages[row["organisation_number"]] = jobs_source.research(row, bodies[row["organisation_number"]], transport, claim)
             elif module == "agent":
                 agent.research(row, bodies[row["organisation_number"]], transport, pages)
             elif module == "discovery":
@@ -661,7 +1166,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                     candidates = discovery.discover(body, transport)
                     row["operations"]["third_party_cost_usd"] = float(discovery.unit_cost)
                     for candidate in candidates:
-                        crawl_site(row, {**body, "hjemmeside": candidate}, transport, pages)
+                        crawl_site(row, body, transport, pages, origin="search", url=candidate)
                         if row["availability"].get("official_website") == "available":
                             break
                 finally:
@@ -677,24 +1182,36 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         row["operations"]["runtime_ms"] += int((time.monotonic() - began) * 1000)
         row["operations"]["requests"] += getattr(transport.local, "requests", 0) - before_requests
 
+    nav_homepages, nav_thread = {}, None
     # Breadth before depth prevents early entities consuming every request.
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         for module in ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ())):
+            if module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
+                # The shared job index loads once per run, overlapping the official-record phases.
+                official_cost = sum(1 for m in modules if m in {"financials", "leadership", "locations"}) * len(bodies)
+                cap = int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.3)
+                nav_thread = threading.Thread(target=jobs_source.load, args=(transport, cap), daemon=True)
+                nav_thread.start()
             selected = rows if module == "identity" else [r for r in rows if r["organisation_number"] in bodies]
             if module == "discovery":
                 selected = [r for r in selected if r["availability"].get("official_website") != "available"]
             list(pool.map(lambda r: task(r, module), selected))
+            family = {"identity": "legal_identity"}.get(module, module)
+            if family in {"legal_identity", "financials", "leadership", "locations"} and not replay:
+                # Second chance after a cool-down: official endpoints throw transient 5xx bursts under load.
+                again = [r for r in rows if r["availability"].get(family) == "failed"
+                         and (module == "identity" or r["organisation_number"] in bodies)]
+                if again and transport.requests < transport.limit and time.monotonic() < transport.deadline - 60:
+                    time.sleep(8)
+                    with transport.lock:
+                        transport.retries_left = max(getattr(transport, "retries_left", 0), len(again))
+                    list(pool.map(lambda r: task(r, module), again))
             write_rows(output / "checkpoint.jsonl", rows)
     for row in rows:
         finish(row, prior.get(row["organisation_number"]))
         if row.get("agent", {}).get("selected_claim_ids"):
-            chosen = set(row["agent"]["selected_claim_ids"])
-            statements = []
-            for c in row["claims"]:
-                if c["id"] in chosen:
-                    statements.append({"text": f"{c['field']}: {json.dumps(c['value'], ensure_ascii=False)}" + (f"; reporting period: {json.dumps(c['reporting_period'], ensure_ascii=False)}" if c.get("reporting_period") else ""), "evidence_ids": c["evidence_ids"], "claim_id": c["id"]})
-            row["summary"]["statements"] = statements
-            row["summary"]["method"] = "model_selected_verified_claims; deterministic_fact_rendering"
+            # Model choices highlight verified claims; the cited narrative stays deterministic.
+            row["summary"]["model_selected_claim_ids"] = [c["id"] for c in row["claims"] if c["id"] in set(row["agent"]["selected_claim_ids"])]
         # Count all observations including redirects. Fetch failures have run-level accounting.
     write_rows(output / "envelopes.jsonl", rows)
     validation = validate(rows, orgs, output / "snapshots")
@@ -717,6 +1234,12 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         report["cost_estimate"] = estimate_costs(report["agent"], len(orgs))
         report["agent"]["companies_with_model_calls"] = sum(bool(r.get("agent", {}).get("model_calls")) for r in rows)
         report["agent"]["completed_tool_loops"] = sum(r.get("agent", {}).get("status") == "completed" for r in rows)
+    report["jobs_source"] = jobs_source.report() if jobs_source else None
+    report["website_methods"] = {}
+    for r in rows:
+        method = (r.get("website_research") or {}).get("verification", {}).get("method")
+        if method:
+            report["website_methods"][method] = report["website_methods"].get(method, 0) + 1
     report["discovery"] = {"provider": "Brave Web Search", "queries": discovery.calls, "declared_unit_cost": float(discovery.unit_cost),
                            "max_cost_usd": float(discovery.max_cost), "live_verified": False} if discovery else None
     write_json(output / "run-report.json", report)

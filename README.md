@@ -1,10 +1,21 @@
 # OrgLens
 
-Evidence-first research agent for Norwegian companies. Accepts an evaluator-owned batch of organisation numbers, retrieves public official records, verifies company sites, preserves immutable source snapshots, and emits one terminal result per company. Includes a portable responsive evidence viewer with search, comparison and JSON download.
+Evidence-first research agent for Norwegian companies. Give it a batch of organisation numbers. For each company it returns one terminal envelope with:
 
-Requires Python 3.12+ and uv. AI mode requires a configured model key and Tavily key; the deterministic baseline remains available without keys. Local `.env` is loaded without executing its contents, and existing process environment variables take precedence.
+- legal identity
+- filed accounts
+- leadership and workplaces
+- a verified website, company-linked social profiles and contact details
+- active job ads and dated activity
+- refresh changes
 
-## Install from a clean checkout
+Every claim carries a source URL, retrieval time, SHA-256 of the exact response bytes, an evidence locator and an identity method. Unknowns are explicit states (`available`, `not_available`, `blocked`, `not_applicable`, `ambiguous`, `failed`) and are never turned into zero.
+
+The default command needs **no API keys and has $0 external API cost**.
+
+## Install (clean machine)
+
+Requires Python 3.12+ and uv.
 
 ```sh
 python -m pip install uv==0.10.9
@@ -14,82 +25,87 @@ uv sync --frozen
 ## One evaluator command
 
 ```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --ai --workers 2 --max-model-calls 300 --max-search-queries 50 --max-requests 2000 --max-seconds 2700
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700
 ```
 
-Replace the input path with Builderr's supplied batch. JSONL objects with `organisation_number`, JSON arrays or text files with one number per line are accepted. Batch size is inferred; no hardcoded 100-company limit. Adjust explicit budgets to the actual evaluator limits; the current organizer contract does not confirm Unstop's older numerical limits.
+- Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
+- Budgets: `--max-requests` and `--max-seconds` are hard caps shared by every HTTP request. The values above match the published daily limits (2,000 outbound requests, 45 minutes). The agent spreads its remaining budget across the companies still waiting, so a larger batch makes each company's research shallower; the run never drops a company.
+- Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
+- Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
 
-The default request budget is conservative. For a large official batch use the supplied frozen registry snapshot to avoid spending one network request per identity. Original official-object JSONL is supported:
-
-```sh
-uv run --frozen orglens run --input input.jsonl --registry registry.jsonl --registry-retrieved-at 2026-10-05T00:00:00Z --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2400
-```
-
-Use the real snapshot timestamp, never the example date above. Exact snapshot format/budgets require organizer confirmation. When a supplied snapshot lacks a company, live registry identity lookup is used.
-
-## Outputs
+Outputs in `--output`:
 
 - `envelopes.jsonl`: one result per input, in input order.
-- `run-report.json`: completion, coverage states, requests, costs and runtime; not an official score.
-- `snapshots/*.bin`: immutable exact response bytes addressed by SHA-256.
-- `checkpoint.jsonl`: partial per-phase recovery artifact; not a final result.
-- `index.html`: self-contained responsive viewer; open directly in a browser.
-
-Keep the entire output directory. Evidence spans/pointers and content hashes refer to these snapshots. Earlier output directories must also be retained for refresh verification.
+- `run-report.json`: coverage, states, requests, p50/p95 runtime, identity methods and job-feed statistics.
+- `snapshots/`: immutable response bytes, addressed by hash.
+- `index.html`: a self-contained viewer for desktop and mobile. It supports search, filters, comparing two companies and downloading the JSON. Every sentence and fact links to its source.
 
 ```sh
 uv run --frozen orglens validate --input input.jsonl --envelopes out/evaluation/envelopes.jsonl --snapshots out/evaluation/snapshots
-uv run --frozen orglens run --input input.jsonl --output out/refresh --previous out/evaluation/envelopes.jsonl --run-id refresh
 uv run --frozen pytest -q
 ```
 
-## Local sample
+## How the agent researches a company
 
-Download the official universe from https://builderr.ai/signalpost-company-universe-2025.jsonl.gz. The competition package includes the exact smoke-test inputs; the universe download is only for additional testing.
+The agent runs in phases. Each phase covers every company before the next phase starts, so early companies cannot use up the budget.
 
-```sh
-uv run --frozen orglens sample --universe signalpost-company-universe-2025.jsonl.gz --count 100 --seed 20261005 --output data/smoke-input.jsonl
-uv run --frozen orglens run --input data/smoke-input.jsonl --output out/smoke --run-id smoke --max-requests 1600 --max-seconds 1200
-```
+1. **Identity anchor.** Enhetsregisteret, or the frozen snapshot, supplies the legal name, form, industry, address, employees, founding date, registered activity, share capital, phone, group membership and dated registry events. All of this comes from one response.
+2. **Official records.** Regnskapsregisteret supplies the latest filed accounts, keeping period, currency and account type. Roles supply leadership. Subunits supply workplaces.
+3. **Jobs: NAV Job Vacancy Feed.** The official feed of Norway's public job board is indexed once per run, using parallel date segments. Ads whose employer name matches the company or one of its workplaces are fetched. An ad is published only if its employer organisation number equals the company, or belongs to a workplace that Enhetsregisteret lists as the company's subunit.
+4. **Website ladder.** Candidates are tried in order:
+   1. the registry-declared homepage
+   2. the employer homepage from an orgnr-verified NAV ad
+   3. the website verified in the previous run
+   4. name-derived domain hypotheses, checked by DNS first
 
-## Research policy
+   A candidate is published only with an exact identity proof:
+   - a labelled organisation number or the `NO … MVA` VAT format on the homepage, in the footer, or on the company's own contact/about page;
+   - or a JSON-LD organisation identifier;
+   - or the full-name domain or full legal name, together with the registered phone, the registered address, or a person listed in the company's official roles.
 
-Registry organisation numbers anchor legal identity. Website publication requires one unambiguous labelled exact organisation number on the homepage or in a site footer. Name/address coincidences, customer-directory mentions, search snippets and URL similarity never authorize publication. Parent, property-manager and group websites are withheld when exact legal ownership is uncertain.
+   These candidates are always rejected:
+   - directories and platforms
+   - pages showing a conflicting organisation number
+   - property-manager sites for housing associations
+5. **Site facts** come only from verified sites, under robots.txt. They are the description (meta, OpenGraph or JSON-LD), public brand, outbound social profile links, email and phone, JSON-LD job postings, RSS/Atom items, JSON-LD articles, and dated items on news pages.
+6. **Synthesis.** A fixed set of templates builds a cited narrative: what the company does, its latest filed numbers (profit or loss, negative equity), leaders, footprint, hiring, latest activity, changes since the last run and what remains unknown. Every statement lists its evidence IDs. No model writes facts.
 
-Static public HTML and JSON-LD only. Robots denial and inaccessible robots policies stop site research. Redirect destinations are validated; private/local/reserved IPs, credentials in URLs and nonstandard ports are rejected. No LinkedIn, Meta, Indeed or similar platform scraping. Company news is labelled company-owned activity, not independent sentiment.
+Optional `--ai` mode (model-directed search with Tavily) from the earlier version is still available. It needs personal keys and is not part of the evaluator command.
 
-With `--ai`, a real model chooses search, candidate inspection and completion actions from observed state. Groq, NVIDIA, Cloudflare and Cohere are a bounded fallback chain; authentication failures disable a provider, and rate limits trigger independent cooldowns. Mistral is opt-in because live generation returned 429. Model calls and search calls count toward the shared request/time budget. A global attempt cap stops further AI work while retaining complete deterministic baseline results. Therefore a capped large run can contain companies without model calls; the report discloses this.
+## Measured results (live, 16 October 2026)
 
-Models select verified claim fields for the summary; code resolves their evidence and renders facts. Arbitrary model-generated prose and numbers are not published. All facts retain deterministic verification. Jobs require a dated JSON-LD JobPosting, unexpired validity where given, and exact legal hiring-organisation name. Missing jobs are not reported as a zero job count.
+| Run | Companies | Valid | Requests | Runtime | Website | Description | Social | Jobs | Activity | Contact |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 100-company smoke (seed 20261005) | 100 | yes | 736 | 145 s | 10 | 8 | 4 | 0 | 100 | 39 |
+| Live refresh of the same 100 | 100 | yes | 737 | 137 s | 10 | 8 | 4 | 0 | 100 | 39 |
+| 1,000-company scale (seed 20261006) | 1,000 | yes | 6,548 | 22 min | 147 | 92 | 100 | 4 | 999 | 414 |
+| Previous version, same 100 | 100 | yes | 635 | 363 s | 1 | 1 | 0 | 0 | 0 | 0 |
 
-## AI configuration, cost and simulation
+In the 1,000-company run, identity, accounts, roles and workplaces are 1,000 / 998 / 999 / 1,000. The 147 websites were verified by:
 
-Copy `.env.example` to a local `.env` and populate credentials without committing them. Supported aliases include the existing `NVDIA_API_KEY`, `Cloudflare_API_KEY` and `AccountID`. `--providers` sets the fallback order. The default models were verified live; model IDs may be overridden with `GROQ_MODEL`, `NVIDIA_MODEL`, `CLOUDFLARE_MODEL`, `COHERE_MODEL`, or `MISTRAL_MODEL`. Overrides require separate model/terms verification before submission. No paid-account upgrade is performed. The application cannot prevent a provider charging an already-paid account: disable paid overage in account dashboards.
+- labelled organisation number: 41
+- registered role holder named on a full-name domain: 55
+- legal name plus registered phone: 25
+- legal name plus registered address: 14
+- registry declaration: 9
+- JSON-LD identifier: 2
+- NAV employer homepage: 1
 
-Tavily basic search is enabled only in AI mode, using `TAVILY_API_KEY`. It does not publish snippets or provider-generated answers. SerpAPI is not integrated. The cost report separates measured usage, conditional free-allowance cost, partial retail estimates and unverified invoice cost. Never claim a complete paid-price estimate when a provider's tariff is unknown.
+- **Refresh:** 0 changes against the previous run, so the false-change rate is 0.
+- **Smoke-test websites:** all 10 published websites were reviewed by hand. One property-manager match found during development was removed, and that case is now a regression test.
+- **NAV jobs on a hiring sample:** across 40 universe companies whose name appears among active NAV employers, 36 received exact-orgnr-verified job ads. Only about 1–2 % of random companies advertise on NAV, which is why the random smoke batch shows 0.
+- **Financials, leadership and locations:** every company is covered from official records.
+- Release artifacts are in `submission/release/`: the smoke, refresh and scale runs, each with a viewer and run report, plus test results and SHA-256 hashes.
 
-```sh
-uv run --frozen orglens simulate --input input.jsonl --envelopes out/evaluation/envelopes.jsonl --snapshots out/evaluation/snapshots --report out/evaluation/run-report.json --output out/simulation.json
-```
+These are operational measurements, not Builderr's score: the official checked collection is not available locally.
 
-This simulator checks batch membership, evidence references/hashes and declared budgets. It is NOT Builderr's evaluator. Optional `--reference reviewed-reference.json` supplies independently reviewed claims, local field-family weights, per-publication correctness/evidence/company reviews and manual synthesis/UX scores. Without those labels, it intentionally reports no score. See `SIMULATOR.md`. Clean install and regression tests do not establish semantic accuracy or qualification.
+## Repository map
 
-## Submission
+- `src/orglens/core.py`: transport, identity anchor, official records, website ladder, site extraction, synthesis, refresh and validation.
+- `src/orglens/navjobs.py`: the NAV job-feed connector.
+- `src/orglens/names.py`: name normalisation, domain hypotheses and the directory blocklist.
+- `src/orglens/viewer.py`: the portable viewer.
+- `tests/`: 49 regression tests covering wrong-company gates, missing-vs-zero, evidence integrity, refresh, URL safety and viewer injection safety.
+- `scripts/package_release.py`: validates runs and packages `submission/release/` with only evidence-referenced snapshots.
 
-See [SUBMISSION.md](SUBMISSION.md), [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md), [EVALUATION.md](EVALUATION.md), and [LIMITATIONS.md](LIMITATIONS.md). Outputs are operational test artifacts, not qualification evidence. Final repository URL and participant contact details must be filled before sending. No automatic submission or email is performed.
-
-## Optional discovery and reproducible replay
-
-An opt-in Brave Search adapter is included to find candidate sites when registry links are missing or invalid. It is disabled by default and has not been live-tested because no key was supplied. Set `BRAVE_API_KEY` securely, confirm your plan permits this use, and explicitly provide the real unit price and spending cap:
-
-```sh
-uv run --frozen orglens run --input input.jsonl --output out/discovery --discover-brave --search-cost-per-request YOUR_PLAN_UNIT_PRICE --max-api-cost YOUR_APPROVED_CAP
-```
-
-Replace price/cap placeholders with numbers. There is no default price assumption. Provider results remain in memory; only independently fetched company pages become evidence. Search calls consume the same outbound-request budget, credentials are sent only to the fixed HTTPS API endpoint, and redirects are disabled for the authenticated request. Contract tests cover filtering and cost caps; live provider performance is unverified.
-
-Replay does not contact sources or claim freshness. It preserves the original retrieval times:
-
-```sh
-uv run --frozen orglens run --input input.jsonl --output out/replay --replay out/evaluation --run-id replay
-```
+See [SUBMISSION.md](SUBMISSION.md), [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) and [LIMITATIONS.md](LIMITATIONS.md).

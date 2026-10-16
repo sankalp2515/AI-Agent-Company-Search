@@ -79,7 +79,7 @@ def test_agent_model_selects_search_inspect_finish(monkeypatch):
         def search(self, query, transport):
             assert '"123456789"' in query and '"Company AS"' in query
             return ["https://example.no/"]
-    def crawl(row, body, transport, pages):
+    def crawl(row, body, transport, pages, **kwargs):
         row["availability"]["official_website"] = "ambiguous"
     monkeypatch.setattr("orglens.core.crawl_site", crawl)
     row = envelope("123456789", "test")

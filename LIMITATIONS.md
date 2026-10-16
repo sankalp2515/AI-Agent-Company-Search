@@ -1,3 +1,12 @@
+# Known limitations (v2, 16 October 2026)
+
+- Builderr's checked collection is hidden, so recall is measured only against our own runs. On a random 100-company batch, 10 websites were verified; most small Norwegian companies have no discoverable static website.
+- Websites are found from the registry, from NAV employer homepages, from the previous run, and from name-derived domains. Sites whose brand differs from the legal name are found only when the registry or NAV declares them. No search API is used in the default command.
+- Sites that show no organisation number, phone, address or registered role holder are left `ambiguous` or `not_available` rather than risk a wrong-company match.
+- NAV jobs: the employer-name prefilter misses ads posted under a brand name that matches neither the company nor any registered workplace. Ads on finn.no are not in NAV's feed. The feed index covers changes from the last 40 days.
+- Static HTML only. JavaScript-rendered content, PDFs and social platform pages are not fetched.
+- "Dated activity" includes official registry events (kind `official_registry_event`), kept separate from company-published items. They are never presented as news or sentiment.
+
 # Measured and known limitations
 
 This is a reproducible research submission candidate, not a claim of winning or official qualification. Builderr's hidden checked collection is unavailable locally. There is no honest local number for competition recall without independent labels.

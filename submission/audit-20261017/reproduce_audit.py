@@ -59,4 +59,3 @@ def adversarial():
 result={'saved_smoke':inspect(ROOT/'submission/release/smoke'),'saved_refresh':inspect(ROOT/'submission/release/refresh'),'adversarial':adversarial()}
 (OUT/'claim-audit.json').write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding='utf-8')
 print(json.dumps({k:{a:b for a,b in v.items() if a not in ('checks','websites','field_counts')} for k,v in result.items()},indent=2))
-

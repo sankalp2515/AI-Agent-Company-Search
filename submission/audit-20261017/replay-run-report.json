@@ -1,0 +1,55 @@
+{
+  "run_id": "audit-replay",
+  "completed_at": "2026-10-16T22:19:01.061319Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 21.601,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 1800,
+    "seconds": 2400
+  },
+  "p50_company_ms": 79,
+  "p95_company_ms": 4044,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 8,
+    "description": 6,
+    "jobs": 0,
+    "activity": 100,
+    "owned_profiles": 2,
+    "contact": 38
+  },
+  "states": {
+    "ambiguous": 3,
+    "not_applicable": 0,
+    "available": 554,
+    "blocked": 3,
+    "failed": 13,
+    "not_available": 427
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "saved_source_replay",
+  "replay_source": "submission/release/smoke",
+  "agent": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 3,
+    "legal_name_and_registered_phone": 1,
+    "registry_declared_homepage": 2,
+    "domain_name_and_registered_role_holder": 2
+  },
+  "discovery": null
+}

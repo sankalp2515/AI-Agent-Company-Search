@@ -1,5 +1,7 @@
 # Known limitations (v2, 16 October 2026)
 
+> Update, 17 October: see the [independent audit](docs/SUBMISSION-AUDIT-2026-10-17.md). Identity fallback, conflicting JSON-LD, mixed-source refresh and date sorting have reproduced defects. Older sections below describe historical versions and must not be treated as current qualification evidence.
+
 - Builderr's checked collection is hidden, so recall is measured only against our own runs. On a random 100-company batch, 10 websites were verified; most small Norwegian companies have no discoverable static website.
 - Websites are found from the registry, from NAV employer homepages, from the previous run, and from name-derived domains. Sites whose brand differs from the legal name are found only when the registry or NAV declares them. No search API is used in the default command.
 - Sites that show no organisation number, phone, address or registered role holder are left `ambiguous` or `not_available` rather than risk a wrong-company match.

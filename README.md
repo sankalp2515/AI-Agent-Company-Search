@@ -1,4 +1,18 @@
+<div align="center">
+
 # OrgLens
+
+**Evidence-first company research for Norway. Every input gets a result. Every published fact has a source.**
+
+[![Checks](https://github.com/sankalp2515/AI-Agent-Company-Search/actions/workflows/check.yml/badge.svg)](https://github.com/sankalp2515/AI-Agent-Company-Search/actions/workflows/check.yml)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue)](pyproject.toml)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+[Quick start](#install-clean-machine) · [Evidence viewer](#evidence-viewer) · [Architecture](docs/ARCHITECTURE.md) · [Independent audit](docs/SUBMISSION-AUDIT-2026-10-17.md) · [Submission](SUBMISSION.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+> **Submission status, 17 October 2026: FIX BEFORE SUBMISSION.** A fresh 100-company test completes, but adversarial tests expose exact-company matching and refresh defects. See the [audit and prioritized fixes](docs/SUBMISSION-AUDIT-2026-10-17.md). Passing CI and smoke tests do not establish qualification.
 
 Evidence-first research agent for Norwegian companies. Give it a batch of organisation numbers. For each company it returns one terminal envelope with:
 
@@ -29,7 +43,7 @@ uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id
 ```
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
-- Budgets: `--max-requests` and `--max-seconds` are hard caps shared by every HTTP request. The values above match the published daily limits (2,000 outbound requests, 45 minutes). The agent spreads its remaining budget across the companies still waiting, so a larger batch makes each company's research shallower; the run never drops a company.
+- Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are conservative historical test settings, **not confirmed current official limits**. Builderr supplies the official budget. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
 - Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
 
@@ -72,6 +86,33 @@ The agent runs in phases. Each phase covers every company before the next phase 
 
 Optional `--ai` mode (model-directed search with Tavily) from the earlier version is still available. It needs personal keys and is not part of the evaluator command.
 
+The identity rules above describe the intended behavior. The audit reproduced weaker registry/name and JSON-LD paths in the current implementation; they must be corrected before claiming reliable exact-entity attribution.
+
+## Evidence viewer
+
+Every completed run writes `index.html` next to its JSONL results. Open that local file in a browser. The repository includes a [100-company example](submission/release/smoke/index.html); GitHub displays its source, so download it to use the viewer.
+
+- Search companies by name, organisation number, city or industry.
+- Filter for verified websites, hiring, linked profiles and changes.
+- Select two companies and compare their profiles.
+- Follow cited sources and inspect retrieval dates, evidence locators and hashes.
+- Inspect explicit unknown states, stale facts and reported changes; export JSONL.
+
+The viewer contains responsive CSS and needs no server, JavaScript framework, CDN or API key. Desktop/mobile interactions have **not** been verified in the 17 October audit because the browser automation connection failed. A UI exists; full UX points are not established.
+
+## Fresh verification (17 October 2026)
+
+| Check | Observed result |
+|---|---|
+| Fresh random batch, seed 20261017 | 100 inputs / 100 valid terminal envelopes |
+| Runtime / HTTP requests / external API charge | 139.984 seconds / 673 / $0 |
+| Websites / descriptions / companies with jobs | 6 / 4 / 1 |
+| Companies with company-published activity / linked social profiles | 2 / 5 |
+| Legal-name and financial claims checked against source bytes | 1,408 correct of 1,408 checked; 3,669 total claims |
+| Regression tests | 49 passed locally, in a clean checkout, and in Linux CI |
+
+The checked claims cover 38.4% of this run's claims and do not establish the correctness of unreviewed external facts. [Audit evidence](submission/audit-20261017/) includes the run report, claim checks and reproducible adversarial cases. No official score is claimed.
+
 ## Measured results (live, 16 October 2026)
 
 | Run | Companies | Valid | Requests | Runtime | Website | Description | Social | Jobs | Activity | Contact |
@@ -94,7 +135,7 @@ In the 1,000-company run, identity, accounts, roles and workplaces are 1,000 / 9
 - **Refresh:** 0 changes against the previous run, so the false-change rate is 0.
 - **Smoke-test websites:** all 10 published websites were reviewed by hand. One property-manager match found during development was removed, and that case is now a regression test.
 - **NAV jobs on a hiring sample:** across 40 universe companies whose name appears among active NAV employers, 36 received exact-orgnr-verified job ads. Only about 1–2 % of random companies advertise on NAV, which is why the random smoke batch shows 0.
-- **Financials, leadership and locations:** every company is covered from official records.
+- **Financials, leadership and locations:** the smoke batch has an available state for each; the scale batch has 998 / 999 / 1,000 respectively. An available state can represent an empty successful endpoint response and is not fact-level recall.
 - Release artifacts are in `submission/release/`: the smoke, refresh and scale runs, each with a viewer and run report, plus test results and SHA-256 hashes.
 
 These are operational measurements, not Builderr's score: the official checked collection is not available locally.
@@ -109,3 +150,20 @@ These are operational measurements, not Builderr's score: the official checked c
 - `scripts/package_release.py`: validates runs and packages `submission/release/` with only evidence-referenced snapshots.
 
 See [SUBMISSION.md](SUBMISSION.md), [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) and [LIMITATIONS.md](LIMITATIONS.md).
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [Current audit](docs/SUBMISSION-AUDIT-2026-10-17.md) | Readiness verdict, measured evidence, defects and next steps |
+| [Architecture](docs/ARCHITECTURE.md) | Active command path, storage and optional AI mode |
+| [Submission checklist](SUBMISSION.md) | Candidate commit, command, costs, contact and unsent email |
+| [Source rights](SOURCE-RIGHTS.md) | Source access, licences, caches and provider disclosure |
+| [Security](SECURITY.md) | URL controls, credentials and known security boundaries |
+| [Data schema](DATA_SCHEMA.md) | Envelope and evidence model |
+| [Limitations](LIMITATIONS.md) | Coverage and operational limitations |
+| [Changelog](CHANGELOG.md) | Implementation and audit milestones |
+
+Earlier build reports and `submission/artifacts` / `submission/ai-artifacts` describe historical versions. The default candidate is the deterministic v2 implementation; optional model-assisted runs are separate evidence.
+
+MIT-licensed application code. Third-party data and snapshots retain their original rights. Maintainer: Sankalp Wanjari, wanjarisankalp@gmail.com.

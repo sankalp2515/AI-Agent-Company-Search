@@ -1,0 +1,31 @@
+{
+  "review_date_local": "2026-10-17",
+  "timezone": "Asia/Calcutta",
+  "code_commit": "a6cc772f9d367e3115af97374ab72e22180f3208",
+  "sources": [
+    {
+      "url": "https://www.builderr.ai/docs/signalpost-evaluation-harness.md",
+      "sha256": "e9f994e2fa34750411487e9fab82dbffd55dc1bb16efe9021906b92896229d45"
+    },
+    {
+      "url": "https://www.builderr.ai/starter-briefs/signalpost-sources.md",
+      "sha256": "f080470ab29d5c6da243d812e35d0ae0aa3d35f5871d62dfef90422df1b8f630"
+    },
+    {
+      "url": "https://www.builderr.ai/starter-briefs/signalpost.md",
+      "sha256": "924ff60e1dab437c63806846aa19eaa29d84d8e87132983c4e5d9f7336214c32"
+    },
+    {
+      "url": "https://www.builderr.ai/signalpost-starter-kit.tar.gz",
+      "sha256": "d48da9910ea7de07d2bf51ab265539a35fe07002a6c1ca5787df81316dfabbf6"
+    }
+  ],
+  "verified_tests": {
+    "local": 49,
+    "clean_checkout": 49,
+    "clean_python": "3.14.3",
+    "linux_ci": "https://github.com/sankalp2515/AI-Agent-Company-Search/actions/runs/38974662125"
+  },
+  "official_score": null,
+  "submission_sent": false
+}

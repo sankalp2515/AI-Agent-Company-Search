@@ -1,5 +1,7 @@
 # Security
 
+See the [17 October embedded-key incident and remediation](docs/SECURITY-INCIDENT-2026-10-17.md). Raw third-party snapshots are no longer publishable repository artifacts; use the tracked-file guard before pushing. Historical reports referring to public snapshot directories predate this cleanup.
+
 Report a suspected vulnerability privately to **wanjarisankalp@gmail.com**. Include the affected commit, reproduction and likely impact. Do not put credentials or private data in public issues.
 
 ## Existing controls

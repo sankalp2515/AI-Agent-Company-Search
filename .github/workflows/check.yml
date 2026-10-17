@@ -9,5 +9,9 @@ jobs:
         with:
           version: "0.10.9"
       - run: uv sync --frozen
+      - name: Check publishable files for credentials and raw snapshots
+        run: |
+          git ls-files -z > /tmp/orglens-tracked-files
+          uv run --frozen python scripts/check_secrets.py --file-list /tmp/orglens-tracked-files
       - run: uv run --frozen pytest -q
       - run: uv run --frozen orglens --help

@@ -13,3 +13,5 @@ submission/release.json
 submission/*.zip
 PROJECT-READINESS.md
 .claude/
+# Exact third-party response bytes can contain embedded credentials. Keep local only.
+submission/**/snapshots/

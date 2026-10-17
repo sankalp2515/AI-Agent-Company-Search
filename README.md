@@ -12,7 +12,7 @@
 
 </div>
 
-> **Submission status, 17 October 2026: FIX BEFORE SUBMISSION.** A fresh 100-company test completes, but adversarial tests expose exact-company matching and refresh defects. See the [audit and prioritized fixes](docs/SUBMISSION-AUDIT-2026-10-17.md). Passing CI and smoke tests do not establish qualification.
+> **Submission status, 17 October 2026: ready to submit version 1.** The audit's identity, refresh, NAV, reliability and viewer fixes are complete and tested. See the [readiness verdict](docs/READINESS-2026-10-17.md). No official score is claimed.
 
 Evidence-first research agent for Norwegian companies. Give it a batch of organisation numbers. For each company it returns one terminal envelope with:
 
@@ -75,18 +75,23 @@ The agent runs in phases. Each phase covers every company before the next phase 
    A candidate is published only with an exact identity proof:
    - a labelled organisation number or the `NO … MVA` VAT format on the homepage, in the footer, or on the company's own contact/about page;
    - or a JSON-LD organisation identifier;
-   - or the full-name domain or full legal name, together with the registered phone, the registered address, or a person listed in the company's official roles.
+   - or the full legal name on the page together with the registered phone or the registered street and postcode;
+   - or a domain that spells the complete legal name, on which the registered daglig leder or owner is named alongside the company name;
+   - or the company's own Enhetsregisteret homepage declaration, when the domain carries the company name and the page shows the full core name.
 
    These candidates are always rejected:
    - directories and platforms
-   - pages showing a conflicting organisation number
+   - pages showing a conflicting organisation number (in text, footer or JSON-LD)
+   - partial-name domains supported only by a shared board member
+   - a declared parent or group domain that does not carry the company's own name
+   - "… Norway/Norge AS" entities on non-`.no` domains, unless an exact organisation number is shown
    - property-manager sites for housing associations
 5. **Site facts** come only from verified sites, under robots.txt. They are the description (meta, OpenGraph or JSON-LD), public brand, outbound social profile links, email and phone, JSON-LD job postings, RSS/Atom items, JSON-LD articles, and dated items on news pages.
 6. **Synthesis.** A fixed set of templates builds a cited narrative: what the company does, its latest filed numbers (profit or loss, negative equity), leaders, footprint, hiring, latest activity, changes since the last run and what remains unknown. Every statement lists its evidence IDs. No model writes facts.
 
 Optional `--ai` mode (model-directed search with Tavily) from the earlier version is still available. It needs personal keys and is not part of the evaluator command.
 
-The identity rules above describe the intended behavior. The audit reproduced weaker registry/name and JSON-LD paths in the current implementation; they must be corrected before claiming reliable exact-entity attribution.
+The audit's identity findings are fixed and covered by regression tests: JSON-LD identifiers must be exact 9-digit organisation numbers, conflicting identifiers veto publication, and phone matches are bounded tokens.
 
 ## Evidence viewer
 
@@ -98,9 +103,35 @@ Every completed run writes `index.html` next to its JSONL results. Open that loc
 - Follow cited sources and inspect retrieval dates, evidence locators and hashes.
 - Inspect explicit unknown states, stale facts and reported changes; export JSONL.
 
-The viewer contains responsive CSS and needs no server, JavaScript framework, CDN or API key. Desktop/mobile interactions have **not** been verified in the 17 October audit because the browser automation connection failed. A UI exists; full UX points are not established.
+The viewer needs no server, JavaScript framework, CDN or API key. On 17 October it was verified in a real browser:
 
-## Fresh verification (17 October 2026)
+- Search, filter, empty state and comparison all behave correctly.
+- Search keeps the profile in sync with the list.
+- No company is ever truncated from the list.
+- Stale facts are labelled "Not re-verified" and cite their previous sources.
+
+| Viewport | Layout | Horizontal overflow | Smallest control |
+|---|---|---|---|
+| Phone, 375 px | single column | none | 44.8 px |
+| Narrow pane, 490 px | single column | none | n/a |
+| Desktop, 1280 px | two columns (320 px list, profile) plus side-by-side comparison | none | n/a |
+
+## Verification of the current code (17 October 2026, v3)
+
+| Run (local, not official) | Companies | Valid | Requests / caps | Runtime | Websites | Descriptions | Social | Jobs | Contact |
+|---|---|---|---|---|---|---|---|---|---|
+| Smoke, seed 20261005 | 100 | yes | 1,510 / 2,000 | 253 s | 8 | 7 | 3 | 0 | 39 |
+| Live refresh of the same 100 | 100 | yes | 1,515 / 2,000 | 227 s | 8 | 7 | 3 | 0 | 39 |
+| Scale, seed 20261018 | 1,100 | yes | 15,451 / 20,000 | 1,976 s | 115 | 67 | 70 | 5 | 425 |
+| Stress: same 1,100 at a tight budget | 1,100 | yes | 2,000 / 2,000 | 238 s | 0 | 0 | 0 | 0 | 381 |
+
+- **Refresh:** 0 changes and 0 false stale facts.
+- **Stress run:** the budget is spent on identity and accounts; every other family is honestly reported as `failed`, and no company is dropped.
+- **Tests:** 80 pass.
+- **Secret guard:** no findings.
+- **Artifacts:** in `submission/release/`. The scale envelopes are gzipped; raw snapshots stay local.
+
+## Earlier audit verification (17 October 2026, before fixes)
 
 | Check | Observed result |
 |---|---|
@@ -113,7 +144,7 @@ The viewer contains responsive CSS and needs no server, JavaScript framework, CD
 
 The checked claims cover 38.4% of this run's claims and do not establish the correctness of unreviewed external facts. [Audit evidence](submission/audit-20261017/) includes the run report, claim checks and reproducible adversarial cases. No official score is claimed.
 
-## Measured results (live, 16 October 2026)
+## Earlier results (16 October 2026, superseded v2 code)
 
 | Run | Companies | Valid | Requests | Runtime | Website | Description | Social | Jobs | Activity | Contact |
 |---|---|---|---|---|---|---|---|---|---|---|

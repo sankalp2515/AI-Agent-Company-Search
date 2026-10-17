@@ -41,11 +41,11 @@ def test_property_manager_number_is_a_conflict():
     assert conflicting_number("123456789", [page("<footer>OBOS Org.nr 987654321</footer>")])
 
 
-def test_registered_leader_corroborates_only_with_name_bearing_domain():
+def test_registered_leader_alone_cannot_corroborate_a_name_bearing_domain():
     row = envelope("123456789", "t")
     claim(row, "leadership", {"name": "Kari Nordmann", "role": "Daglig leder"}, snap(), {"json_pointer": "/x"})
     pages = [page("<p>Kontakt: Kari Nordmann, daglig leder</p>")]
-    assert corroborated({"navn": "Example AS"}, pages, row, domain_named=True)[2] == "domain_name_and_registered_role_holder"
+    assert corroborated({"navn": "Example AS"}, pages, row, domain_named=True) is None
     assert corroborated({"navn": "Example AS"}, pages, row, domain_named=False) is None
 
 

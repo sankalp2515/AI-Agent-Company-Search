@@ -1,0 +1,62 @@
+{
+  "run_id": "local-v3-stress1100-2000req",
+  "completed_at": "2026-10-17T08:47:45.199020Z",
+  "companies": 1100,
+  "envelopes": 1100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1100
+  },
+  "requests": 2000,
+  "bytes": 5782248,
+  "runtime_seconds": 237.609,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 2000,
+    "seconds": 2700
+  },
+  "p50_company_ms": 3218,
+  "p95_company_ms": 3422,
+  "coverage": {
+    "legal_identity": 1100,
+    "financials": 895,
+    "leadership": 0,
+    "locations": 0,
+    "official_website": 0,
+    "description": 0,
+    "jobs": 0,
+    "activity": 1099,
+    "owned_profiles": 0,
+    "contact": 381
+  },
+  "states": {
+    "available": 3475,
+    "blocked": 0,
+    "failed": 3850,
+    "ambiguous": 3,
+    "not_applicable": 0,
+    "not_available": 3672
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "jobs_source": {
+    "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
+    "state": "not_loaded",
+    "window_days": 40,
+    "feed_pages": 0,
+    "detail_requests": 0,
+    "completed_segments": 0,
+    "total_segments": 6,
+    "error": "Request budget too small for the NAV feed index",
+    "indexed_active_employers": 0,
+    "indexed_active_ads": 0,
+    "token": "NAV published public token"
+  },
+  "website_methods": {},
+  "discovery": null
+}

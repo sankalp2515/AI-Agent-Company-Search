@@ -19,6 +19,7 @@ from email.utils import format_datetime
 from .names import translit, LEGAL_FORMS
 
 BASE = "https://pam-stilling-feed.nav.no"
+GENERIC_EMPLOYER_WORDS = {"norge", "norway", "norsk", "service", "services", "holding", "group", "gruppen", "invest", "kommune"}
 
 
 def norm_employer(name):
@@ -34,11 +35,15 @@ class NavJobs:
         self.max_ads = max_ads_per_company
         self.token = None
         self.index = {}  # normalized business name -> {uuid: feed item}
+        self.org_index = {}
+        self.word_index = {}
+        self.compact_index = {}
         self.pages = 0
         self.state = "not_loaded"
         self.error = None
         self.lock = threading.Lock()
         self.details = 0
+        self.complete_segments = 0
 
     def headers(self):
         return {"Authorization": "Bearer " + self.token, "Accept": "application/json"}
@@ -46,6 +51,9 @@ class NavJobs:
     def load(self, transport, page_cap=None):
         """Index active ads modified within the window; latest entry per ad wins."""
         cap = min(self.max_pages, page_cap if page_cap is not None else self.max_pages)
+        self.index, self.org_index, self.word_index, self.compact_index = {}, {}, {}, {}
+        self.pages, self.complete_segments = 0, 0
+        self.error = None
         if cap < self.segments:
             self.state = "not_loaded"
             self.error = "Request budget too small for the NAV feed index"
@@ -74,10 +82,21 @@ class NavJobs:
             for _ in range(per_segment):
                 snap = transport.get(url, "official_public_api", headers=headers)
                 if snap.get("status") != 200:
-                    break
+                    return items, False, "NAV feed request failed"
+                try:
+                    body = json.loads(snap["text"])
+                    if not isinstance(body, dict) or not isinstance(body.get("items"), list):
+                        raise ValueError("invalid feed")
+                    for item in body["items"]:
+                        if not isinstance(item, dict) or not isinstance(item.get("_feed_entry"), dict):
+                            raise ValueError("invalid feed item")
+                        modified = datetime.fromisoformat(item["date_modified"])
+                        if modified.tzinfo is None:
+                            raise ValueError("missing timezone")
+                except (ValueError, TypeError, KeyError):
+                    return items, False, "NAV feed response malformed"
                 with self.lock:
                     self.pages += 1
-                body = json.loads(snap["text"])
                 done = False
                 for item in body.get("items", []):
                     modified = datetime.fromisoformat(item.get("date_modified", "1970-01-01T00:00:00+00:00"))
@@ -86,12 +105,17 @@ class NavJobs:
                         break
                     items.append(item)
                 if done or not body.get("next_url"):
-                    break
+                    return items, True, None
+                if not isinstance(body["next_url"], str) or not body["next_url"].startswith("/api/v1/"):
+                    return items, False, "NAV feed pagination URL malformed"
                 url, headers = BASE + body["next_url"], self.headers()
-            return items
+            return items, False, "NAV feed page limit reached"
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.segments) as pool:
-            for items in pool.map(walk, bounds):
+            for items, complete, error in pool.map(walk, bounds):
+                self.complete_segments += int(complete)
+                if error:
+                    self.error = error
                 for item in items:
                     entry = item.get("_feed_entry") or {}
                     uuid = entry.get("uuid")
@@ -101,23 +125,60 @@ class NavJobs:
                             latest[uuid] = item
         for uuid, item in latest.items():
             entry = item["_feed_entry"]
-            if entry.get("status") != "ACTIVE" or not entry.get("businessName"):
+            if entry.get("status") != "ACTIVE":
                 continue
-            self.index.setdefault(norm_employer(entry["businessName"]), {})[uuid] = item
-        self.state = "loaded" if self.pages else "failed"
+            name = entry.get("businessName")
+            if isinstance(name, str) and name:
+                key = norm_employer(name)
+                self.index.setdefault(key, {})[uuid] = item
+                if len(key.replace(" ", "")) >= 4:
+                    self.compact_index.setdefault(key.replace(" ", ""), set()).add(key)
+                for word in key.split():
+                    if len(word) >= 5 and word not in GENERIC_EMPLOYER_WORDS:
+                        self.word_index.setdefault(word, set()).add(key)
+            employer = entry.get("employer") if isinstance(entry.get("employer"), dict) else {}
+            # Some feed versions include identifiers; they only discover candidates.
+            for value in (entry.get("orgnr"), entry.get("businessOrgNumber"), employer.get("orgnr")):
+                orgnr = re.sub(r"\D", "", str(value or ""))
+                if len(orgnr) == 9:
+                    self.org_index.setdefault(orgnr, {})[uuid] = item
+        self.state = "loaded" if self.complete_segments == self.segments else ("partial" if self.pages else "failed")
 
-    def candidates(self, names):
+    def candidates(self, names, orgnrs=()):
+        """Rank discovery hints only; every result still needs employer identity proof."""
         found = {}
+        for org in orgnrs:
+            for uuid, item in self.org_index.get(str(org), {}).items():
+                found[uuid] = (1000, item)
         for name in names:
             key = norm_employer(name)
             if len(key) >= 3:
-                found.update(self.index.get(key, {}))
-        return list(found.values())
+                possible = {key}
+                words = set(key.split())
+                for word in words:
+                    possible.update(self.word_index.get(word, ()))
+                # "UP LINK" and "Uplink" are the same spelling once spaces are ignored.
+                possible.update(self.compact_index.get(key.replace(" ", ""), ()))
+                for candidate in sorted(possible):
+                    overlap = words.intersection(candidate.split())
+                    score = 100 if candidate == key else 10 * len(overlap)
+                    compact, other = key.replace(" ", ""), candidate.replace(" ", "")
+                    if compact in other or other in compact:
+                        score += 50
+                    for uuid, item in self.index.get(candidate, {}).items():
+                        if score > found.get(uuid, (-1, None))[0]:
+                            found[uuid] = (score, item)
+        return [item for _, item in sorted(found.values(), key=lambda pair: (-pair[0], pair[1].get("url", "")))]
 
     def research(self, row, body, transport, claim):
         """Publish active ads whose detail record names this exact employer orgnr."""
-        if self.state != "loaded":
-            row["availability"]["jobs"] = row["availability"].get("jobs") if row["availability"].get("jobs") == "available" else ("failed" if self.state == "failed" else "not_available")
+        research = {"state": "completed", "organisation_number": row["organisation_number"], "feed_state": self.state}
+        row.setdefault("research_sources", {})["nav_jobs"] = research
+        if self.state not in {"loaded", "partial"}:
+            # An unqueried or unloaded source is a failed check, never "ambiguous" (wrong-company doubt) or "not_available".
+            state = "failed"
+            research.update(state="failed" if self.state == "failed" else "not_queried", availability=state)
+            row["availability"]["jobs"] = row["availability"].get("jobs") if row["availability"].get("jobs") == "available" else state
             if self.error:
                 row["errors"].append({"module": "nav_jobs", "message": self.error})
             return []
@@ -125,18 +186,31 @@ class NavJobs:
         units = {str(c["value"].get("organisation_number")): c["value"].get("name") for c in row["claims"]
                  if c["field"] == "locations" and isinstance(c["value"], dict)}
         names = [body.get("navn", "")] + [n for n in units.values() if n] + [h.get("navn", "") for h in body.get("historiskeNavn", [])[-2:]]
-        accepted, homepages = 0, []
-        for item in self.candidates(names)[: self.max_ads * 2]:
+        accepted, homepages, detail_failures = 0, [], 0
+        candidates = self.candidates(names, [org, *units])
+        limit = self.max_ads * 2
+        partial = self.state == "partial" or len(candidates) > limit
+        researched = 0
+        for item in candidates[:limit]:
             if accepted >= self.max_ads:
+                partial = True
                 break
+            researched += 1
             snap = transport.get(BASE + item["url"], "official_public_api", headers=self.headers())
             with self.lock:
                 self.details += 1
             if snap.get("status") != 200:
+                detail_failures += 1
                 continue
-            detail = json.loads(snap["text"])
-            ad = detail.get("ad_content") or {}
-            employer = ad.get("employer") or {}
+            try:
+                detail = json.loads(snap["text"])
+                ad = detail["ad_content"]
+                employer = ad["employer"]
+                if not isinstance(ad, dict) or not isinstance(employer, dict):
+                    raise ValueError("invalid ad")
+            except (ValueError, TypeError, KeyError):
+                detail_failures += 1
+                continue
             employer_org = re.sub(r"\D", "", str(employer.get("orgnr") or ""))
             parent_snap = None
             if employer_org != org and employer_org not in units and len(employer_org) == 9:
@@ -146,6 +220,10 @@ class NavJobs:
                     unit = json.loads(parent_snap["text"]) if parent_snap.get("status") == 200 else {}
                 except ValueError:
                     unit = {}
+                if not isinstance(unit, dict):
+                    unit = {}
+                if not unit:
+                    detail_failures += 1
                 if str(unit.get("overordnetEnhet")) == org:
                     units[employer_org] = unit.get("navn")
                     claim(row, "locations", {"organisation_number": employer_org, "name": unit.get("navn"), "address": unit.get("beliggenhetsadresse")},
@@ -170,11 +248,15 @@ class NavJobs:
         if accepted:
             row["availability"]["jobs"] = "available"
         elif row["availability"].get("jobs") != "available":
-            row["availability"]["jobs"] = "not_available"
+            row["availability"]["jobs"] = "failed" if detail_failures or partial else "not_available"
+        research.update(state="partial" if partial or detail_failures else "completed",
+                        availability="available" if accepted else ("failed" if detail_failures or partial else "not_available"),
+                        candidate_count=len(candidates), detail_requests=researched, accepted_ads=accepted)
         return homepages
 
     def report(self):
         return {"source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)", "state": self.state, "window_days": self.days,
                 "feed_pages": self.pages, "detail_requests": self.details,
+                "completed_segments": self.complete_segments, "total_segments": self.segments, "error": self.error,
                 "indexed_active_employers": len(self.index), "indexed_active_ads": sum(len(v) for v in self.index.values()),
                 "token": "NAV_FEED_TOKEN" if os.environ.get("NAV_FEED_TOKEN") else "NAV published public token"}

@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 import urllib.robotparser
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import warnings
@@ -31,6 +32,7 @@ SITE_FIELDS = ("official_website", "description", "activity", "owned_profiles", 
 ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organisation\s+number|organization\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
 UA = "OrgLens/0.1 (Norwegian company research; public sources only)"
 MAX_BYTES = 4_000_000
+MAX_READ_SECONDS = 25
 TLS = ssl.create_default_context(cafile=certifi.where())  # pinned CA bundle, identical on every OS
 FAST_HOSTS = {"data.brreg.no", "pam-stilling-feed.nav.no"}
 
@@ -159,9 +161,18 @@ class Transport:
                         chain.append({"url": url, "status": status})
                         url = urllib.parse.urljoin(url, response.headers["Location"])
                         continue
-                    raw = response.read(MAX_BYTES + 1)
-                    if len(raw) > MAX_BYTES:
-                        raise ValueError("Response exceeds safe snapshot limit")
+                    # Chunked read with a wall-clock cap: a trickling server cannot hold a worker past the budget.
+                    read_started, buffer = time.monotonic(), bytearray()
+                    while True:
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        buffer += chunk
+                        if len(buffer) > MAX_BYTES:
+                            raise ValueError("Response exceeds safe snapshot limit")
+                        if time.monotonic() - read_started > MAX_READ_SECONDS or time.monotonic() >= self.deadline:
+                            raise ValueError("Response body too slow; abandoned")
+                    raw = bytes(buffer)
                     charset = response.headers.get_content_charset() or "utf-8"
                     content_type = response.headers.get_content_type()
                 sha = digest(raw)
@@ -460,13 +471,19 @@ def node_types(node):
 
 def jsonld_org_ids(node):
     values = []
-    for key in ("taxID", "vatID", "identifier", "leiCode", "duns"):
+    # LEI/DUNS and suffixes of foreign identifiers are not Norwegian org numbers.
+    for key in ("taxID", "vatID", "identifier"):
         raw = node.get(key)
         for item in raw if isinstance(raw, list) else [raw]:
             if isinstance(item, dict):
+                kind = str(item.get("propertyID") or "").lower()
+                if kind and not any(x in kind for x in ("org", "vat", "tax", "brreg")):
+                    continue
                 item = item.get("value")
             if item:
-                values.append(re.sub(r"\D", "", str(item))[-9:] if re.sub(r"\D", "", str(item)) else "")
+                match = re.fullmatch(r"(?:NO\s*)?((?:\d[\s.]*){9})(?:\s*MVA)?", str(item).strip(), re.I)
+                if match:
+                    values.append(re.sub(r"\D", "", match[1]))
     return values
 
 
@@ -488,6 +505,8 @@ def social_profile(url):
 def proof_on_pages(org, legal_name, pages):
     """Return (snapshot, locator, method) proving the exact entity, or a conflict marker."""
     from .names import text_contains_name, distinctive, name_tokens
+    if conflicting_number(org, pages):
+        return None
     found = site_identity_proof(org, pages)
     if found:
         return found[0], found[1], "labelled_organisation_number"
@@ -517,7 +536,10 @@ def conflicting_number(org, pages):
         visible = [text] if i == 0 else [" ".join(f.stripped_strings) for f in soup.select('footer, [role="contentinfo"]')]
         for chunk in visible:
             numbers |= set(labelled_numbers(chunk))
-    return bool(numbers) and org not in numbers
+        for node in jsonld_nodes(snapshot["text"]):
+            if any(t in ("Organization", "LocalBusiness", "Corporation", "Store", "ProfessionalService") for t in node_types(node)):
+                numbers.update(jsonld_org_ids(node))
+    return bool(numbers - {org})
 
 
 def leader_names(row):
@@ -545,25 +567,50 @@ def leader_on_pages(row, pages):
     return None
 
 
+OPERATING_ROLES = ("daglig leder", "innehaver", "administrerende")
+
+
+def operating_leader_on_pages(row, pages, legal):
+    """Operating head (CEO/owner) named on a site that also names the company itself."""
+    from .names import distinctive, name_tokens
+    words = distinctive(name_tokens(legal)) or name_tokens(legal)
+    heads = [c for c in row["claims"] if c["field"] == "leadership" and isinstance(c["value"], dict)
+             and any(r in str(c["value"].get("role") or "").lower() for r in OPERATING_ROLES)]
+    for c in heads:
+        parts = str(c["value"].get("name") or "").split()
+        if len(parts) < 2 or len(parts[-1]) < 3 or re.search(r"\b(AS|ASA|ANS|DA|SA)\b", " ".join(parts)):
+            continue
+        pattern = re.compile(r"\b" + re.escape(parts[0]) + r"\b(?:\s+\w+\.?){0,2}\s+" + re.escape(parts[-1]) + r"\b", re.I)
+        for snapshot, soup, text in pages:
+            match = pattern.search(text)
+            if match and words and all(w in translit_text(text).split() for w in words[:2]):
+                return snapshot, {"text_quote": match.group(0), "corroboration": f"registered {c['value'].get('role')} named on a site whose domain spells the full legal name"}
+    return None
+
+
 def corroborated(body, pages, row=None, domain_named=False):
-    from .names import text_contains_name
     legal = body.get("navn", "")
-    if row is not None and domain_named:
-        # Domain carries the legal name and the site names a person registered in the company's official roles.
-        found = leader_on_pages(row, pages)
+    if row is not None and domain_named is True:
+        # domain_named=True only when the domain spells the complete legal name (see crawl_site).
+        found = operating_leader_on_pages(row, pages, legal)
         if found:
-            return found[0], found[1], "domain_name_and_registered_role_holder"
+            return found[0], found[1], "full_name_domain_and_registered_operating_head"
+    # A shared director, partial-name domain or registry URL alone is a candidate, not proof.
+    legal_flat = translit_text(legal)
     phone = re.sub(r"\D", "", str(body.get("telefon") or body.get("mobil") or ""))[-8:]
     address = body.get("forretningsadresse") or {}
     postcode = str(address.get("postnummer", ""))
     streets = [translit_text(x) for x in address.get("adresse", []) if not str(x).lower().startswith("c/o")]
     for snapshot, soup, text in pages:
-        if not (text_contains_name(text, legal) or domain_named):
+        if not legal_flat or " " + legal_flat + " " not in " " + translit_text(text) + " ":
             continue
-        digits = re.sub(r"\D", "", text)
         flat = " " + translit_text(text) + " "
-        if len(phone) == 8 and phone in digits:
-            return snapshot, {"text_quote": legal, "corroboration": "exact legal name + registered phone"}, "legal_name_and_registered_phone"
+        tokens = re.findall(r"(?<!\w)(?:\+47[ .-]*|0047[ .-]*)?(?:\d[ .-]*){8}(?!\w)", text)
+        for a in soup.select('a[href^="tel:"]'):
+            tokens.append(a.get("href", "")[4:])
+        matched_phone = next((v for v in tokens if re.sub(r"\D", "", v).removeprefix("0047").removeprefix("47") == phone or re.sub(r"\D", "", v) == phone), None)
+        if len(phone) == 8 and matched_phone:
+            return snapshot, {"text_quote": legal, "phone_quote": matched_phone, "corroboration": "full legal name + bounded registered phone"}, "legal_name_and_registered_phone"
         if postcode and " " + postcode + " " in flat and any(len(s) >= 5 and " " + s + " " in flat for s in streets):
             return snapshot, {"text_quote": legal, "corroboration": "exact legal name + registered street and postcode"}, "legal_name_and_registered_address"
     return None
@@ -586,7 +633,7 @@ def fetch_robots(row, base, host, transport):
         robot.parse(robot_snap["text"].splitlines())
         crawl_delay = robot.crawl_delay(UA) or robot.crawl_delay("*") or 0
         request_rate = robot.request_rate(UA) or robot.request_rate("*")
-        gap = max(.35, min(10, crawl_delay), request_rate.seconds / request_rate.requests if request_rate else 0)
+        gap = max(.35, crawl_delay, request_rate.seconds / request_rate.requests if request_rate else 0)
         with transport.lock:
             transport.host_delays[host] = max(transport.host_delays.get(host, 0), gap)
         return robot, None
@@ -676,13 +723,15 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
     # only an exact organisation-number proof is accepted for them.
     managed = form in NO_GUESS_FORMS or national_mismatch(home["source_url"], legal)
     if not proof and not conflict and not managed:
-        proof = corroborated(body, pages, row, domain_is_full_name(home["source_url"], legal) or origin in TRUSTED_ORIGINS)
-    if not proof and not conflict and origin in TRUSTED_ORIGINS and not managed:
-        named = domain_matches_name(home["source_url"], legal) or any(text_contains_name(t, legal) for _, _, t in pages)
-        if named:
-            method = "registry_declared_homepage" if origin == "registry" else "nav_orgnr_verified_employer_homepage"
-            proof = home, {"declared_by": "Enhetsregisteret hjemmeside" if origin == "registry" else "NAV job ad employer.homepage with exact employer orgnr",
-                           "declared_value": raw_url, "name_check": "legal name token present in domain or page"}, method
+        proof = corroborated(body, pages, row, domain_is_full_name(home["source_url"], legal))
+    if not proof and not conflict and not managed and origin == "registry":
+        # The company's own Enhetsregisteret homepage declaration, with the complete core name on the domain or page.
+        # The domain itself must carry the name: a declared parent/group domain (e.g. a brand page on the
+        # international parent's site) is not the Norwegian entity's own website.
+        if domain_is_full_name(home["source_url"], legal) or (domain_matches_name(home["source_url"], legal)
+                                                              and any(text_contains_name(t, legal) for _, _, t in pages)):
+            proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
+                           "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
@@ -786,7 +835,9 @@ def extract_site_facts(row, body, pages, method):
                       "url": node.get("url", snap["source_url"]), "source": "company website JobPosting"}, snap,
                       {"jsonld": {k: node.get(k) for k in ("title", "datePosted", "validThrough")}}, identity_method="verified_site_and_exact_hiring_name")
                 row["availability"]["jobs"] = "available"
-            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished"):
+            static_page = re.search(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|kontakt|contact|forside|home",
+                                    (str(node.get("url") or snap["source_url"]) + " " + str(node.get("headline") or "")).lower())
+            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and (not static_page or "NewsArticle" in types or "PressRelease" in types) and snap is not pages[0][0]:
                 claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": node["datePublished"], "url": node.get("url") or snap["source_url"],
                       "kind": "company_owned_article"}, snap, {"jsonld": {k: node.get(k) for k in ("headline", "datePublished")}}, identity_method="verified_company_site")
                 row["availability"]["activity"] = "available"
@@ -884,6 +935,18 @@ def fmt_amount(value):
     return f"{value.get('currency') or ''} {sign}{amount:,.0f}".strip()
 
 
+def parsed_date(value):
+    """Normalize ISO and RSS dates for ordering; retain raw dates on claims."""
+    try:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            dt = parsedate_to_datetime(str(value))
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        return datetime.min.replace(tzinfo=timezone.utc)
+
+
 def synthesize(row):
     """Deterministic, evidence-cited narrative. Every statement renders only verified claims."""
     by = {}
@@ -961,10 +1024,10 @@ def synthesize(row):
         titles = "; ".join(str(c["value"].get("title"))[:90] for c in jobs[:3])
         say(f"Appears to be hiring: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} with an exact employer match ({titles}).", jobs[:3], "hiring")
     activity = by.get("activity", [])
-    news = sorted([c for c in activity if c["value"].get("kind") != "official_registry_event"], key=lambda c: str(c["value"].get("published_at")), reverse=True)
-    events = sorted([c for c in activity if c["value"].get("kind") == "official_registry_event"], key=lambda c: str(c["value"].get("published_at")), reverse=True)
+    news = sorted([c for c in activity if c["value"].get("kind") != "official_registry_event"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
+    events = sorted([c for c in activity if c["value"].get("kind") == "official_registry_event"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
     if news:
-        say(f"Latest company-published activity: “{news[0]['value'].get('headline')}” ({str(news[0]['value'].get('published_at'))[:10]}).", news[:1], "activity")
+        say(f"Latest company-published activity: “{news[0]['value'].get('headline')}” ({parsed_date(news[0]['value'].get('published_at')).date().isoformat()}).", news[:1], "activity")
     if events:
         say(f"Most recent registry event: {events[0]['value'].get('headline')} ({events[0]['value'].get('published_at')}).", events[:1], "activity")
     if row.get("changes"):
@@ -988,8 +1051,13 @@ def finish(row, previous=None):
     row["run"]["completed_at"] = now()
     row["availability_status"] = "available" if row["legal_identity"] else row["availability"]["legal_identity"]
     # Diff field sets, not source hashes or volatile retrieval timestamps.
+    previous = previous or {}
+    old_refresh = previous.get("refresh") or {}
+    prior_evidence = {e["id"]: e for e in [*old_refresh.get("previous_evidence", []), *previous.get("evidence", [])]}
+    prior_snapshots = {s["id"]: s for s in [*old_refresh.get("previous_snapshots", []), *previous.get("source_snapshots", [])]}
+    old_claims = {c["id"]: c for c in [*old_refresh.get("last_known_claims", []), *previous.get("claims", [])]}
     before = {}
-    for c in (previous or {}).get("claims", []):
+    for c in old_claims.values():
         before.setdefault(c["field"], []).append(c)
     after = {}
     for c in row["claims"]:
@@ -997,19 +1065,35 @@ def finish(row, previous=None):
     retained = []
     for field, old in before.items():
         family = family_of(field)
-        if row["availability"].get(family) in {"failed", "blocked", "ambiguous"}:
-            retained.extend({**c, "stale": True} for c in old)
-            continue
         current = after.get(field, [])
-        if sorted(digest({"value": c["value"], "period": c.get("reporting_period")}) for c in old) != sorted(digest({"value": c["value"], "period": c.get("reporting_period")}) for c in current):
+        current_ids = {c["id"] for c in current}
+        comparable = []
+        for c in old:
+            failed = row["availability"].get(family) in {"failed", "blocked", "ambiguous"}
+            evidence = [prior_evidence[e] for e in c["evidence_ids"] if e in prior_evidence]
+            for ev in evidence:
+                if ev.get("source_class") in {"company_owned", "official_public_api"} and c["id"] not in current_ids:
+                    observed = [s for s in row["source_snapshots"] if ev["source_url"] in {s.get("source_url"), s.get("requested_url")}]
+                    # A successful registry response says nothing about a failed news feed.
+                    source_state = (row.get("research_sources", {}).get("nav_jobs") or {}).get("state") if ev.get("source_class") == "official_public_api" else None
+                    failed = failed or not observed or any(s.get("status") != 200 for s in observed) or source_state in {"partial", "failed"}
+            if failed and c["id"] not in current_ids:
+                retained.append({**c, "stale": True})
+            else:
+                comparable.append(c)
+        if comparable and sorted(digest({"value": c["value"], "period": c.get("reporting_period")}) for c in comparable) != sorted(digest({"value": c["value"], "period": c.get("reporting_period")}) for c in current):
             row["changes"].append({"field": field, "type": "changed" if current else "removed",
-                                   "previous_claims": old, "current_claims": current})
+                                   "previous_claims": comparable, "current_claims": current})
+        elif not comparable and current:
+            # New observations of a family whose older source was unavailable are additions,
+            # not evidence that its retained claims were removed.
+            row["changes"].append({"field": field, "type": "added", "previous_claims": [], "current_claims": current})
     if previous:
         for field in after.keys() - before.keys():
             row["changes"].append({"field": field, "type": "added", "previous_claims": [], "current_claims": after[field]})
-    row["refresh"] = {"previous_run_id": (previous or {}).get("run", {}).get("run_id"), "material_changes": len(row["changes"]),
-                       "last_known_claims": retained, "previous_evidence": (previous or {}).get("evidence", []),
-                       "previous_snapshots": (previous or {}).get("source_snapshots", [])}
+    row["refresh"] = {"previous_run_id": previous.get("run", {}).get("run_id"), "material_changes": len(row["changes"]),
+                       "last_known_claims": retained, "previous_evidence": list(prior_evidence.values()),
+                       "previous_snapshots": list(prior_snapshots.values())}
     facts = {c["field"]: c for c in row["claims"]}
     observed_periods = [c.get("reporting_period") for c in row["claims"] if c["field"].startswith("financials.")]
     ends = [p.get("tilDato") for p in observed_periods if isinstance(p, dict) and p.get("tilDato")]
@@ -1066,7 +1150,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         from .replay import ReplayTransport
         transport = ReplayTransport(output / "snapshots", replay, requests, seconds)
     else:
-        transport = Transport(output / "snapshots", requests, seconds)
+        # Reserve time to write envelopes, validate evidence and render the viewer inside --max-seconds.
+        transport = Transport(output / "snapshots", requests, max(30, seconds - max(60, seconds * 0.08)))
     started = time.monotonic()
     rows = [envelope(org, run_id) for org in orgs]
     bodies = {}

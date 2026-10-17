@@ -3,3 +3,4 @@ submission/ai-artifacts/** -text
 *.bin -text
 submission/artifacts/** -text
 submission/artifact-hashes.json -text
+submission/release/** -text

@@ -33,6 +33,8 @@ def main():
     run.add_argument("--registry", help="Evaluator frozen BRREG original-object JSONL or semicolon CSV")
     run.add_argument("--registry-retrieved-at", help="Actual timestamp of supplied registry snapshot")
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
+    run.add_argument("--discover", action="store_true", help="Opt-in search discovery (SerpAPI, Tavily) using keys from the environment; not part of the evaluator command")
+    run.add_argument("--no-discover", action="store_true", help="Force-disable search discovery")
     run.add_argument("--discover-brave", action="store_true", help="Opt-in search; BRAVE_API_KEY and declared costs required")
     run.add_argument("--search-cost-per-request", type=float)
     run.add_argument("--max-api-cost", type=float, default=0)
@@ -104,6 +106,11 @@ def main():
                 parser.error("Provide positive finite --search-cost-per-request and --max-api-cost")
             from .discovery import BraveDiscovery
             discovery = BraveDiscovery(os.environ.get("BRAVE_API_KEY"), rate, args.max_api_cost)
+        elif args.discover and not args.no_discover and not args.replay:
+            # Opt-in only: the evaluator command must stay keyless and reproducible.
+            from .discovery import build_discovery_from_env
+            discovery = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0,
+                                                 max_cost=args.max_api_cost or 0.0)
         rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
                                  requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
                                  previous=previous, pages=args.pages, modules=modules,

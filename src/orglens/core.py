@@ -1325,7 +1325,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         method = (r.get("website_research") or {}).get("verification", {}).get("method")
         if method:
             report["website_methods"][method] = report["website_methods"].get(method, 0) + 1
-    report["discovery"] = {"provider": "Brave Web Search", "queries": discovery.calls, "declared_unit_cost": float(discovery.unit_cost),
+    report["discovery"] = {"provider": getattr(discovery, "provider_name", "Brave Web Search"), "queries": discovery.calls, "declared_unit_cost": float(discovery.unit_cost),
                            "max_cost_usd": float(discovery.max_cost), "live_verified": False} if discovery else None
     write_json(output / "run-report.json", report)
     return rows, report

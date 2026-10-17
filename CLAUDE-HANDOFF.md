@@ -27,6 +27,8 @@ Read `git status --short` and review actual files before editing. These are inte
 
 The security guard is a separate verified change: five focused tests failed when absent, then **5 passed** after implementation. Root will publish security changes and this handoff only. Agent/NAV/UI work stays local for you to finish, test and commit.
 
+**Latest completed targeted check:** `tests/test_integrity_fixes.py tests/test_nav_coverage.py tests/test_coverage.py` returned **1 failed, 32 passed**. The remaining failure is `tests/test_nav_coverage.py::test_joined_employer_words_find_exact_entity`: feed employer `Uplink` was not discovered for legal name `UP LINK AS`; availability was `not_available` instead of `available`. Do not weaken the exact-orgnr publication gate to fix candidate discovery. All eight integrity regression tests passed in this run. See `out/claude-targeted-tests.txt`. The broader publishable working-tree scan covered 95 files with no findings. These are focused checks, not fresh smoke/scale or full-suite verification.
+
 Review core refresh logic carefully: stale facts should survive multiple failed refreshes, while successful observation of removal must create a real change. Shared family availability (`activity`) cannot substitute for source success. New source metadata and exact source URL snapshots are available. Preserve original evidence across retries and detect legitimate additions/changes.
 
 ## Remaining implementation work, in order

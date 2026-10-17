@@ -14,6 +14,8 @@
 
 > **Submission status, 17 October 2026: ready to submit version 1.** The audit's identity, refresh, NAV, reliability and viewer fixes are complete and tested. See the [readiness verdict](docs/READINESS-2026-10-17.md). No official score is claimed.
 
+**18 October update:** participant reports version 1 submitted at `29daa24`. See the [current materials review and revision priorities](docs/REVISION-STRATEGY-2026-10-18.md): budget allocation, external coverage, targeted AI and a changed provisional leaderboard. Search added at `0f51c30` remains opt-in; the submitted default command executes no LLM.
+
 Evidence-first research agent for Norwegian companies. Give it a batch of organisation numbers. For each company it returns one terminal envelope with:
 
 - legal identity

@@ -1,6 +1,6 @@
 # Signalpost submission — OrgLens v2
 
-> **Status 17 October 2026: ready to submit as version 1.** See [docs/READINESS-2026-10-17.md](docs/READINESS-2026-10-17.md). Not yet sent; the email below must be sent by the participant.
+> **Status 18 October 2026: participant reports version 1 submitted.** Its pinned executable commit is retained below. The organizer acknowledgement/score has not been inspected. See [the current revision strategy](docs/REVISION-STRATEGY-2026-10-18.md); later GitHub pushes do not update the frozen submission automatically.
 
 | Required item | Value |
 |---|---|
@@ -18,11 +18,11 @@
 
 ## Before sending
 
-1. Exact commit 29daa24c8ee9ef330ebc8c721168f6b2dce800d6 was verified from a clean GitHub clone: locked install, 80 tests and a live run producing valid envelopes and the viewer. Later commits only touch documentation.
+1. Exact commit 29daa24c8ee9ef330ebc8c721168f6b2dce800d6 was verified from a clean GitHub clone: locked install, 80 tests and a live run producing valid envelopes and the viewer. Later implementation commit `0f51c30342dfc6cdbba3c8c94c1aae9c7301348c` adds opt-in search; it is not automatically part of submitted version 1.
 2. Ask Builderr to confirm the official request/time budget and any frozen registry snapshot. When a snapshot is supplied, append `--registry <path> --registry-retrieved-at <timestamp>`.
-3. You can send four revised hashes after this one (five versions in total). Revisions close 18 October 2026; the exact cutoff hour is unspecified, so send version 1 today.
+3. Up to four revised hashes are allowed after version 1 (five versions total). On today's date, 18 October 2026, confirm whether revisions are still accepted: the contract says close October 18 while the challenge page says before October 18. Exact hour/timezone is unspecified.
 
-## Email draft (not sent)
+## Original version-1 email template (historical; participant reports submission)
 
 To: submit@builderr.ai
 Subject: Signalpost entry — OrgLens v2 — Sankalp Wanjari

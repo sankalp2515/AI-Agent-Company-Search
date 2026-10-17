@@ -6,7 +6,7 @@
 |---|---|
 | Agent | OrgLens v2: evidence-first Norwegian company research agent |
 | Repository | https://github.com/sankalp2515/AI-Agent-Company-Search |
-| Exact commit | `[FILLED AFTER PUSH]` |
+| Exact commit | `29daa24c8ee9ef330ebc8c721168f6b2dce800d6` |
 | Install | `uv sync --frozen` |
 | One run command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700` |
 | Profiles | 100-company smoke result plus live refresh in `submission/release/smoke` and `submission/release/refresh`. 1,100 company profiles in `submission/release/scale` (envelopes gzipped, viewer `index.html`). Tight-budget stress report in `submission/release/stress-1100-at-2000-requests-run-report.json` |
@@ -18,7 +18,7 @@
 
 ## Before sending
 
-1. Replace the commit placeholder with the pushed hash; this is done in the commit that follows this file.
+1. Exact commit 29daa24c8ee9ef330ebc8c721168f6b2dce800d6 was verified from a clean GitHub clone: locked install, 80 tests and a live run producing valid envelopes and the viewer. Later commits only touch documentation.
 2. Ask Builderr to confirm the official request/time budget and any frozen registry snapshot. When a snapshot is supplied, append `--registry <path> --registry-retrieved-at <timestamp>`.
 3. You can send four revised hashes after this one (five versions in total). Revisions close 18 October 2026; the exact cutoff hour is unspecified, so send version 1 today.
 
@@ -32,7 +32,7 @@ Hello Builderr,
 Please evaluate OrgLens v2, an evidence-first agent for Norwegian company research.
 
 - Repository: https://github.com/sankalp2515/AI-Agent-Company-Search
-- Exact commit: [FILLED AFTER PUSH]
+- Exact commit: 29daa24c8ee9ef330ebc8c721168f6b2dce800d6
 - Install: `uv sync --frozen`
 - Run: `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700`
 

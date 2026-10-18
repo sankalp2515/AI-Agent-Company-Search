@@ -14,6 +14,9 @@ class ReplayTransport(Transport):
             row = json.loads(line)
             for snap in row["source_snapshots"]:
                 self.index.setdefault(snap.get("requested_url", snap["source_url"]), snap)
+                # A verified website seed can be the final redirect destination.
+                # Those exact bytes were observed there, with the same timestamp.
+                self.index.setdefault(snap["source_url"], snap)
 
     def get(self, url, source_class="official_registry"):
         snap = self.index.get(url)

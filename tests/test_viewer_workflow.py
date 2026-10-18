@@ -81,3 +81,17 @@ assert.ok(stale);
 assert.match(ids.detail.textContent,/Not re-verified/);
 assert.ok(descendants(ids.detail).some(n=>n.tagName==='a' && n.href==='https://registry.example.no/source'));
 """)
+
+
+def test_comparison_overview_keeps_periods_and_unknowns(tmp_path):
+    a,b=row(123456789,'Alpha AS'),row(987654321,'Beta AS')
+    a['claims']=[{'id':'revenue','field':'financials.revenue','value':{'amount':0,'currency':'NOK'},
+                  'reporting_period':{'fraDato':'2025-01-01','tilDato':'2025-12-31'},'evidence_ids':[]}]
+    b['availability']['financials']='failed'
+    execute(tmp_path,[a,b],"""
+selected.add('123456789'); selected.add('987654321'); comparing=true; show();
+const table=descendants(ids.detail).find(n=>n.tagName==='table');
+assert.ok(table); assert.match(table.textContent,/Alpha AS/); assert.match(table.textContent,/Beta AS/);
+assert.match(table.textContent,/NOK 0/); assert.match(table.textContent,/2025-12-31/);
+assert.match(table.textContent,/failed/);
+""")

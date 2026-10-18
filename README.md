@@ -12,9 +12,11 @@
 
 </div>
 
-> **Submission status, 17 October 2026: ready to submit version 1.** The audit's identity, refresh, NAV, reliability and viewer fixes are complete and tested. See the [readiness verdict](docs/READINESS-2026-10-17.md). No official score is claimed.
+> **19 October 2026: revision candidate.** Version 1 was submitted previously. The current local release adds external-first allocation, stricter evidence checks and a cited comparison view. See [submission instructions](SUBMISSION.md). No official score is claimed; revision-window acceptance remains unconfirmed.
 
 **18 October update:** participant reports version 1 submitted at `29daa24`. See the [current materials review and revision priorities](docs/REVISION-STRATEGY-2026-10-18.md): budget allocation, external coverage, targeted AI and a changed provisional leaderboard. Search added at `0f51c30` remains opt-in; the submitted default command executes no LLM.
+
+**Local candidate:** [qualification experiments](docs/QUALIFICATION-EXPERIMENTS-2026-10-18.md) compare external-first allocation, bounded search and literal LLM quotation selection. The candidate adds publisher checks, evidence-span corrections and a compact desktop/mobile comparison overview. It is not a submitted revision or a measured official qualification.
 
 Evidence-first research agent for Norwegian companies. Give it a batch of organisation numbers. For each company it returns one terminal envelope with:
 
@@ -92,6 +94,8 @@ The agent runs in phases. Each phase covers every company before the next phase 
 6. **Synthesis.** A fixed set of templates builds a cited narrative: what the company does, its latest filed numbers (profit or loss, negative equity), leaders, footprint, hiring, latest activity, changes since the last run and what remains unknown. Every statement lists its evidence IDs. No model writes facts.
 
 Optional `--ai` mode (model-directed search with Tavily) from the earlier version is still available. It needs personal keys and is not part of the evaluator command.
+
+For local candidate experiments, `--strategy balanced --pages 8` prioritizes external research and bounds NAV detail work. Optional `--discover --max-search-queries 60` enables bounded search; `--extract-ai --providers groq --max-model-calls 60` lets a model select existing source quotations when descriptions lack structured metadata. These options preserve exact-company publication checks. Provider credentials must be supplied through the environment; their remaining allowance and actual billing are not established by a zero configured rate. An official revision needs organizer-supported credentials and the supplied official budgets.
 
 The audit's identity findings are fixed and covered by regression tests: JSON-LD identifiers must be exact 9-digit organisation numbers, conflicting identifiers veto publication, and phone matches are bounded tokens.
 

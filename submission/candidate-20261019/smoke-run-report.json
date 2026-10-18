@@ -1,0 +1,110 @@
+{
+  "run_id": "release-smoke100",
+  "completed_at": "2026-10-18T18:35:05.304734Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "requests": 919,
+  "bytes": 55991687,
+  "runtime_seconds": 167.844,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 2000,
+    "seconds": 900
+  },
+  "p50_company_ms": 8279,
+  "p95_company_ms": 26403,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 9,
+    "description": 8,
+    "jobs": 0,
+    "activity": 100,
+    "owned_profiles": 4,
+    "contact": 39
+  },
+  "states": {
+    "failed": 30,
+    "ambiguous": 6,
+    "not_applicable": 0,
+    "blocked": 3,
+    "available": 560,
+    "not_available": 401
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 2,
+    "unique_urls": 154,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 100,
+      "request_ceiling": 2000
+    },
+    {
+      "stage": "website",
+      "requests": 253,
+      "request_ceiling": 1240
+    },
+    {
+      "stage": "financials",
+      "requests": 100,
+      "request_ceiling": 2000
+    },
+    {
+      "stage": "leadership",
+      "requests": 100,
+      "request_ceiling": 2000
+    },
+    {
+      "stage": "locations",
+      "requests": 100,
+      "request_ceiling": 2000
+    },
+    {
+      "stage": "jobs",
+      "requests": 266,
+      "request_ceiling": 2000
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": {
+    "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
+    "state": "loaded",
+    "window_days": 40,
+    "feed_pages": 84,
+    "detail_requests": 99,
+    "cache_hits": 38,
+    "max_candidate_details": 4,
+    "max_detail_requests": 200,
+    "completed_segments": 6,
+    "total_segments": 6,
+    "error": null,
+    "indexed_active_employers": 5573,
+    "indexed_active_ads": 9174,
+    "token": "NAV published public token"
+  },
+  "website_methods": {
+    "labelled_organisation_number": 4,
+    "registry_declared_homepage": 3,
+    "legal_name_and_registered_phone": 1,
+    "legal_name_and_registered_address": 1
+  },
+  "discovery": null
+}

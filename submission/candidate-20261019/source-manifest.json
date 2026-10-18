@@ -1,0 +1,22 @@
+{
+  "kind": "release_source_fingerprint",
+  "files": {
+    "pyproject.toml": "dcb114f5491159f634b5a29da08b0229a8b92b2211f15fe10de7675e221edde4",
+    "src/orglens/__init__.py": "26cdc3cb64883d3561c65aaa0825e36d32ee58bf27503f1fa312e640e08ebf34",
+    "src/orglens/agent.py": "e1e6d036b100ac57f6e09e6a3eeaecf405e3fc8c4c70af7dd14a5e8b6bd24874",
+    "src/orglens/cli.py": "742312fa37be45c1d729ed475423485fd701abb74d0c1daaefbc8139215e5e44",
+    "src/orglens/core.py": "d11ddf6dbba9fb4ee63213b7034a6eb6c05c069a71d8b234019805b3bd9c8ff7",
+    "src/orglens/costs.py": "ffe57a9c6266c310d76bba33d4a4e847896eb1971a34a4037ef8b36852f41832",
+    "src/orglens/discovery.py": "92fe3fd5e44581c54b9e32712a9261bb8a85c20e97fa45844226361f87101314",
+    "src/orglens/names.py": "2c3214595602d988a5516a10fd66051f3758525920ee8bcf6398449265b09982",
+    "src/orglens/navjobs.py": "312065da5b234d13b6eedb8fb44bcdd59bbace0e45552916c9527a2c33be0e77",
+    "src/orglens/quotes.py": "007e38a0f761b717191a088cc7253654e5b04416d6332d58a96a6ab0739fb4d4",
+    "src/orglens/replay.py": "4c337c72e3483e7b68c903de69e4334935f46e54c55ff1d6cb28ab3249e08950",
+    "src/orglens/simulator.py": "8e5a117d3b0ef0ee9e36099fe9272845f8299cf8005103ccd0ba2fac144d2d09",
+    "src/orglens/viewer.py": "8d69b4f8b21e851b078141b95cada274af6b3d90d50c9c9a1c50f68b02366d3c",
+    "uv.lock": "0e5e4419d9910d7af251d419ee9d33df16f9e33cf06f28a3ecd28a342229f2f4"
+  },
+  "source_sha256": "e59e3254a6bc6a83c9f69b3b6a151213248f72583f12e0fb767e23bf1b40ab27",
+  "smoke_report": "smoke-run-report.json",
+  "note": "Code/dependency fingerprint of the live release runs. Documentation/artifact-only commits do not change this fingerprint. Exact Git commit is supplied in the release handoff."
+}

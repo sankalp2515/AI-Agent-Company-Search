@@ -1,55 +1,47 @@
-# Signalpost submission — OrgLens v2
+# Signalpost revision candidate — OrgLens
 
-> **Status 18 October 2026: participant reports version 1 submitted.** Its pinned executable commit is retained below. The organizer acknowledgement/score has not been inspected. See [the current revision strategy](docs/REVISION-STRATEGY-2026-10-18.md); later GitHub pushes do not update the frozen submission automatically.
+Prepared 19 October 2026. This is a local release candidate, not a submitted revision or an official qualification result. The historical version-1 submission is retained in [the archive](docs/SUBMISSION-V1-HISTORICAL.md).
 
 | Required item | Value |
-|---|---|
-| Agent | OrgLens v2: evidence-first Norwegian company research agent |
+| --- | --- |
+| Agent | OrgLens — evidence-first Norwegian company research |
 | Repository | https://github.com/sankalp2515/AI-Agent-Company-Search |
-| Exact commit | `29daa24c8ee9ef330ebc8c721168f6b2dce800d6` |
-| Install | `uv sync --frozen` |
-| One run command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700` |
-| Profiles | 100-company smoke result plus live refresh in `submission/release/smoke` and `submission/release/refresh`. 1,100 company profiles in `submission/release/scale` (envelopes gzipped, viewer `index.html`). Tight-budget stress report in `submission/release/stress-1100-at-2000-requests-run-report.json` |
-| Models | None required. The default agent is deterministic and tool-using; synthesis is fixed templates over verified claims. Optional `--ai` mode (Groq/NVIDIA/Cloudflare/Cohere + Tavily) is not part of the evaluator command |
-| APIs | Brønnøysundregistrene (Enhetsregisteret entities, roles, subunits; Regnskapsregisteret accounts), NAV Job Vacancy Feed (public token or `NAV_FEED_TOKEN`), and company-owned websites under robots.txt. All free, no keys |
-| Licences | MIT code; dependencies beautifulsoup4 (MIT), soupsieve (MIT), certifi (MPL-2.0); official data under NLOD/NAV terms. See SOURCE-RIGHTS.md |
-| Expected cost per official run | **$0 external API cost** (no keys). Measured: 100 companies use 1,510 requests and 253 s; 1,100 companies use 15,451 requests and 1,976 s. Under a 2,000-request cap, 1,100 companies complete in 238 s with unqueried families reported as `failed`. Set `--max-requests` and `--max-seconds` to Builderr's actual limits. Compute and bandwidth are excluded |
+| Exact revision | Use the full hash returned by `git rev-parse HEAD` on this release; the release handoff gives the pinned hash. A local commit must be pushed before Builderr can fetch it. |
+| Install | `python -m pip install uv==0.10.9` then `uv sync --frozen` |
+| Smoke report | [Current 100-company report](submission/candidate-20261019/smoke-run-report.json) |
+| Models in declared command | None required. Optional AI modes are described below. |
+| External API cost | $0 for the declared keyless command; compute and bandwidth excluded. |
+| APIs | Enhetsregisteret, Regnskapsregisteret, NAV Job Vacancy Feed and verified company websites under robots.txt. NAV's published public token is fetched at runtime. No personal account credential is required. |
+| Licences | MIT application; beautifulsoup4/soupsieve MIT; certifi MPL-2.0; official data and website access as documented in [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md). |
 | Contact | Sankalp Wanjari — wanjarisankalp@gmail.com |
 
-## Before sending
+## One evaluator command
 
-1. Exact commit 29daa24c8ee9ef330ebc8c721168f6b2dce800d6 was verified from a clean GitHub clone: locked install, 80 tests and a live run producing valid envelopes and the viewer. Later implementation commit `0f51c30342dfc6cdbba3c8c94c1aae9c7301348c` adds opt-in search; it is not automatically part of submitted version 1.
-2. Ask Builderr to confirm the official request/time budget and any frozen registry snapshot. When a snapshot is supplied, append `--registry <path> --registry-retrieved-at <timestamp>`.
-3. Up to four revised hashes are allowed after version 1 (five versions total). On today's date, 18 October 2026, confirm whether revisions are still accepted: the contract says close October 18 while the challenge page says before October 18. Exact hour/timezone is unspecified.
+```sh
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --no-discover
+```
 
-## Original version-1 email template (historical; participant reports submission)
+The 20,000-request / 1,800-second limits are local engineering settings, **not confirmed official allowances**. Builderr must substitute its actual shared limits. If a frozen registry is supplied, add `--registry registry.jsonl --registry-retrieved-at <actual retrieval timestamp>`. Inputs are always the evaluator-supplied company numbers; the local sample never controls official runs.
 
-To: submit@builderr.ai
-Subject: Signalpost entry — OrgLens v2 — Sankalp Wanjari
+Open `out/evaluation/index.html` directly on desktop or mobile to search companies, compare two profiles, inspect dated accounts, follow citations and expand evidence locators. The viewer is self-contained and requires no frontend installation or external hosting. Missing data stays explicit.
 
-Hello Builderr,
+## Why this revision should improve the entry
 
-Please evaluate OrgLens v2, an evidence-first agent for Norwegian company research.
+- External research runs before the costly job-feed detail work. Stage budgets and NAV detail caps preserve research breadth.
+- Publisher checks reject directories, platforms and conflicting company identities. Search-result mentions alone cannot prove a company's website.
+- Source spans, feed URLs, Facebook profile IDs and social evidence locators preserve the actual evidence.
+- Static careers/terms pages are excluded from generic news markup. Refresh caches are per run; saved-source replay retains original retrieval dates.
+- Shared snapshot validation hashes once per invocation with bounded concurrency, while rechecking corruption on every later validation.
+- The responsive viewer adds a compact, cited comparison overview. [Desktop](docs/images/comparison-desktop.png) and [mobile](docs/images/comparison-mobile.png) inspection captures use earlier development data; they illustrate the current viewer layout, not fresh research.
 
-- Repository: https://github.com/sankalp2515/AI-Agent-Company-Search
-- Exact commit: 29daa24c8ee9ef330ebc8c721168f6b2dce800d6
-- Install: `uv sync --frozen`
-- Run: `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700`
+See [the experiment record](docs/QUALIFICATION-EXPERIMENTS-2026-10-18.md) for retained failures and limits. Structural validation and smoke coverage do not establish an official score or factual precision.
 
-It needs no API keys and has $0 external API cost.
+## Optional AI and search
 
-For every company, it combines:
+`--extract-ai --providers groq --max-model-calls 60` enables bounded literal-quotation selection from an already verified website. The model selects a paragraph index or abstains; it cannot author claims or override identity checks. `--discover --max-search-queries 60` enables search candidates through configured providers. The declared keyless command enables neither option.
 
-- official identity, accounts, roles and workplaces;
-- active job ads from NAV's official feed, published only when the employer organisation number matches exactly;
-- a verified company website found without a search API, published only with an exact identity proof;
-- site-derived description, social profiles, contacts and dated activity;
-- a cited narrative summary.
+Local experiments used Groq `openai/gpt-oss-20b` plus optional SerpAPI/Tavily search. Provider model licences and service terms are separate from the application licence. Model token usage is recorded, but a complete paid official-run cost is not verified. Use an AI/search revision only when Builderr agrees to reproducible credentials and budgets. Do not send personal keys or raw snapshots in Git.
 
-The repository includes the 100-company smoke result, a live refresh (0 changes), 1,100 company profiles, a tight-budget stress report and a responsive evidence viewer (`index.html`) that was verified on desktop and mobile.
+## Revision acceptance
 
-Could you confirm the official request/time budget, and whether a frozen registry snapshot will be supplied?
-
-Contact: Sankalp Wanjari — wanjarisankalp@gmail.com
-
-Thank you.
+The live challenge header says October 21, but its revision paragraph still says up to four revised hashes **before October 18**. On October 19, acceptance of another revision requires Builderr's clarification. This repository makes no assumption that the revision window was extended. No email or revised entry has been sent by this task.

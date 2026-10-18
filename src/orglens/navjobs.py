@@ -28,11 +28,13 @@ def norm_employer(name):
 
 
 class NavJobs:
-    def __init__(self, days=45, max_pages=200, segments=6, max_ads_per_company=10):
+    def __init__(self, days=45, max_pages=200, segments=6, max_ads_per_company=10, max_candidate_details=4, max_detail_requests=None):
         self.days = days
         self.max_pages = max_pages
         self.segments = segments
         self.max_ads = max_ads_per_company
+        self.max_candidate_details = max_candidate_details
+        self.max_detail_requests = max_detail_requests
         self.token = None
         self.index = {}  # normalized business name -> {uuid: feed item}
         self.org_index = {}
@@ -44,6 +46,29 @@ class NavJobs:
         self.lock = threading.Lock()
         self.details = 0
         self.complete_segments = 0
+        self.response_cache = {}
+        self.response_locks = {}
+        self.cache_hits = 0
+
+    def cached_get(self, transport, url, source_class="official_public_api", headers=None, detail=False):
+        """One in-run fetch per URL, including concurrent companies; never relabel old evidence fresh."""
+        with self.lock:
+            lock = self.response_locks.setdefault(url, threading.Lock())
+        with lock:
+            with self.lock:
+                if url in self.response_cache:
+                    self.cache_hits += 1
+                    return self.response_cache[url]
+                if detail:
+                    if self.max_detail_requests is not None and self.details >= self.max_detail_requests:
+                        return {"source_url": url, "status": 0, "error": "NAV detail module budget exhausted"}
+                    self.details += 1
+            snapshot = transport.get(url, source_class, headers=headers) if headers else transport.get(url, source_class)
+            # All consumers see the same run observation. Failed observations remain explicit;
+            # source-wide retry policy belongs to the next refresh, not each namesake company.
+            with self.lock:
+                self.response_cache[url] = snapshot
+            return snapshot
 
     def headers(self):
         return {"Authorization": "Bearer " + self.token, "Accept": "application/json"}
@@ -53,6 +78,8 @@ class NavJobs:
         cap = min(self.max_pages, page_cap if page_cap is not None else self.max_pages)
         self.index, self.org_index, self.word_index, self.compact_index = {}, {}, {}, {}
         self.pages, self.complete_segments = 0, 0
+        self.response_cache, self.response_locks = {}, {}
+        self.details, self.cache_hits = 0, 0
         self.error = None
         if cap < self.segments:
             self.state = "not_loaded"
@@ -188,7 +215,7 @@ class NavJobs:
         names = [body.get("navn", "")] + [n for n in units.values() if n] + [h.get("navn", "") for h in body.get("historiskeNavn", [])[-2:]]
         accepted, homepages, detail_failures = 0, [], 0
         candidates = self.candidates(names, [org, *units])
-        limit = self.max_ads * 2
+        limit = min(self.max_ads * 2, self.max_candidate_details)
         partial = self.state == "partial" or len(candidates) > limit
         researched = 0
         for item in candidates[:limit]:
@@ -196,9 +223,7 @@ class NavJobs:
                 partial = True
                 break
             researched += 1
-            snap = transport.get(BASE + item["url"], "official_public_api", headers=self.headers())
-            with self.lock:
-                self.details += 1
+            snap = self.cached_get(transport, BASE + item["url"], headers=self.headers(), detail=True)
             if snap.get("status") != 200:
                 detail_failures += 1
                 continue
@@ -215,7 +240,7 @@ class NavJobs:
             parent_snap = None
             if employer_org != org and employer_org not in units and len(employer_org) == 9:
                 # NAV usually names the workplace; prove it is a registered subunit of this exact entity.
-                parent_snap = transport.get("https://data.brreg.no/enhetsregisteret/api/underenheter/" + employer_org)
+                parent_snap = self.cached_get(transport, "https://data.brreg.no/enhetsregisteret/api/underenheter/" + employer_org, "official_registry")
                 try:
                     unit = json.loads(parent_snap["text"]) if parent_snap.get("status") == 200 else {}
                 except ValueError:
@@ -257,6 +282,8 @@ class NavJobs:
     def report(self):
         return {"source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)", "state": self.state, "window_days": self.days,
                 "feed_pages": self.pages, "detail_requests": self.details,
+                "cache_hits": self.cache_hits, "max_candidate_details": self.max_candidate_details,
+                "max_detail_requests": self.max_detail_requests,
                 "completed_segments": self.complete_segments, "total_segments": self.segments, "error": self.error,
                 "indexed_active_employers": len(self.index), "indexed_active_ads": sum(len(v) for v in self.index.values()),
                 "token": "NAV_FEED_TOKEN" if os.environ.get("NAV_FEED_TOKEN") else "NAV published public token"}

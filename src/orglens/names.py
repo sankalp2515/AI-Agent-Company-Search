@@ -27,7 +27,8 @@ AGGREGATORS = {"brreg.no", "proff.no", "purehelp.no", "gulesider.no", "1881.no",
                "linkedin.com", "facebook.com", "instagram.com", "indeed.com", "glassdoor.com", "tiktok.com", "x.com",
                "twitter.com", "youtube.com", "wikipedia.org", "nav.no", "arbeidsplassen.no", "vibbo.no",
                "eurocampings.co.uk", "booking.com", "tripadvisor.com", "google.com", "yelp.com", "mittanbud.no",
-               "anbudstorget.no", "legelisten.no", "utdanning.no", "visitnorway.com", "norgesbilen.no", "proffnett.no"}
+               "anbudstorget.no", "legelisten.no", "utdanning.no", "visitnorway.com", "norgesbilen.no", "proffnett.no",
+               "lokalebedrifter.no", "byndle.no", "tikkio.com", "ticketco.events", "eventbrite.com"}
 
 
 def translit(value):
@@ -84,21 +85,40 @@ def domain_is_full_name(url, legal_name):
     """Domain label spells the complete core legal name (hyphens ignored)."""
     domain = registrable(urllib.parse.urlsplit(url).hostname)
     label = translit(domain.split(".")[0]).replace("-", "")
-    joined = "".join(name_tokens(legal_name))
+    words = re.findall(r"[a-z0-9]+", translit(legal_name))
+    removable = LEGAL_FORMS - {"norge", "norway", "avd", "avdeling", "filial"}
+    complete = [w for w in words if w not in removable]
+    joined = "".join(w for w in complete if w not in STOPWORDS)
     national = set(re.findall(r"[a-z]+", translit(legal_name))) & {"norge", "norway", "norden", "scandinavia", "skandinavia"}
     if national and not domain.endswith(".no"):
         # "X Norway AS" on x.com is usually the international parent's site, not the Norwegian entity.
         return False
-    return len(joined) >= 5 and label == joined
+    variants = {joined, "".join(complete)}
+    if national and domain.endswith('.no'):
+        # Preserve the existing Norwegian-domain alias policy. The same alias
+        # on an international parent domain is still rejected above.
+        variants.add("".join(name_tokens(legal_name)))
+    return len(joined) >= 5 and label in variants
 
 
 def text_contains_name(text, legal_name):
     """Full core legal name (all tokens, in order) appears in visible text."""
-    core = core_name(legal_name)
-    if len(core) < 4:
-        return False
-    visible = " " + " ".join(re.findall(r"[a-z0-9]+", translit(text))) + " "
-    return " " + core + " " in visible
+    return matched_name_span(text, legal_name) is not None
+
+
+def matched_name_span(text, legal_name):
+    """Return the actual visible name span, preserving case, accents and punctuation."""
+    # Apply the same connector/form normalization to both sides. Preserve
+    # national and division qualifiers: a parent brand is not its Norwegian unit.
+    removable = (LEGAL_FORMS - {"norge", "norway", "avd", "avdeling", "filial"}) | STOPWORDS
+    expected = [translit(m.group()) for m in re.finditer(r'[^\W_]+', legal_name) if translit(m.group()) not in removable]
+    if len(' '.join(expected)) < 4:
+        return None
+    visible = [(translit(m.group()), m.start(), m.end()) for m in re.finditer(r'[^\W_]+', text) if translit(m.group()) not in removable]
+    for i in range(len(visible)-len(expected)+1):
+        if [w[0] for w in visible[i:i+len(expected)]] == expected:
+            return text[visible[i][1]:visible[i+len(expected)-1][2]]
+    return None
 
 
 def guess_domains(legal_name, legal_form_code=None, limit=6):

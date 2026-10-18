@@ -39,7 +39,7 @@ def _open(req, timeout, ctx):
     return urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPSHandler(context=ctx)).open(req, timeout=timeout)
 
 
-def candidate_roots(body):
+def candidate_roots(body, preserve_paths=False):
     """Extract candidate root URLs from Brave, Tavily, SerpAPI, or raw URL collections."""
     roots = []
     urls = []
@@ -76,7 +76,9 @@ def candidate_roots(body):
         if p.scheme not in {"http", "https"}:
             continue
         # Deduplicate and promote to root https URL
-        root = urllib.parse.urlunsplit(("https", p.netloc, "/", "", ""))
+        path = p.path or "/" if preserve_paths else "/"
+        query = urllib.parse.urlencode([(k,v) for k,v in urllib.parse.parse_qsl(p.query) if not k.lower().startswith(('utm_', 'fbclid', 'gclid'))]) if preserve_paths else ""
+        root = urllib.parse.urlunsplit(("https", p.netloc, path, query, ""))
         if root not in roots:
             roots.append(root)
     return roots[:3]
@@ -133,7 +135,7 @@ class SerpApiProvider:
                     if any(t in err for t in ("exhaust", "quota", "plan", "searches", "rate")):
                         self.disabled = True
                     return []
-                return candidate_roots(data)
+                return candidate_roots(data, preserve_paths=True)
         except urllib.error.HTTPError as exc:
             if exc.code in {401, 402, 403, 429}:
                 self.disabled = True
@@ -178,7 +180,7 @@ class TavilyProvider:
                 if len(raw) > 2_000_000:
                     return []
                 data = json.loads(raw.decode("utf-8", errors="replace"))
-                return candidate_roots(data)
+                return candidate_roots(data, preserve_paths=True)
         except urllib.error.HTTPError as exc:
             if exc.code in {401, 402, 403, 429, 432, 433}:
                 self.disabled = True
@@ -189,10 +191,11 @@ class TavilyProvider:
 
 class MultiSearchDiscovery:
     """Ordered fallback chain across search providers with strict budgets and caps."""
-    def __init__(self, providers, unit_cost=0.0, max_cost=0.0):
+    def __init__(self, providers, unit_cost=0.0, max_cost=0.0, max_queries=100):
         self.providers = providers
         self.unit_cost = Decimal(str(unit_cost))
         self.max_cost = Decimal(str(max_cost))
+        self.max_queries = max_queries
         self.spent = Decimal("0")
         self.calls = 0
         self.lock = threading.Lock()
@@ -216,16 +219,16 @@ class MultiSearchDiscovery:
             if getattr(provider, "disabled", False):
                 continue
             with self.lock:
+                if self.calls >= self.max_queries:
+                    return []
                 if self.max_cost > 0 and self.spent + self.unit_cost > self.max_cost:
                     return []
                 transport.reserve(getattr(provider, "endpoint", "search"))
-
-            candidates = provider.search(query, timeout)
-            with self.lock:
+                # Reserve cost and attempts atomically before concurrent requests begin.
                 self.spent += self.unit_cost
                 self.calls += 1
                 self.local.calls = getattr(self.local, "calls", 0) + 1
-
+            candidates = provider.search(query, timeout)
             if candidates:
                 return candidates
 
@@ -271,7 +274,7 @@ class BraveDiscovery:
         return candidate_roots(payload)
 
 
-def build_discovery_from_env(unit_cost=0.0, max_cost=0.0):
+def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100):
     """Instantiate ordered provider chain from environment variables."""
     providers = []
     # 1. Primary: SerpAPI Key 1 (highest Norwegian entity precision)
@@ -292,4 +295,4 @@ def build_discovery_from_env(unit_cost=0.0, max_cost=0.0):
     if not providers:
         return None
 
-    return MultiSearchDiscovery(providers, unit_cost=unit_cost, max_cost=max_cost)
+    return MultiSearchDiscovery(providers, unit_cost=unit_cost, max_cost=max_cost, max_queries=max_queries)

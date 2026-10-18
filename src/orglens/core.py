@@ -110,6 +110,9 @@ class Transport:
         self.host_times = {}
         self.host_delays = {}
         self.local = threading.local()
+        self.site_cache = {}
+        self.site_cache_locks = {}
+        self.site_cache_hits = 0
 
     def reserve(self, url):
         host = urllib.parse.urlsplit(url).hostname
@@ -132,6 +135,23 @@ class Transport:
                 self.host_times[host] = time.monotonic()
 
     def get(self, url, source_class="official_registry", headers=None):
+        if source_class != "company_owned" or headers:
+            return self._get(url, source_class, headers)
+        with self.lock:
+            lock = self.site_cache_locks.setdefault(url, threading.Lock())
+        with lock:
+            with self.lock:
+                cached = self.site_cache.get(url)
+                if cached is not None:
+                    self.site_cache_hits += 1
+                    return dict(cached)
+            snapshot = self._get(url, source_class, headers)
+            if snapshot.get('status') in {200, 404, 410}:
+                with self.lock:
+                    self.site_cache[url] = dict(snapshot)
+            return snapshot
+
+    def _get(self, url, source_class="official_registry", headers=None):
         started = time.monotonic()
         requested = url
         origin_host = urllib.parse.urlsplit(url).hostname
@@ -495,11 +515,19 @@ def social_profile(url):
     if not platform or p.scheme not in {"http", "https"} or not path or path.count("/") > 3:
         return None
     lowered = path.lower()
+    if platform == "facebook" and (re.fullmatch(r"/\d+_\d+", lowered) or lowered in {"/photo.php", "/story.php", "/permalink.php", "/video.php", "/photo", "/reel"}):
+        return None
     if any(x in lowered for x in ("sharer", "/share", "intent/", "/plugins", "dialog/", "/hashtag", "/watch", "/p/", "/reel", "/status/", "/posts/", "/events/")):
         return None
     if lowered in {"/home", "/login", "/privacy", "/legal", "/policies", "/terms"}:
         return None
-    return {"platform": platform, "url": urllib.parse.urlunsplit(("https", p.netloc.lower().removeprefix("m."), path, "", ""))}
+    query = ""
+    if platform == "facebook" and lowered == "/profile.php":
+        identifiers = urllib.parse.parse_qs(p.query, keep_blank_values=True).get("id", [])
+        if len(identifiers) != 1 or not re.fullmatch(r"[0-9]+", identifiers[0]):
+            return None
+        query = urllib.parse.urlencode({"id": identifiers[0]})
+    return {"platform": platform, "url": urllib.parse.urlunsplit(("https", p.netloc.lower().removeprefix("m."), path, query, ""))}
 
 
 def proof_on_pages(org, legal_name, pages):
@@ -589,6 +617,7 @@ def operating_leader_on_pages(row, pages, legal):
 
 
 def corroborated(body, pages, row=None, domain_named=False):
+    from .names import matched_name_span
     legal = body.get("navn", "")
     if row is not None and domain_named is True:
         # domain_named=True only when the domain spells the complete legal name (see crawl_site).
@@ -602,7 +631,8 @@ def corroborated(body, pages, row=None, domain_named=False):
     postcode = str(address.get("postnummer", ""))
     streets = [translit_text(x) for x in address.get("adresse", []) if not str(x).lower().startswith("c/o")]
     for snapshot, soup, text in pages:
-        if not legal_flat or " " + legal_flat + " " not in " " + translit_text(text) + " ":
+        actual_name = matched_name_span(text, legal)
+        if not legal_flat or actual_name is None:
             continue
         flat = " " + translit_text(text) + " "
         tokens = re.findall(r"(?<!\w)(?:\+47[ .-]*|0047[ .-]*)?(?:\d[ .-]*){8}(?!\w)", text)
@@ -610,9 +640,9 @@ def corroborated(body, pages, row=None, domain_named=False):
             tokens.append(a.get("href", "")[4:])
         matched_phone = next((v for v in tokens if re.sub(r"\D", "", v).removeprefix("0047").removeprefix("47") == phone or re.sub(r"\D", "", v) == phone), None)
         if len(phone) == 8 and matched_phone:
-            return snapshot, {"text_quote": legal, "phone_quote": matched_phone, "corroboration": "full legal name + bounded registered phone"}, "legal_name_and_registered_phone"
+            return snapshot, {"text_quote": actual_name, "registered_legal_name": legal, "phone_quote": matched_phone, "corroboration": "full legal name + bounded registered phone"}, "legal_name_and_registered_phone"
         if postcode and " " + postcode + " " in flat and any(len(s) >= 5 and " " + s + " " in flat for s in streets):
-            return snapshot, {"text_quote": legal, "corroboration": "exact legal name + registered street and postcode"}, "legal_name_and_registered_address"
+            return snapshot, {"text_quote": actual_name, "registered_legal_name": legal, "corroboration": "exact legal name + registered street and postcode"}, "legal_name_and_registered_address"
     return None
 
 
@@ -662,6 +692,12 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         site_fail(row, "ambiguous", f"Candidate {host} is a directory/platform, not a company-owned site")
         return False
     base = urllib.parse.urlunsplit((p.scheme, p.netloc, "/", "", ""))
+    discovered_page = None
+    if origin == "search" and (p.path not in {"", "/"} or p.query):
+        # A search hit identifies a document, not its publisher. Prove the site's
+        # owner at its root/contact pages before using the discovered document.
+        # Otherwise a directory's customer number becomes the site's identity.
+        discovered_page, url = url, base
     robot, state = fetch_robots(row, base, host, transport)
     if robot is None:
         site_fail(row, state)
@@ -742,7 +778,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
     claim(row, "official_website", home["source_url"], proof_snap, proof_locator, identity_method=method)
     row["availability"]["official_website"] = "available"
     row.setdefault("website_research", {})["verification"] = {"url": home["source_url"], "method": method, "origin": origin}
-    for target in (links[2:] + extra)[: max(0, budget - min(2, len(links)))]:
+    remaining_links = ([discovered_page] if discovered_page and discovered_page != home["source_url"] else []) + links[2:] + extra
+    for target in remaining_links[: max(0, budget - min(2, len(links)))]:
         fetch(target)
     if feed is not None and robot.can_fetch(UA, urllib.parse.urljoin(home["source_url"], feed["href"])):
         feed_url = urllib.parse.urljoin(home["source_url"], feed["href"])
@@ -751,32 +788,44 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             attach(row, feed_snap)
             if availability(feed_snap) == "available":
                 extract_feed(row, feed_snap)
-    extract_site_facts(row, body, pages, method)
+    extract_site_facts(row, body, pages, method, getattr(transport, "quote_selector", None), transport)
     return True
 
 
 def extract_feed(row, snap):
+    import xml.etree.ElementTree as ET
     try:
-        soup = BeautifulSoup(snap["text"], "html.parser")
-    except Exception:
+        if re.search(r'<!DOCTYPE|<!ENTITY', snap['text'], re.I):
+            return
+        root = ET.fromstring(snap['text'])
+    except (ET.ParseError, ValueError):
         return
     count = 0
-    for item in soup.find_all(["item", "entry"]):
-        title = item.find("title")
-        date = item.find(["pubdate", "published", "updated", "dc:date"])
-        link = item.find("link")
-        href = (link.get("href") or link.get_text(strip=True)) if link else None
-        if not (title and date and title.get_text(strip=True)):
+    local = lambda tag: tag.rsplit('}', 1)[-1].lower()
+    for item in root.iter():
+        if local(item.tag) not in {'item', 'entry'}:
             continue
-        claim(row, "activity", {"headline": title.get_text(strip=True)[:300], "published_at": date.get_text(strip=True), "url": href or snap["source_url"],
-                                "kind": "company_owned_feed_item"}, snap, {"feed_item": count, "title": title.get_text(strip=True)[:120]}, identity_method="verified_company_site_feed")
+        children = {local(n.tag): n for n in item}
+        content = lambda key: ''.join(children[key].itertext()).strip() if key in children else ''
+        title = content('title')
+        date = content('pubdate') or content('published') or content('updated') or content('date')
+        if not title or not date:
+            continue
+        links = [n for n in item if local(n.tag) == 'link' and n.get('rel', 'alternate') == 'alternate']
+        href = next((n.get('href') or (n.text or '').strip() for n in links if n.get('href') or (n.text or '').strip()), None)
+        href = urllib.parse.urljoin(snap['source_url'], href) if href else snap['source_url']
+        if urllib.parse.urlsplit(href).scheme not in {'http', 'https'}:
+            continue
+        claim(row, "activity", {"headline": title[:300], "published_at": date, "url": href,
+                                "kind": "company_owned_feed_item"}, snap, {"feed_item": count, "title": title[:120]},
+              period={"published_at": date}, identity_method="verified_company_site_feed")
         row["availability"]["activity"] = "available"
         count += 1
         if count >= 8:
             break
 
 
-def extract_site_facts(row, body, pages, method):
+def extract_site_facts(row, body, pages, method, quote_selector=None, transport=None):
     from .names import core_name
     org = row["organisation_number"]
     home, home_soup, _ = pages[0]
@@ -812,7 +861,15 @@ def extract_site_facts(row, body, pages, method):
             else:
                 profile = social_profile(urllib.parse.urljoin(snap["source_url"], href))
                 if profile:
-                    socials.setdefault(profile["url"].lower(), (profile, snap))
+                    if profile['platform'] == 'facebook' and re.fullmatch(r'/\d+', urllib.parse.urlsplit(profile['url']).path):
+                        # Bare numeric URLs can be photos as well as pages. Require
+                        # an explicit profile link context; an embedded feed image
+                        # alone cannot establish a company-linked profile.
+                        label = ' '.join([a.get_text(' ',strip=True), str(a.get('aria-label','')), str(a.get('title',''))])
+                        context = a.find_parent(['footer']) or a.find_parent(class_=re.compile(r'social|sosial',re.I))
+                        if not context and not re.search(r'facebook|f[øo]lg oss|follow us',label,re.I):
+                            continue
+                    socials.setdefault(profile["url"].lower(), (profile, snap, {"link_href": href}))
         for node in jsonld_nodes(snap["text"]):
             types = node_types(node)
             if any(t in ("Organization", "LocalBusiness", "Corporation") for t in types):
@@ -820,7 +877,7 @@ def extract_site_facts(row, body, pages, method):
                 for linked in [same_as] if isinstance(same_as, str) else same_as if isinstance(same_as, list) else []:
                     profile = social_profile(linked) if isinstance(linked, str) else None
                     if profile:
-                        socials.setdefault(profile["url"].lower(), (profile, snap))
+                        socials.setdefault(profile["url"].lower(), (profile, snap, {"jsonld": {"sameAs": linked}}))
                 if snap is home and node.get("description") and row["availability"].get("description") != "available" and len(str(node["description"])) >= 20:
                     claim(row, "description", str(node["description"])[:1000], snap, {"jsonld": "Organization.description"}, identity_method="verified_company_site")
                     row["availability"]["description"] = "available"
@@ -835,7 +892,7 @@ def extract_site_facts(row, body, pages, method):
                       "url": node.get("url", snap["source_url"]), "source": "company website JobPosting"}, snap,
                       {"jsonld": {k: node.get(k) for k in ("title", "datePosted", "validThrough")}}, identity_method="verified_site_and_exact_hiring_name")
                 row["availability"]["jobs"] = "available"
-            static_page = re.search(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|kontakt|contact|forside|home",
+            static_page = re.search(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|salgsbetingelser|kj[oø]psbetingelser|career|karriere|ledige[- /]stillinger|kontakt|contact|forside|home",
                                     (str(node.get("url") or snap["source_url"]) + " " + str(node.get("headline") or "")).lower())
             if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and (not static_page or "NewsArticle" in types or "PressRelease" in types) and snap is not pages[0][0]:
                 claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": node["datePublished"], "url": node.get("url") or snap["source_url"],
@@ -857,9 +914,9 @@ def extract_site_facts(row, body, pages, method):
                 seen += 1
                 if seen >= 6:
                     break
-    for key, (profile, snap) in list(socials.items())[:10]:
+    for key, (profile, snap, locator) in list(socials.items())[:10]:
         claim(row, "owned_profiles", {"platform": profile["platform"], "url": profile["url"], "relation": "linked from verified company website; profile content not fetched"},
-              snap, {"link_href": profile["url"]}, identity_method="outbound_link_on_verified_company_site")
+              snap, locator, identity_method="outbound_link_on_verified_company_site")
         row["availability"]["owned_profiles"] = "available"
     for email, snap in list(emails.items())[:3]:
         claim(row, "contact", {"type": "email", "value": email}, snap, {"link_href": "mailto:" + email}, identity_method="verified_company_site")
@@ -867,6 +924,43 @@ def extract_site_facts(row, body, pages, method):
     for phone, snap in list(phones.items())[:3]:
         claim(row, "contact", {"type": "phone", "value": phone}, snap, {"link_href": "tel:" + phone}, identity_method="verified_company_site")
         row["availability"]["contact"] = "available"
+    if row["availability"].get("description") != "available":
+        def description_quote(node):
+            quote = node.get_text(' ', strip=True)
+            if not 60 <= len(quote) <= 1200 or re.search(r'cookie|personvern|privacy|samtykke|javascript|nettleser|all rights reserved', quote, re.I):
+                return None
+            for parent in [node, *node.parents]:
+                if parent.name in {'nav', 'header', 'footer', 'aside'}:
+                    return None
+                classes = parent.get('class', [])
+                classes = classes if isinstance(classes, list) else [classes]
+                if re.search(r'(?:^|[-_\s])(blog|news|nyhet|post)(?:[-_\s]|$)', ' '.join(classes), re.I):
+                    return None
+            return quote
+        # Literal company-authored prose is useful when metadata is absent. Restrict
+        # this fallback to page main content; navigation/cookie/footer text is not a profile.
+        for snap, parsed, visible in pages:
+            if set(labelled_numbers(visible)) - {org}:
+                continue
+            options=[]
+            selector='main p, [role="main"] p, article p'
+            for paragraph in parsed.select(selector):
+                quote = description_quote(paragraph)
+                if quote and quote not in options:options.append(quote)
+            if quote_selector and transport:
+                # More sites use nested divs instead of semantic main/paragraph tags.
+                # The model may select an existing source span, never author one.
+                for node in parsed.select('p, div, section'):
+                    if node.find_parent(['nav','header','footer','aside']) or node.find(['p','div','section']):continue
+                    quote=description_quote(node)
+                    if quote and quote not in options:options.append(quote)
+                quote=quote_selector.select_description(body.get('navn',''),options,transport)
+            else:
+                quote=options[0] if options else None
+            if quote and quote in options and quote in visible:
+                claim(row, "description", quote, snap, {"text_quote": quote}, identity_method="verified_company_site_model_selected_quote" if quote_selector else "verified_company_site_literal_text")
+                row["availability"]["description"] = "available"
+                return
 
 
 def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2):
@@ -1114,6 +1208,7 @@ def finish(row, previous=None):
 
 def validate(rows, orgs, snapshots=None):
     errors = []
+    snapshot_hashes = []
     if [r["organisation_number"] for r in rows] != orgs:
         errors.append("Output membership/order differs from input")
     for row in rows:
@@ -1135,13 +1230,28 @@ def validate(rows, orgs, snapshots=None):
                 errors.append("Incomplete evidence")
         if snapshots:
             for s in row["source_snapshots"]:
-                path = Path(snapshots) / (s["content_sha256"] + ".bin")
-                if not path.exists() or digest(path.read_bytes()) != s["content_sha256"]:
-                    errors.append("Snapshot missing or corrupted")
+                snapshot_hashes.append(s["content_sha256"])
+    if snapshot_hashes:
+        def intact(sha):
+            path = Path(snapshots) / (sha + ".bin")
+            try:
+                return path.exists() and digest(path.read_bytes()) == sha
+            except OSError:
+                return False
+        # Shared evidence is immutable within this check. Rehash it on every
+        # validation invocation, with bounded I/O rather than serial file reads.
+        unique = list(dict.fromkeys(snapshot_hashes))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            checked = dict(zip(unique, pool.map(intact, unique)))
+        for sha in snapshot_hashes:
+            if not checked[sha]:
+                errors.append("Snapshot missing or corrupted")
     return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
 
 
-def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True):
+def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
+    if strategy not in {"baseline", "balanced"}:
+        raise ValueError("Unknown research strategy")
     if agent and replay:
         raise ValueError("AI network research is not allowed in offline replay")
     output = Path(output)
@@ -1153,6 +1263,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         # Reserve time to write envelopes, validate evidence and render the viewer inside --max-seconds.
         transport = Transport(output / "snapshots", requests, max(30, seconds - max(60, seconds * 0.08)))
     started = time.monotonic()
+    transport.quote_selector = quote_selector
     rows = [envelope(org, run_id) for org in orgs]
     bodies = {}
     prior = {r["organisation_number"]: r for r in previous or []}
@@ -1234,7 +1345,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 share = remaining / pending
                 depth = max(2, min(pages, int(share) - 2))
                 research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
-                                 guesses=guesses and share >= 6, max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
+                                 guesses=guesses and share >= (3 if strategy == "balanced" else 6), max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
             elif module == "jobs":
                 if jobs_source is None:
                     row["availability"]["jobs"] = row["availability"].get("jobs", "not_available")
@@ -1268,10 +1379,29 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         row["operations"]["requests"] += getattr(transport.local, "requests", 0) - before_requests
 
     nav_homepages, nav_thread = {}, None
+    stage_metrics = []
+    if strategy == "balanced":
+        # Reserve the early opportunity for source-backed external facts. Official
+        # identities still anchor every row; financials remain the first record phase.
+        phase_order = ("identity", *(("website",) if "website" in modules else ()),
+                       *(("discovery",) if discovery else ()), *(("agent",) if agent else ()),
+                       *(m for m in modules if m not in {"website", "jobs"}),
+                       *(("jobs",) if "jobs" in modules else ()))
+        if jobs_source:
+            jobs_source.max_detail_requests = max(1, requests // 10)
+    else:
+        phase_order = ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ()))
     # Breadth before depth prevents early entities consuming every request.
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        for module in ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ())):
-            if module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
+        for module in phase_order:
+            stage_begin = transport.requests
+            transport.limit = requests
+            if strategy == "balanced" and module in {"website", "discovery", "agent"}:
+                fraction = .60 if module == "website" else .30
+                transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
+            if strategy == "balanced" and module == "jobs" and jobs_source and not replay:
+                jobs_source.load(transport, min(100, max(0, requests - transport.requests) // 2))
+            if strategy == "baseline" and module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
                 # The shared job index loads once per run, overlapping the official-record phases.
                 official_cost = sum(1 for m in modules if m in {"financials", "leadership", "locations"}) * len(bodies)
                 cap = int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.3)
@@ -1292,6 +1422,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                         transport.retries_left = max(getattr(transport, "retries_left", 0), len(again))
                     list(pool.map(lambda r: task(r, module), again))
             write_rows(output / "checkpoint.jsonl", rows)
+            stage_metrics.append({"stage": module, "requests": transport.requests-stage_begin,
+                                  "request_ceiling": transport.limit})
+        transport.limit = requests
     for row in rows:
         finish(row, prior.get(row["organisation_number"]))
         if row.get("agent", {}).get("selected_claim_ids"):
@@ -1310,9 +1443,17 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
               "states": {s: sum(v == s for r in rows for v in r["availability"].values()) for s in STATES},
               "score": None, "score_note": "Operational smoke test; no hidden labels or official competition score"}
     report["registry_snapshot"] = {"path": str(registry), "retrieved_at": registry_retrieved_at, "sha256": snapshot_hash} if registry else None
+    report["strategy"] = strategy
+    report["company_source_cache"] = {"scope": "this run only", "hits": transport.site_cache_hits,
+                                      "unique_urls": len(transport.site_cache),
+                                      "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."}
+    report["stages"] = stage_metrics
     report["mode"] = "saved_source_replay" if replay else "live"
     report["replay_source"] = str(replay) if replay else None
     report["agent"] = agent.report() if agent else None
+    report["quote_selector"] = quote_selector.report() if quote_selector else None
+    if quote_selector and quote_selector.calls:
+        report["third_party_cost_usd"] = None
     if agent:
         from .costs import estimate_costs
         report["third_party_cost_usd"] = None
@@ -1327,5 +1468,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             report["website_methods"][method] = report["website_methods"].get(method, 0) + 1
     report["discovery"] = {"provider": getattr(discovery, "provider_name", "Brave Web Search"), "queries": discovery.calls, "declared_unit_cost": float(discovery.unit_cost),
                            "max_cost_usd": float(discovery.max_cost), "live_verified": False} if discovery else None
+    if discovery and discovery.calls and not discovery.unit_cost:
+        report["third_party_cost_usd"] = None
+        report["discovery"]["billing_note"] = "Query usage measured, provider rate/free allowance unverified; zero declared rate is not proof of zero cost."
     write_json(output / "run-report.json", report)
     return rows, report

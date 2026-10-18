@@ -27,6 +27,7 @@ def main():
     run.add_argument("--max-seconds", type=int, default=2400)
     run.add_argument("--workers", type=int, default=12)
     run.add_argument("--pages", type=int, default=5)
+    run.add_argument("--strategy", choices=("baseline", "balanced"), default="baseline", help="Experimental bounded external-first allocation; baseline preserves original phase order")
     run.add_argument("--modules", default="financials,leadership,locations,jobs,website")
     run.add_argument("--nav-days", type=int, default=40, help="Window of NAV job-feed changes indexed for active ads")
     run.add_argument("--no-guess", action="store_true", help="Disable keyless name-derived website candidates")
@@ -39,6 +40,7 @@ def main():
     run.add_argument("--search-cost-per-request", type=float)
     run.add_argument("--max-api-cost", type=float, default=0)
     run.add_argument("--ai", action="store_true", help="Model-directed research with Tavily; API usage consumes account allowances")
+    run.add_argument("--extract-ai", action="store_true", help="Bounded model selection of literal description quotes from already verified sites")
     run.add_argument("--providers", default="groq,nvidia,cloudflare,cohere", help="Ordered fallback chain; Mistral opt-in until its quota is available")
     run.add_argument("--max-model-calls", type=int, default=100)
     run.add_argument("--max-search-queries", type=int, default=25)
@@ -90,6 +92,12 @@ def main():
         previous = [json.loads(line) for line in Path(args.previous).read_text(encoding="utf-8").splitlines() if line.strip()] if args.previous else None
         discovery = None
         agent = None
+        quote_selector = None
+        if args.extract_ai:
+            if args.replay:parser.error('Model quote selection cannot be used in offline replay')
+            from .agent import providers_from_env
+            from .quotes import QuoteSelector
+            quote_selector = QuoteSelector(providers_from_env(args.providers.split(','))[0], args.max_model_calls)
         if args.ai:
             if args.replay or args.discover_brave:
                 parser.error("AI mode cannot be combined with offline replay or Brave discovery")
@@ -110,12 +118,12 @@ def main():
             # Opt-in only: the evaluator command must stay keyless and reproducible.
             from .discovery import build_discovery_from_env
             discovery = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0,
-                                                 max_cost=args.max_api_cost or 0.0)
+                                                 max_cost=args.max_api_cost or 0.0, max_queries=args.max_search_queries)
         rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
                                  requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
                                  previous=previous, pages=args.pages, modules=modules,
                                  registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent,
-                                 jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess)
+                                 jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess, strategy=args.strategy, quote_selector=quote_selector)
         render(rows, Path(args.output) / "index.html")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         raise SystemExit(0 if report["validation"]["passed"] else 1)

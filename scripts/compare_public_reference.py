@@ -7,12 +7,15 @@ Do not silently remove missed opportunities or call host agreement identity proo
 import argparse
 import json
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit,parse_qs
 
 
 def url_key(url):
     p = urlsplit(str(url or ''))
-    return (p.hostname or '').lower().removeprefix('www.'), p.path.rstrip('/')
+    host=(p.hostname or '').lower().removeprefix('www.')
+    path=p.path.rstrip('/')
+    identity_query=tuple(parse_qs(p.query).get('id',[])) if host=='facebook.com' and path=='/profile.php' else ()
+    return host,path,identity_query
 
 
 def compare(rows, reference):

@@ -195,6 +195,7 @@ class Transport:
                     raw = bytes(buffer)
                     charset = response.headers.get_content_charset() or "utf-8"
                     content_type = response.headers.get_content_type()
+                    retry_after = response.headers.get('Retry-After')
                 sha = digest(raw)
                 # Immutable snapshots: identical bytes share storage, observations retain retrieval time.
                 dest = self.root / (sha + ".bin")
@@ -206,6 +207,7 @@ class Transport:
                         "source_url": url, "redirect_chain": chain, "status": status,
                         "retrieved_at": now(), "content_sha256": sha, "snapshot_path": f"snapshots/{sha}.bin",
                         "source_class": source_class, "content_type": content_type, "charset": charset,
+                        "retry_after": retry_after,
                         "text": raw.decode(charset, errors="replace"), "elapsed_ms": int((time.monotonic() - started) * 1000)}
             raise ValueError("Redirect limit exceeded")
         except (BudgetExceeded, ValueError, OSError, urllib.error.URLError) as exc:
@@ -243,6 +245,16 @@ def attach(row, snapshot):
     return safe["id"]
 
 
+def activity_identity(value):
+    if not isinstance(value,dict) or not value.get('url') or not value.get('published_at'):
+        return None
+    date=parsed_date(value['published_at'])
+    if date.year<1900:
+        return None
+    url=urllib.parse.urlsplit(value['url'])
+    return urllib.parse.urlunsplit((url.scheme,url.netloc.lower(),url.path.rstrip('/'),url.query,'')),date.date().isoformat()
+
+
 def claim(row, field, value, snapshot, locator, period=None, identity_method="official_organisation_endpoint"):
     if value is None or value == "":
         return
@@ -258,6 +270,13 @@ def claim(row, field, value, snapshot, locator, period=None, identity_method="of
           "reporting_period": period, "extraction_method": "deterministic_v1", "identity_method": identity_method}
     if not any(item["id"] == eid for item in row["evidence"]):
         row["evidence"].append(ev)
+    if field == 'activity':
+        key=activity_identity(value)
+        if key:
+            existing=next((c for c in row['claims'] if c['field']=='activity' and activity_identity(c['value'])==key),None)
+            if existing:
+                if eid not in existing['evidence_ids']:existing['evidence_ids'].append(eid)
+                return
     cid = digest({"org": row["organisation_number"], "field": field, "value": value, "period": period})[:24]
     if not any(item["id"] == cid for item in row["claims"]):
         row["claims"].append({"id": cid, "field": field, "value": value, "availability": "available", "evidence_ids": [eid], "reporting_period": period})
@@ -663,10 +682,26 @@ def site_fail(row, state, message=None):
 
 
 def fetch_robots(row, base, host, transport):
-    robot_snap = transport.get(urllib.parse.urljoin(base, "robots.txt"), "company_owned")
-    attach(row, robot_snap)
+    for attempt in range(2):
+        robot_snap = transport.get(urllib.parse.urljoin(base, "robots.txt"), "company_owned")
+        attach(row, robot_snap)
+        if (attempt or robot_snap.get('status') not in {0,429,500,502,503,504}
+                or robot_snap.get('budget_exhausted') or time.monotonic() >= getattr(transport,'deadline',float('inf'))-2):
+            break
+        delay = 1.0 if robot_snap.get('status') == 429 else 0.0
+        if robot_snap.get('retry_after'):
+            try:
+                delay=max(delay,float(robot_snap['retry_after']))
+            except ValueError:
+                try:delay=max(delay,parsedate_to_datetime(robot_snap['retry_after']).timestamp()-time.time())
+                except (ValueError,TypeError,OverflowError):break
+        if delay > 5 or time.monotonic()+delay >= getattr(transport,'deadline',float('inf'))-2:
+            break
+        if delay:time.sleep(delay)
     robot = urllib.robotparser.RobotFileParser()
     code = robot_snap["status"]
+    if code == 429:
+        return None, 'blocked'
     if code == 200:
         robot.parse(robot_snap["text"].splitlines())
         crawl_delay = robot.crawl_delay(UA) or robot.crawl_delay("*") or 0
@@ -731,6 +766,22 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             return False
         origin = "redirect"
     soup, text = soup_text(home["text"])
+    legal_name = body.get('navn','')
+    publisher_labels = [n.get_text(' ',strip=True) for n in soup.select('title,h1')]
+    publisher_labels += [n.get('content','') for n in soup.select('meta[property="og:site_name"]')]
+    if (origin == 'registry' and page_limit >= 3 and not domain_is_full_name(home['source_url'],legal_name)
+            and not any(text_contains_name(label,legal_name) for label in publisher_labels)):
+        # A registered URL can become a group portal. Follow an explicitly linked
+        # complete-name domain, then independently prove that target's identity.
+        for link in soup.find_all('a',href=True):
+            target=urllib.parse.urljoin(home['source_url'],link['href'])
+            if registrable(urllib.parse.urlsplit(target).hostname)==registrable(final_host) or not domain_is_full_name(target,legal_name):
+                continue
+            row.setdefault('website_research',{}).setdefault('registered_hub_candidates',[]).append({'source_url':home['source_url'],'candidate':target})
+            if crawl_site(row,body,transport,page_limit-1,origin='registered_hub_link',url=target):
+                return True
+            site_fail(row,'ambiguous','Registered group portal links a specific company site, but its identity remains unverified')
+            return False
     pages = [(home, soup, text)]
     links, extra = [], []
     feed = soup.find("link", attrs={"type": re.compile("rss|atom", re.I), "href": True})
@@ -756,8 +807,10 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             pages.append((snap, parsed, visible))
 
     budget = max(1, page_limit - 1)
-    for target in links[:min(2, budget)]:
+    initial_contacts = links[:min(2, budget)]
+    for target in initial_contacts:
         fetch(target)
+    used_contacts = len(initial_contacts)
     legal = body.get("navn", "")
     org = row["organisation_number"]
     proof = proof_on_pages(org, legal, pages)
@@ -776,6 +829,15 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
                                                               and any(text_contains_name(t, legal) for _, _, t in pages)):
             proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
                            "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
+    # Some companies put their legal identifier only in a privacy/legal page.
+    # Spend bounded extra identity work only when the first contact pages fail.
+    while not proof and not conflict and used_contacts < min(len(links), budget, 4):
+        fetch(links[used_contacts])
+        used_contacts += 1
+        proof = proof_on_pages(org, legal, pages)
+        conflict = conflicting_number(org, pages)
+        if not proof and not conflict and not managed:
+            proof = corroborated(body, pages, row, domain_is_full_name(home['source_url'], legal))
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
@@ -786,8 +848,9 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
     claim(row, "official_website", home["source_url"], proof_snap, proof_locator, identity_method=method)
     row["availability"]["official_website"] = "available"
     row.setdefault("website_research", {})["verification"] = {"url": home["source_url"], "method": method, "origin": origin}
-    remaining_links = ([discovered_page] if discovered_page and discovered_page != home["source_url"] else []) + links[2:] + extra
-    for target in remaining_links[: max(0, budget - min(2, len(links)))]:
+    remaining_links = ([discovered_page] if discovered_page and discovered_page != home["source_url"] else []) + links[used_contacts:] + extra
+    remaining_links.sort(key=lambda u: 0 if u == discovered_page else 1 if any(t in u.lower() for t in ('news','nyhet','aktuelt','presse','blog')) else 2 if any(t in u.lower() for t in MORE_TERMS) else 3)
+    for target in remaining_links[: max(0, budget - used_contacts)]:
         fetch(target)
     if feed is not None and robot.can_fetch(UA, urllib.parse.urljoin(home["source_url"], feed["href"])):
         feed_url = urllib.parse.urljoin(home["source_url"], feed["href"])
@@ -830,6 +893,64 @@ def extract_feed(row, snap):
         row["availability"]["activity"] = "available"
         count += 1
         if count >= 8:
+            break
+
+
+def extract_dated_news_cards(row, snap, parsed):
+    """Literal dated cards on an already verified site; no inferred event dates."""
+    from .names import registrable
+    months = {word:month for month,words in enumerate([
+        'januar january jan','februar february feb','mars march mar','april apr','mai may',
+        'juni june jun','juli july jul','august aug','september sept sep','oktober october okt oct',
+        'november nov','desember december des dec'],1) for word in words.split()}
+    month_pattern='|'.join(sorted(months,key=len,reverse=True))
+    date_pattern = re.compile(r'(?<!\d)(?:\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}\.?\s+(?:'+month_pattern+r')\.?\s+\d{4})(?!\d)',re.I)
+    news_path = re.compile(r'/(?:news|nyheter|nyhet|aktuelt|blog|blogg|presse|press|articles?)(?:/|[-_])', re.I)
+    known = {(c['value'].get('url'), parsed_date(c['value'].get('published_at')).date().isoformat())
+             for c in row['claims'] if c['field']=='activity' and isinstance(c['value'],dict)}
+    count=0
+    for text_node in parsed.find_all(string=date_pattern):
+        if text_node.find_parent(['nav','header','footer','aside','script','style']):
+            continue
+        match=date_pattern.search(str(text_node))
+        raw_date=match.group()
+        try:
+            if re.search(r'[a-z]',raw_date,re.I):
+                day,month,year=raw_date.replace('.','').lower().split()
+                date=datetime(int(year),months[month],int(day)).date()
+            else:
+                date=datetime.strptime(raw_date,'%Y-%m-%d' if '-' in raw_date else '%d.%m.%Y').date()
+        except ValueError:
+            continue
+        if date.year < 1990 or date > datetime.now(timezone.utc).date():
+            continue
+        for parent in list(text_node.parents)[:4]:
+            if parent.name in {'main','body','html','nav','header','footer','aside'}:
+                break
+            if len(parent.get_text(' ',strip=True)) > 2400 or len(date_pattern.findall(parent.get_text(' ',strip=True))) != 1:
+                continue
+            links=[]
+            for link in parent.find_all('a',href=True):
+                url=urllib.parse.urljoin(snap['source_url'],link['href'])
+                label=link.get_text(' ',strip=True)
+                if not 12 <= len(label) <= 300 or not news_path.search(urllib.parse.urlsplit(url).path):
+                    continue
+                if registrable(urllib.parse.urlsplit(url).hostname) != registrable(urllib.parse.urlsplit(snap['source_url']).hostname):
+                    continue
+                if parent.name not in {'article','li'} and link.parent is not parent and not (link.parent.name in {'h1','h2','h3','h4'} and link.parent.parent is parent):
+                    continue
+                links.append((link,url,label))
+            if len(links)!=1:
+                continue
+            link,url,label=links[0]
+            key=(url,date.isoformat())
+            if key not in known:
+                claim(row,'activity',{'headline':label,'published_at':date.isoformat(),'url':url,'kind':'company_owned_news_card'},snap,
+                      {'link_href':link['href'],'text_quote':label,'date_quote':raw_date},period={'published_at':date.isoformat()},identity_method='verified_company_site_dated_card')
+                row['availability']['activity']='available'
+                known.add(key);count+=1
+            break
+        if count>=8:
             break
 
 
@@ -922,6 +1043,7 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 seen += 1
                 if seen >= 6:
                     break
+        extract_dated_news_cards(row,snap,parsed)
     for key, (profile, snap, locator) in list(socials.items())[:10]:
         claim(row, "owned_profiles", {"platform": profile["platform"], "url": profile["url"], "relation": "linked from verified company website; profile content not fetched"},
               snap, locator, identity_method="outbound_link_on_verified_company_site")
@@ -989,10 +1111,20 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
     for url in extra:
         add(url, "nav_employer")
     add(body.get("_previous_website"), "previous")
+    personal_mail = {'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.no', 'outlook.com', 'live.com', 'live.no',
+                     'msn.com', 'yahoo.com', 'yahoo.no', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com', 'online.no'}
+    for domain in re.findall(r'@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)', str(body.get('epostadresse') or ''), re.I):
+        if domain.lower() not in personal_mail:
+            # A registered contact domain is a hypothesis, never publisher proof.
+            # Accountants, managers and group domains must still pass crawl_site.
+            add('https://' + domain.lower() + '/', 'registry_email')
     research = row.setdefault("website_research", {"candidates": []})
     for field in SITE_FIELDS:
         row["availability"].setdefault(field, "not_available")
     for url, origin in candidates:
+        if time.monotonic() >= getattr(transport,'deadline',float('inf')) or getattr(transport,'requests',0) >= getattr(transport,'limit',float('inf')):
+            site_fail(row,'failed','Website research budget exhausted')
+            return False
         research["candidates"].append({"url": url, "origin": origin})
         if crawl_site(row, body, transport, page_limit, origin=origin, url=url):
             return True
@@ -1000,6 +1132,8 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
         return False
     fetched = 0
     for url in guess_domains(body.get("navn", ""), (body.get("organisasjonsform") or {}).get("kode")):
+        if time.monotonic() >= getattr(transport,'deadline',float('inf')) or getattr(transport,'requests',0) >= getattr(transport,'limit',float('inf')):
+            break
         if fetched >= max_guess_fetches:
             break
         key = registrable(urllib.parse.urlsplit(url).hostname)
@@ -1271,6 +1405,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         # Reserve time to write envelopes, validate evidence and render the viewer inside --max-seconds.
         transport = Transport(output / "snapshots", requests, max(30, seconds - max(60, seconds * 0.08)))
     started = time.monotonic()
+    network_deadline = transport.deadline
     transport.quote_selector = quote_selector
     rows = [envelope(org, run_id) for org in orgs]
     bodies = {}
@@ -1401,9 +1536,21 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         phase_order = ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ()))
     # Breadth before depth prevents early entities consuming every request.
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        for module in phase_order:
+        for stage_index,module in enumerate(phase_order):
             stage_begin = transport.requests
             transport.limit = requests
+            transport.deadline = network_deadline
+            if strategy == 'balanced':
+                remaining_seconds=max(0,network_deadline-time.monotonic())
+                if module in {'website','discovery','agent'}:
+                    time_fraction={'website':.45,'discovery':.35,'agent':.25}[module]
+                    transport.deadline=min(network_deadline,time.monotonic()+remaining_seconds*time_fraction)
+                elif module in {'financials','leadership','locations'}:
+                    records_left=sum(m in {'financials','leadership','locations'} for m in phase_order[stage_index:])
+                    jobs_reserve=min(120,max(30,seconds*.1)) if 'jobs' in phase_order[stage_index+1:] else 0
+                    allowance=max(1,(remaining_seconds-jobs_reserve)/max(1,records_left))
+                    transport.deadline=min(network_deadline,time.monotonic()+allowance)
+            stage_time_ceiling=round(max(0,transport.deadline-started),3)
             if strategy == "balanced" and module in {"website", "discovery", "agent"}:
                 fraction = .60 if module == "website" else .30
                 transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
@@ -1431,8 +1578,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                     list(pool.map(lambda r: task(r, module), again))
             write_rows(output / "checkpoint.jsonl", rows)
             stage_metrics.append({"stage": module, "requests": transport.requests-stage_begin,
-                                  "request_ceiling": transport.limit})
+                                  "request_ceiling": transport.limit,"time_ceiling_seconds":stage_time_ceiling})
         transport.limit = requests
+        transport.deadline = network_deadline
     for row in rows:
         finish(row, prior.get(row["organisation_number"]))
         if row.get("agent", {}).get("selected_claim_ids"):

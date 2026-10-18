@@ -26,6 +26,7 @@ EXCLUDED = AGGREGATORS | {
     "indeed.com", "glassdoor.com", "unstop.com", "1881.no", "gulesider.no", "yelp.com",
     "youtube.com", "wikipedia.org", "vexter.no", "kredittsjekk.no", "allabolag.se",
     "forvalt.no", "regnskapstall.no", "bedriftsdatabasen.no", "eniro.no", "firmview.no",
+    "rocketreach.co", "leadiq.com", "tracxn.com", "zoominfo.com", "signalhire.com", "apollo.io",
 }
 
 
@@ -39,7 +40,7 @@ def _open(req, timeout, ctx):
     return urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPSHandler(context=ctx)).open(req, timeout=timeout)
 
 
-def candidate_roots(body, preserve_paths=False):
+def candidate_roots(body, preserve_paths=False, limit=3):
     """Extract candidate root URLs from Brave, Tavily, SerpAPI, or raw URL collections."""
     roots = []
     urls = []
@@ -81,15 +82,18 @@ def candidate_roots(body, preserve_paths=False):
         root = urllib.parse.urlunsplit(("https", p.netloc, path, query, ""))
         if root not in roots:
             roots.append(root)
-    return roots[:3]
+    return roots[:limit]
 
 
-def make_company_query(company):
+def make_company_query(company, policy="broad"):
     """Format search query combining company legal name and municipality."""
     name = (company.get("navn") or company.get("legal_name") or "").strip()
     addr = company.get("forretningsadresse") or company.get("postadresse") or {}
     kommune = (addr.get("kommune") or company.get("municipality") or "").strip()
     orgnr = company.get("organisasjonsnummer") or company.get("organisation_number") or ""
+    if policy == "precise" and name:
+        phrase = ' '.join(name.replace('"', ' ').split())
+        return '"' + phrase + '" -site:proff.no -site:purehelp.no -site:1881.no -site:brreg.no'
     parts = []
     if name:
         parts.append(name)
@@ -104,9 +108,10 @@ class SerpApiProvider:
     """Google Search for Norway (gl=no, hl=no) via SerpAPI."""
     endpoint = "https://serpapi.com/search.json"
 
-    def __init__(self, key, label="serpapi"):
+    def __init__(self, key, label="serpapi", query_policy="broad"):
         self.key = key
         self.label = label
+        self.query_policy = query_policy
         self.disabled = False
         self.ctx = ssl.create_default_context(cafile=certifi.where())
 
@@ -120,7 +125,7 @@ class SerpApiProvider:
             "google_domain": "google.no",
             "gl": "no",
             "hl": "no",
-            "num": 4,
+            "num": 10 if self.query_policy == 'precise' else 4,
         }
         url = self.endpoint + "?" + urllib.parse.urlencode(params)
         req = urllib.request.Request(url, headers={"User-Agent": "OrgLens/0.2 discovery", "Accept": "application/json"})
@@ -135,7 +140,7 @@ class SerpApiProvider:
                     if any(t in err for t in ("exhaust", "quota", "plan", "searches", "rate")):
                         self.disabled = True
                     return []
-                return candidate_roots(data, preserve_paths=True)
+                return candidate_roots(data, preserve_paths=True, limit=6 if self.query_policy == 'precise' else 3)
         except urllib.error.HTTPError as exc:
             if exc.code in {401, 402, 403, 429}:
                 self.disabled = True
@@ -148,22 +153,26 @@ class TavilyProvider:
     """Fast web search via Tavily API."""
     endpoint = "https://api.tavily.com/search"
 
-    def __init__(self, key, label="tavily"):
+    def __init__(self, key, label="tavily", query_policy="broad"):
         self.key = key
         self.label = label
+        self.query_policy = query_policy
         self.disabled = False
         self.ctx = ssl.create_default_context(cafile=certifi.where())
 
     def search(self, query, timeout):
         if self.disabled or not self.key:
             return []
-        payload = json.dumps({
+        body = {
             "query": query,
             "search_depth": "basic",
-            "max_results": 4,
+            "max_results": 10 if self.query_policy == 'precise' else 4,
             "include_answer": False,
             "include_raw_content": False,
-        }).encode("utf-8")
+        }
+        if self.query_policy == 'precise':
+            body.update(country='norway', exclude_domains=sorted(EXCLUDED))
+        payload = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             self.endpoint,
             data=payload,
@@ -180,7 +189,7 @@ class TavilyProvider:
                 if len(raw) > 2_000_000:
                     return []
                 data = json.loads(raw.decode("utf-8", errors="replace"))
-                return candidate_roots(data, preserve_paths=True)
+                return candidate_roots(data, preserve_paths=True, limit=6 if self.query_policy == 'precise' else 3)
         except urllib.error.HTTPError as exc:
             if exc.code in {401, 402, 403, 429, 432, 433}:
                 self.disabled = True
@@ -191,7 +200,10 @@ class TavilyProvider:
 
 class MultiSearchDiscovery:
     """Ordered fallback chain across search providers with strict budgets and caps."""
-    def __init__(self, providers, unit_cost=0.0, max_cost=0.0, max_queries=100):
+    def __init__(self, providers, unit_cost=0.0, max_cost=0.0, max_queries=100, query_policy="broad"):
+        if query_policy not in {'broad', 'precise'}:
+            raise ValueError('Unknown search query policy')
+        self.query_policy = query_policy
         self.providers = providers
         self.unit_cost = Decimal(str(unit_cost))
         self.max_cost = Decimal(str(max_cost))
@@ -211,7 +223,7 @@ class MultiSearchDiscovery:
             return []
         timeout = min(12.0, remaining_time)
 
-        query = make_company_query(company)
+        query = make_company_query(company, self.query_policy)
         if not query:
             return []
 
@@ -274,25 +286,25 @@ class BraveDiscovery:
         return candidate_roots(payload)
 
 
-def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100):
+def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100, query_policy="broad"):
     """Instantiate ordered provider chain from environment variables."""
     providers = []
     # 1. Primary: SerpAPI Key 1 (highest Norwegian entity precision)
     k1 = os.environ.get("SERPAPI_API_KEY")
     if k1:
-        providers.append(SerpApiProvider(k1, label="serpapi-1"))
+        providers.append(SerpApiProvider(k1, label="serpapi-1", query_policy=query_policy))
 
     # 2. Secondary: SerpAPI Key 2 (fallback when Key 1 quota is reached)
     k2 = os.environ.get("SERPAPI_API_KEY_2")
     if k2 and k2 != k1:
-        providers.append(SerpApiProvider(k2, label="serpapi-2"))
+        providers.append(SerpApiProvider(k2, label="serpapi-2", query_policy=query_policy))
 
     # 3. Tertiary: Tavily (large 1,000 requests allowance)
     tk = os.environ.get("TAVILY_API_KEY")
     if tk:
-        providers.append(TavilyProvider(tk, label="tavily"))
+        providers.append(TavilyProvider(tk, label="tavily", query_policy=query_policy))
 
     if not providers:
         return None
 
-    return MultiSearchDiscovery(providers, unit_cost=unit_cost, max_cost=max_cost, max_queries=max_queries)
+    return MultiSearchDiscovery(providers, unit_cost=unit_cost, max_cost=max_cost, max_queries=max_queries, query_policy=query_policy)

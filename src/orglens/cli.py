@@ -44,6 +44,7 @@ def main():
     run.add_argument("--providers", default="groq,nvidia,cloudflare,cohere", help="Ordered fallback chain; Mistral opt-in until its quota is available")
     run.add_argument("--max-model-calls", type=int, default=100)
     run.add_argument("--max-search-queries", type=int, default=25)
+    run.add_argument("--search-policy", choices=('broad','precise'), default='broad', help="Experimental exact-name search and directory exclusions")
     run.add_argument("--agent-steps", type=int, default=6)
     sample = sub.add_parser("sample", help="Create a reproducible local test sample, never used in official evaluation")
     sample.add_argument("--universe", required=True)
@@ -118,7 +119,7 @@ def main():
             # Opt-in only: the evaluator command must stay keyless and reproducible.
             from .discovery import build_discovery_from_env
             discovery = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0,
-                                                 max_cost=args.max_api_cost or 0.0, max_queries=args.max_search_queries)
+                                                 max_cost=args.max_api_cost or 0.0, max_queries=args.max_search_queries, query_policy=args.search_policy)
         rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
                                  requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
                                  previous=previous, pages=args.pages, modules=modules,

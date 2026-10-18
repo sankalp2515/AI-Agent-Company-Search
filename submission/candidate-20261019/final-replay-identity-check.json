@@ -1,0 +1,16 @@
+{
+  "mode": "saved_source_replay",
+  "guarded_rows": [
+    {
+      "org": "996920917",
+      "website_state": "ambiguous",
+      "published_site_claims": 0
+    },
+    {
+      "org": "941487351",
+      "website_state": "failed",
+      "published_site_claims": 0
+    }
+  ],
+  "passed": true
+}

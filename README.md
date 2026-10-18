@@ -12,7 +12,7 @@
 
 </div>
 
-> **19 October 2026: revision candidate.** Version 1 was submitted previously. The current local release adds external-first allocation, stricter evidence checks and a cited comparison view. See [submission instructions](SUBMISSION.md). No official score is claimed; revision-window acceptance remains unconfirmed.
+> **19 October 2026: verified revision candidate.** Version 1 was submitted previously. The local release adds external-first allocation, stricter evidence checks and a cited comparison view. It passes 127 tests and a clean-clone 100-company live smoke test. See [verification and limits](docs/READINESS-2026-10-19.md) and [submission instructions](SUBMISSION.md). No official score is claimed; revision-window acceptance remains unconfirmed.
 
 **18 October update:** participant reports version 1 submitted at `29daa24`. See the [current materials review and revision priorities](docs/REVISION-STRATEGY-2026-10-18.md): budget allocation, external coverage, targeted AI and a changed provisional leaderboard. Search added at `0f51c30` remains opt-in; the submitted default command executes no LLM.
 
@@ -43,11 +43,11 @@ uv sync --frozen
 ## One evaluator command
 
 ```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --max-requests 2000 --max-seconds 2700
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --no-discover
 ```
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
-- Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are conservative historical test settings, **not confirmed current official limits**. Builderr supplies the official budget. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
+- Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are local release-test settings, **not confirmed official limits**. Builderr supplies the official budget. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
 - Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
 

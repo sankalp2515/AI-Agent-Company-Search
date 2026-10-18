@@ -29,6 +29,7 @@ Open `out/evaluation/index.html` directly on desktop or mobile to search compani
 
 - External research runs before the costly job-feed detail work. Stage budgets and NAV detail caps preserve research breadth.
 - Publisher checks reject directories, platforms and conflicting company identities. Search-result mentions alone cannot prove a company's website.
+- Numbered legal entities retain their distinguishing label. Name/contact corroboration rejects a conflicting primary publisher, including parent/acquisition mentions supported only by a shared phone or address.
 - Source spans, feed URLs, Facebook profile IDs and social evidence locators preserve the actual evidence.
 - Static careers/terms pages are excluded from generic news markup. Refresh caches are per run; saved-source replay retains original retrieval dates.
 - Shared snapshot validation hashes once per invocation with bounded concurrency, while rechecking corruption on every later validation.

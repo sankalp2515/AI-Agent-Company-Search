@@ -1,6 +1,6 @@
 {
-  "run_id": "release-smoke100",
-  "completed_at": "2026-10-18T18:35:05.304734Z",
+  "run_id": "identity-guard-smoke100",
+  "completed_at": "2026-10-18T18:51:14.528880Z",
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -8,16 +8,16 @@
     "errors": [],
     "envelopes": 100
   },
-  "requests": 919,
-  "bytes": 55991687,
-  "runtime_seconds": 167.844,
+  "requests": 915,
+  "bytes": 55774450,
+  "runtime_seconds": 175.0,
   "third_party_cost_usd": 0,
   "limits": {
     "requests": 2000,
     "seconds": 900
   },
-  "p50_company_ms": 8279,
-  "p95_company_ms": 26403,
+  "p50_company_ms": 8466,
+  "p95_company_ms": 26904,
   "coverage": {
     "legal_identity": 100,
     "financials": 100,
@@ -31,12 +31,12 @@
     "contact": 39
   },
   "states": {
-    "failed": 30,
+    "not_available": 401,
     "ambiguous": 6,
-    "not_applicable": 0,
     "blocked": 3,
-    "available": 560,
-    "not_available": 401
+    "failed": 30,
+    "not_applicable": 0,
+    "available": 560
   },
   "score": null,
   "score_note": "Operational smoke test; no hidden labels or official competition score",
@@ -45,7 +45,7 @@
   "company_source_cache": {
     "scope": "this run only",
     "hits": 2,
-    "unique_urls": 154,
+    "unique_urls": 153,
     "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
   },
   "stages": [
@@ -56,7 +56,7 @@
     },
     {
       "stage": "website",
-      "requests": 253,
+      "requests": 249,
       "request_ceiling": 1240
     },
     {
@@ -96,8 +96,8 @@
     "completed_segments": 6,
     "total_segments": 6,
     "error": null,
-    "indexed_active_employers": 5573,
-    "indexed_active_ads": 9174,
+    "indexed_active_employers": 5574,
+    "indexed_active_ads": 9175,
     "token": "NAV published public token"
   },
   "website_methods": {

@@ -1,0 +1,336 @@
+{
+  "mode": "saved_source_identity_recheck_not_live_batch",
+  "reviewed": 47,
+  "rejected": 8,
+  "results": [
+    {
+      "org": "983746802",
+      "name": "EPSIS AS",
+      "site": "https://epsis.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "921181647",
+      "name": "EDUPLAYTION AS",
+      "site": "https://numetry.com/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "920478840",
+      "name": "INVIVO BIONICS AS",
+      "site": "https://www.invivo.io",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "962999336",
+      "name": "VANG BYGG AS",
+      "site": "https://www.norgeshus.no/forhandlere/norgeshus-vang-bygg/om-oss",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "919750588",
+      "name": "SMAU ARKITEKTUR AS",
+      "site": "https://www.smau-arkitektur.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "996920917",
+      "name": "KINLAND I AS",
+      "site": "https://kinland.no/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "982089549",
+      "name": "MNEMONIC AS",
+      "site": "https://www.mnemonic.io/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "985196907",
+      "name": "NORMILK AS",
+      "site": "https://www.normilk.no",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "832186082",
+      "name": "FEMAC AS",
+      "site": "https://www.femac.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "922173478",
+      "name": "OPUS \u00d8KONOMI AS",
+      "site": "https://opusokonomi.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "986303278",
+      "name": "VEVLE MEK VERKSTAD AS",
+      "site": "https://www.vevlemek.no",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "941487351",
+      "name": "HANS SYLTE AS",
+      "site": "https://absentreprenor.no/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "921336934",
+      "name": "NVA BYGG AS",
+      "site": "https://www.nvabygg.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "997145607",
+      "name": "STILLE STYRKE AS",
+      "site": "https://www.stillestyrke.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "935246520",
+      "name": "TRITON ANCHOR AS",
+      "site": "https://www.tritonanchor.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "886119372",
+      "name": "PRO TOTALBYGG AS",
+      "site": "https://prototalbygg.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "989190431",
+      "name": "QUELLE AS",
+      "site": "https://quelle.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "979712286",
+      "name": "MESTERHUS OSLO AS",
+      "site": "https://mesterhusoslo.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "831034572",
+      "name": "FISKERUTA AS",
+      "site": "https://fiskeruta.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "826838582",
+      "name": "KUNDELAB AS",
+      "site": "https://www.kundelab.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "985975019",
+      "name": "BYGDESERVICE NORGE SA",
+      "site": "https://bygdeservice.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "980385213",
+      "name": "SOTA DATA AS",
+      "site": "https://www.sotadata.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "985370761",
+      "name": "H\u00c5LAND INSTRUMENTERING AS",
+      "site": "https://hi-as.no/no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "933741427",
+      "name": "BROSUNDKLINIKKEN AS",
+      "site": "https://brosundklinikken.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "994985922",
+      "name": "TREDJEPART AS",
+      "site": "https://www.tredjepart.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "997019105",
+      "name": "FASIA AS",
+      "site": "https://www.fasia.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "986731210",
+      "name": "BEST OF SCANDINAVIA INCOMING AS",
+      "site": "https://www.bosincoming.no",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "991883754",
+      "name": "SOLA BOBIL AS",
+      "site": "https://solabobil.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "994602497",
+      "name": "TRANSLINK CORPORATE FINANCE NORGE AS",
+      "site": "https://translinkcf.no/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "996465748",
+      "name": "FORSTMESTER AS",
+      "site": "https://forstmester.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "932344114",
+      "name": "RYSPINN AS",
+      "site": "https://www.ryspinn.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "998200040",
+      "name": "ARKITEKTURVERKET AS",
+      "site": "https://arkitekturverket.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "919797886",
+      "name": "BERGEN HUNDESKOLE AS",
+      "site": "https://www.bergenhundeskole.no",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "958759819",
+      "name": "KROSSOBANEN AS",
+      "site": "https://www.krossobanen.no",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "918814124",
+      "name": "SYBR AS",
+      "site": "https://www.sybr.no/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "921069537",
+      "name": "VELG MED HJERTET AS",
+      "site": "https://velgmedhjertet.no",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "996557278",
+      "name": "BJERKVIK HOTELL AS",
+      "site": "https://www.bjerkvikhotell.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "919296585",
+      "name": "FARVATN VENTURE AS",
+      "site": "https://farvatnventure.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "913455991",
+      "name": "STRUCTOR OSLO AS",
+      "site": "https://structor.no/",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "918843957",
+      "name": "PREPPIO AS",
+      "site": "https://www.preppio.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "993132160",
+      "name": "VIA GLORIA AS",
+      "site": "https://www.viagloria.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "996912140",
+      "name": "EINE ADVOKATFIRMA AS",
+      "site": "https://www.eineadvokat.no",
+      "accepted_by_latest_corroboration": false,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "981617770",
+      "name": "STALL BERGAN AS",
+      "site": "https://stallbergan.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "813522152",
+      "name": "MIVA AS",
+      "site": "https://miva.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "917807531",
+      "name": "MAT OG TRENING AS",
+      "site": "https://www.mattrening.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "931466941",
+      "name": "OPTITRAILS AS",
+      "site": "https://www.optitrails.com/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "918411348",
+      "name": "TAKSTFORUM TELEMARK AS",
+      "site": "https://www.takstforum-telemark.no/",
+      "accepted_by_latest_corroboration": true,
+      "original_method": "legal_name_and_registered_address"
+    }
+  ]
+}

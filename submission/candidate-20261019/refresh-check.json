@@ -1,0 +1,7 @@
+{
+  "companies": 100,
+  "companies_with_changes": 0,
+  "duplicate_claim_ids": 0,
+  "companies_retaining_stale_claims": 5,
+  "note": "Live refresh; website/network failures preserve last-known claims. No zero-change assertion is made for changed sources."
+}

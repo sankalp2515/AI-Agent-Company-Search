@@ -24,3 +24,16 @@ def test_exact_trading_name_and_registered_phone_allow_missing_legal_suffix():
 def test_name_span_preserves_original_unicode_and_punctuation():
     from orglens.names import matched_name_span
     assert matched_name_span('Contact Sør & Sæter today.','SØR OG SÆTER AS')=='Sør & Sæter'
+
+
+def test_numbered_legal_entity_is_not_the_parent_brand():
+    assert not text_contains_name('Kinland invests in properties.','KINLAND I AS')
+    assert not text_contains_name('Kinland i Oslo owns properties.','KINLAND I AS')
+    assert text_contains_name('Contact Kinland I AS for this property.','KINLAND I AS')
+    assert not domain_is_full_name('https://kinland.no/','KINLAND I AS')
+
+
+def test_acquired_company_mention_and_shared_phone_do_not_prove_publisher():
+    html='<title>ABS Entreprenør AS</title><h1>Om ABS Entreprenør AS</h1><p>ABS Entreprenør AS kjøpte opp Hans Sylte AS i 2017.</p><p>Hans: 913 54 831</p>'
+    parsed,text=soup_text(html)
+    assert corroborated({'navn':'HANS SYLTE AS','telefon':'91354831'},[(snapshot(html,'https://absentreprenor.no/'),parsed,text)]) is None

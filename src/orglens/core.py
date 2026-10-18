@@ -617,8 +617,16 @@ def operating_leader_on_pages(row, pages, legal):
 
 
 def corroborated(body, pages, row=None, domain_named=False):
-    from .names import matched_name_span
+    from .names import matched_name_span, text_contains_name
     legal = body.get("navn", "")
+    if pages and not domain_named:
+        primary = pages[0][1]
+        publisher_labels = [n.get_text(' ', strip=True) for n in primary.select('title, h1')]
+        publisher_labels += [n.get('content', '') for n in primary.select('meta[property="og:site_name"]')]
+        if any(publisher_labels) and not any(text_contains_name(label, legal) for label in publisher_labels):
+            # A subsidiary/acquisition mention plus a shared address or contact
+            # cannot turn the parent's whole website into the requested company.
+            return None
     if row is not None and domain_named is True:
         # domain_named=True only when the domain spells the complete legal name (see crawl_site).
         found = operating_leader_on_pages(row, pages, legal)

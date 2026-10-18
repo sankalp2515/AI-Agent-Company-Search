@@ -88,7 +88,8 @@ def domain_is_full_name(url, legal_name):
     words = re.findall(r"[a-z0-9]+", translit(legal_name))
     removable = LEGAL_FORMS - {"norge", "norway", "avd", "avdeling", "filial"}
     complete = [w for w in words if w not in removable]
-    joined = "".join(w for w in complete if w not in STOPWORDS)
+    identity_connectors = STOPWORDS - {"i", "a"}
+    joined = "".join(w for w in complete if w not in identity_connectors)
     national = set(re.findall(r"[a-z]+", translit(legal_name))) & {"norge", "norway", "norden", "scandinavia", "skandinavia"}
     if national and not domain.endswith(".no"):
         # "X Norway AS" on x.com is usually the international parent's site, not the Norwegian entity.
@@ -97,7 +98,7 @@ def domain_is_full_name(url, legal_name):
     if national and domain.endswith('.no'):
         # Preserve the existing Norwegian-domain alias policy. The same alias
         # on an international parent domain is still rejected above.
-        variants.add("".join(name_tokens(legal_name)))
+        variants.add("".join(w for w in complete if w not in identity_connectors | {"norge", "norway", "norden", "scandinavia", "skandinavia"}))
     return len(joined) >= 5 and label in variants
 
 
@@ -110,7 +111,12 @@ def matched_name_span(text, legal_name):
     """Return the actual visible name span, preserving case, accents and punctuation."""
     # Apply the same connector/form normalization to both sides. Preserve
     # national and division qualifiers: a parent brand is not its Norwegian unit.
-    removable = (LEGAL_FORMS - {"norge", "norway", "avd", "avdeling", "filial"}) | STOPWORDS
+    removable = (LEGAL_FORMS - {"norge", "norway", "avd", "avdeling", "filial"}) | (STOPWORDS - {"i", "a"})
+    legal_words = [translit(m.group()) for m in re.finditer(r'[^\W_]+', legal_name)]
+    if len(legal_words) >= 2 and re.fullmatch(r'(?:[ivx]+|[0-9]+)', legal_words[-2]) and legal_words[-1] in LEGAL_FORMS:
+        # A Roman-numbered entity needs the full legal label. "Kinland i Oslo"
+        # is a location phrase, not evidence for the distinct KINLAND I AS.
+        removable.discard(legal_words[-1])
     expected = [translit(m.group()) for m in re.finditer(r'[^\W_]+', legal_name) if translit(m.group()) not in removable]
     if len(' '.join(expected)) < 4:
         return None

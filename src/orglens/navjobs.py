@@ -13,6 +13,7 @@ import json
 import os
 import re
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
 
@@ -87,7 +88,14 @@ class NavJobs:
             return
         self.token = os.environ.get("NAV_FEED_TOKEN")
         if not self.token:
-            snap = transport.get(BASE + "/api/publicToken", "official_public_api")
+            for attempt in range(2):
+                snap = transport.get(BASE + "/api/publicToken", "official_public_api")
+                if (attempt or snap.get('status') not in {0,500,502,503,504}
+                        or snap.get('budget_exhausted')
+                        or time.monotonic() >= getattr(transport,'deadline',float('inf'))-2
+                        or getattr(transport,'requests',0) >= getattr(transport,'limit',float('inf'))):
+                    break
+                time.sleep(1)
             if snap.get("status") != 200:
                 self.state, self.error = "failed", "NAV public token unavailable"
                 return

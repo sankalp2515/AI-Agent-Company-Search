@@ -15,6 +15,45 @@ from orglens.discovery import (
 )
 
 
+def test_rejected_hints_can_fall_back_without_eagerly_buying_all_searches():
+    class Provider:
+        disabled = False
+        endpoint = 'https://search.test/'
+        def __init__(self, url):self.url, self.calls = url, 0
+        def search(self, query, timeout):
+            self.calls += 1
+            return [self.url]
+    class Transport:
+        requests = 0
+        limit = 100
+        deadline = time.monotonic()+60
+        def reserve(self, url):self.requests += 1
+    wrong, right = Provider('https://namesake.test/'), Provider('https://company.test/')
+    discovery = MultiSearchDiscovery([wrong,right],max_queries=2)
+    batches = discovery.discover_batches({'navn':'Company AS'},Transport())
+    assert next(batches) == ['https://namesake.test/']
+    assert right.calls == 0
+    # The caller found no identity proof, so it requests the next provider.
+    assert next(batches) == ['https://company.test/']
+    assert discovery.calls == 2
+    assert list(batches) == []
+
+
+def test_fallback_after_rejected_hints_still_respects_global_search_cap():
+    class Provider:
+        disabled = False
+        endpoint = 'https://search.test/'
+        def search(self, query, timeout):return ['https://candidate.test/']
+    class Transport:
+        requests = 0
+        limit = 100
+        deadline = time.monotonic()+60
+        def reserve(self, url):self.requests += 1
+    discovery = MultiSearchDiscovery([Provider(),Provider()],max_queries=1)
+    assert len(list(discovery.discover_batches({'navn':'Company AS'},Transport()))) == 1
+    assert discovery.calls == 1
+
+
 def test_candidate_roots_handles_serpapi_and_knowledge_graph():
     body = {
         "knowledge_graph": {"website": "https://company.no/about"},

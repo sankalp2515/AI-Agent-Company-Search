@@ -216,25 +216,26 @@ class MultiSearchDiscovery:
         self.provider_name = f"multi_search ({', '.join(names)})"
 
     def discover(self, company, transport):
-        if transport.requests >= transport.limit:
-            return []
-        remaining_time = max(0.1, transport.deadline - time.monotonic() - 15)
-        if remaining_time <= 1.0:
-            return []
-        timeout = min(12.0, remaining_time)
+        return next(self.discover_batches(company, transport), [])
 
+    def discover_batches(self, company, transport):
+        """Try another provider only if the caller rejects the preceding hints."""
         query = make_company_query(company, self.query_policy)
         if not query:
-            return []
+            return
 
         for provider in self.providers:
             if getattr(provider, "disabled", False):
                 continue
+            remaining_time = transport.deadline - time.monotonic() - 15
+            if transport.requests >= transport.limit or remaining_time <= 1:
+                return
+            timeout = min(12.0, remaining_time)
             with self.lock:
                 if self.calls >= self.max_queries:
-                    return []
+                    return
                 if self.max_cost > 0 and self.spent + self.unit_cost > self.max_cost:
-                    return []
+                    return
                 transport.reserve(getattr(provider, "endpoint", "search"))
                 # Reserve cost and attempts atomically before concurrent requests begin.
                 self.spent += self.unit_cost
@@ -242,9 +243,7 @@ class MultiSearchDiscovery:
                 self.local.calls = getattr(self.local, "calls", 0) + 1
             candidates = provider.search(query, timeout)
             if candidates:
-                return candidates
-
-        return []
+                yield candidates
 
 
 class BraveDiscovery:

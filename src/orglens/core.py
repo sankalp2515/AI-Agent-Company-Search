@@ -1502,10 +1502,17 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 body = bodies[row["organisation_number"]]
                 calls_before = getattr(discovery.local, "calls", 0)
                 try:
-                    candidates = discovery.discover(body, transport)
+                    batches = discovery.discover_batches(body, transport) if hasattr(discovery,'discover_batches') else (discovery.discover(body, transport),)
                     row["operations"]["third_party_cost_usd"] = float(discovery.unit_cost)
-                    for candidate in candidates:
-                        crawl_site(row, body, transport, pages, origin="search", url=candidate)
+                    inspected = set()
+                    for candidates in batches:
+                        for candidate in candidates:
+                            if candidate in inspected:
+                                continue
+                            inspected.add(candidate)
+                            crawl_site(row, body, transport, pages, origin="search", url=candidate)
+                            if row["availability"].get("official_website") == "available":
+                                break
                         if row["availability"].get("official_website") == "available":
                             break
                 finally:

@@ -1,4 +1,12 @@
-from scripts.compare_public_reference import url_key
+import importlib.util
+from pathlib import Path
+
+
+spec = importlib.util.spec_from_file_location(
+    'compare_public_reference', Path(__file__).resolve().parents[1] / 'scripts' / 'compare_public_reference.py')
+comparison = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(comparison)
+url_key = comparison.url_key
 
 
 def test_facebook_profile_identity_is_not_lost_when_comparing_reference_urls():

@@ -1,0 +1,83 @@
+{
+  "run_id": "release-random100",
+  "companies": 100,
+  "external_news_companies": 3,
+  "external_news_facts": 14,
+  "dated_card_evidence_checked": 1,
+  "literal_card_and_dedup_failures": [],
+  "published_websites": [
+    {
+      "org": "924447001",
+      "name": "CHARLOTTES HOBBY AS",
+      "url": "https://charlotteshobby.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "829275872",
+      "name": "HAUKÅSEN FJELLGARD AS",
+      "url": "https://www.haukasenlodge.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "957295398",
+      "name": "UP LINK AS",
+      "url": "https://www.uplink.no",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "984196865",
+      "name": "SEEYOU AS",
+      "url": "https://www.seeyou.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "995606747",
+      "name": "MYRE & PARTNERE AS",
+      "url": "https://myrepartnere.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "985234094",
+      "name": "SAMEIET BERGHEIM AMFI",
+      "url": "https://bergheimamfi.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "934222156",
+      "name": "MITT BARNEBARN AS",
+      "url": "https://mittbarnebarn.no",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "874271322",
+      "name": "SCANSLEP AS",
+      "url": "https://scanslep.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "826408502",
+      "name": "QUANTUM LEAP GROW AS",
+      "url": "https://quantumleapgrow.com",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "917191530",
+      "name": "INFRABEAM AS",
+      "url": "https://www.infrabeam.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "992227249",
+      "name": "MOSS REVISJONSKONTOR AS",
+      "url": "https://mossrevisjon.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "979570023",
+      "name": "MAURVANGEN AS",
+      "url": "https://www.maurvangen.no/",
+      "method": "legal_name_and_registered_address"
+    }
+  ],
+  "limitation": "Literal source checks and identity-method listing are not an independent factual-precision score."
+}

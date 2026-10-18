@@ -1,5 +1,7 @@
 # Revision handoff — 19 October 2026
 
+Historical keyless release record. The newer [hybrid qualification candidate](QUALIFICATION-CANDIDATE-2026-10-19.md) and [current submission instructions](../SUBMISSION.md) supersede this release's test counts and recommended command. Metrics below remain tied to their original source.
+
 OrgLens has a locally committed, reproducible revision candidate. Its executable source is verified; no official qualifying score has been measured. The release is not pushed or submitted by this task. See [SUBMISSION.md](../SUBMISSION.md) for the single run command, contact, licences, cost and viewer entrypoint.
 
 ## Verified evidence

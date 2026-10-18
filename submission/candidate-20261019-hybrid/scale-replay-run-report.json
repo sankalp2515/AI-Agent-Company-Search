@@ -1,0 +1,101 @@
+{
+  "run_id": "release-scale-replay1100",
+  "completed_at": "2026-10-18T19:52:47.620218Z",
+  "companies": 1100,
+  "envelopes": 1100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1100
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 192.734,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 20000,
+    "seconds": 900
+  },
+  "p50_company_ms": 78,
+  "p95_company_ms": 7811,
+  "coverage": {
+    "legal_identity": 1100,
+    "financials": 1097,
+    "leadership": 1097,
+    "locations": 1100,
+    "official_website": 69,
+    "description": 46,
+    "jobs": 0,
+    "activity": 1099,
+    "owned_profiles": 40,
+    "contact": 398
+  },
+  "states": {
+    "ambiguous": 134,
+    "not_available": 4314,
+    "failed": 497,
+    "not_applicable": 0,
+    "available": 6046,
+    "blocked": 9
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 0,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 0,
+      "request_ceiling": 20000,
+      "time_ceiling_seconds": 898.875
+    },
+    {
+      "stage": "website",
+      "requests": 0,
+      "request_ceiling": 12000,
+      "time_ceiling_seconds": 406.487
+    },
+    {
+      "stage": "financials",
+      "requests": 0,
+      "request_ceiling": 20000,
+      "time_ceiling_seconds": 343.073
+    },
+    {
+      "stage": "leadership",
+      "requests": 0,
+      "request_ceiling": 20000,
+      "time_ceiling_seconds": 463.929
+    },
+    {
+      "stage": "locations",
+      "requests": 0,
+      "request_ceiling": 20000,
+      "time_ceiling_seconds": 808.875
+    },
+    {
+      "stage": "jobs",
+      "requests": 0,
+      "request_ceiling": 20000,
+      "time_ceiling_seconds": 898.875
+    }
+  ],
+  "mode": "saved_source_replay",
+  "replay_source": "out/release-20261019/scale1100",
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 29,
+    "legal_name_and_registered_phone": 14,
+    "registry_declared_homepage": 12,
+    "legal_name_and_registered_address": 14
+  },
+  "discovery": null
+}

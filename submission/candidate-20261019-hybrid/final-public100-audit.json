@@ -1,0 +1,449 @@
+{
+  "run_id": "final-public100",
+  "companies": 100,
+  "external_news_companies": 24,
+  "external_news_facts": 134,
+  "dated_card_evidence_checked": 32,
+  "literal_card_and_dedup_failures": [],
+  "published_websites": [
+    {
+      "org": "938702675",
+      "name": "AF GRUPPEN ASA",
+      "url": "https://www.afgruppen.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "995754606",
+      "name": "CONSTO AS",
+      "url": "https://consto.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "837895502",
+      "name": "HAUGESUND SPAREBANK",
+      "url": "https://www.haugesund-sparebank.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "979543883",
+      "name": "DIPS AS",
+      "url": "https://www.dips.com",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "999296432",
+      "name": "ENTRA ASA",
+      "url": "https://www.entra.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "976605713",
+      "name": "KITRON ASA",
+      "url": "https://www.kitron.com",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "975536440",
+      "name": "ENERGISENTERET DA",
+      "url": "https://eis.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "966820152",
+      "name": "NORDIC DOOR AS",
+      "url": "https://www.nordicdoor.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "878612752",
+      "name": "RAGASCO AS",
+      "url": "https://ragasco.com/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "999256864",
+      "name": "SENTIA ASA",
+      "url": "https://www.sentiagruppen.com",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "999164137",
+      "name": "ZAPTEC ASA",
+      "url": "https://www.zaptec.com",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "997777212",
+      "name": "ISCHEBECK NORDIC AS",
+      "url": "https://www.ischebeck.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "971521902",
+      "name": "STIFTELSEN STEINERSKOLEN I BÆRUM",
+      "url": "https://www.stib.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "982215668",
+      "name": "RSV GRUPPEN AS",
+      "url": "https://rsvgruppen.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "990167826",
+      "name": "STIFTELSEN NASJONAL JAZZSCENE",
+      "url": "https://nasjonaljazzscene.no/",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "814152162",
+      "name": "THE WELL AS",
+      "url": "https://thewell.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "979299753",
+      "name": "HJELPEMIDDELSPESIALISTEN AS",
+      "url": "https://hm-spes.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "925703508",
+      "name": "PERVACO AS",
+      "url": "https://www.pervaco.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "982178568",
+      "name": "STEINKJER BY- OG BYGDESERVICE SA",
+      "url": "https://steinkjerbygdeservice.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "971487046",
+      "name": "STIFTELSEN HAMMAREN",
+      "url": "https://hammaren.barnehage.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "983815251",
+      "name": "TEKNOMED AS",
+      "url": "https://teknomed.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "944379274",
+      "name": "TRANSPORTSENTRALEN VESTFOLD AS",
+      "url": "https://www.ts-vestfold.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "980545768",
+      "name": "NARVIK GOLFKLUBB",
+      "url": "https://www.narvikgolf.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "970601902",
+      "name": "NORDIC SUPPLY PARTNER AS",
+      "url": "https://www.nsp.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "991123709",
+      "name": "SKJÆRETEKNIKK AS",
+      "url": "https://skjaereteknikk.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "999614973",
+      "name": "STUDIX AS",
+      "url": "https://studix.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "990090793",
+      "name": "CHRISTIANIA TAXI AS",
+      "url": "https://02365.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "991068287",
+      "name": "GULLSMED CAMILLA AS",
+      "url": "https://www.gullsmedcamilla.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "912048535",
+      "name": "SAILOR MUSIC AS",
+      "url": "https://www.sailormusic.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "985133530",
+      "name": "TØNSBERG MEDLAB AS",
+      "url": "https://www.tmedlab.no",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "993775770",
+      "name": "REVISJONSSENTERET AS",
+      "url": "https://www.revisjonssenteret.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "912180328",
+      "name": "SHOC LIFESTYLE AS",
+      "url": "https://shoclifestyle.no/home",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "915198503",
+      "name": "HELL CATERING AS",
+      "url": "https://hell-catering.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "913979362",
+      "name": "KILSUND TRAVEL AS",
+      "url": "https://www.kilsundtravel.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "913884213",
+      "name": "SANOMEGA AS",
+      "url": "https://www.sanomega.as/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "917255342",
+      "name": "TRØNDELAG BETONG AS",
+      "url": "https://trondelag-betong.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "913170296",
+      "name": "WORK SYSTEM NORWAY AS",
+      "url": "https://www.worksystem.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "922532184",
+      "name": "HAIKJEFTEN AS",
+      "url": "https://www.haikjeften.no",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "924437774",
+      "name": "ROSENBORG MURHÅNDTVERK AS",
+      "url": "https://Murhandtverk.no",
+      "method": "jsonld_organisation_identifier"
+    },
+    {
+      "org": "832459372",
+      "name": "NORSK FISKEEKSPORT AS",
+      "url": "https://norskfiskeeksport.com",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "932098342",
+      "name": "BRANNKONTROLL NORGE AS",
+      "url": "https://brannkontrollnorge.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "943672520",
+      "name": "PEAB BYGG AS",
+      "url": "https://peab.no:443/bygg/",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "996547639",
+      "name": "LY FORSIKRING ASA",
+      "url": "https://www.lyforsikring.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "983717098",
+      "name": "LEIRVIK AS",
+      "url": "https://leirvik.com/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "991853995",
+      "name": "BIEN SPAREBANK ASA",
+      "url": "https://www.bien.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "818711832",
+      "name": "LUFTAMBULANSETJENESTEN HF",
+      "url": "https://www.luftambulanse.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "910608193",
+      "name": "KAEFER ENERGY AS",
+      "url": "https://kaeferenergy.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "869938432",
+      "name": "STIFTELSEN SILDAJAZZEN",
+      "url": "https://sildajazz.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "997275160",
+      "name": "TOTAL VVS AS",
+      "url": "https://total-vvs.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "990574855",
+      "name": "NOR-EL AS",
+      "url": "https://www.nor-el.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "957523730",
+      "name": "SALANGEN BOLIGSTIFTELSE",
+      "url": "https://www.salbos.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "982769221",
+      "name": "STRONGPOINT ASA",
+      "url": "https://www.strongpoint.com",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "988943037",
+      "name": "SWIMEYE AS",
+      "url": "https://swimeye.com/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "990002398",
+      "name": "FAGERAAS SKOGSDRIFT DA",
+      "url": "https://fageraasskogsdrift.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "997557689",
+      "name": "SAFE SOUND AUDIO AS",
+      "url": "https://www.safesound.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "929897404",
+      "name": "SOLVANG ASA",
+      "url": "https://solvangship.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "967292907",
+      "name": "STARINA AS",
+      "url": "https://www.starina.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "935762286",
+      "name": "VALDRES INSTALLASJON AS",
+      "url": "https://www.valdres-installasjon.no",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "991449175",
+      "name": "MOSA DESIGNLAB AS",
+      "url": "https://www.mosadesignlab.no/",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "897270552",
+      "name": "KINKELIANE AS",
+      "url": "https://www.kinkeliane.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "998578485",
+      "name": "NEERGÅRD REGNSKAP AS",
+      "url": "https://neergardregnskap.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "912004716",
+      "name": "PREREG AS",
+      "url": "https://www.prereg.no",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "923096728",
+      "name": "ROAD SUPPLY AS",
+      "url": "https://www.roadsupply.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "820371542",
+      "name": "FJELD OG VANN AS",
+      "url": "https://www.fjeldogvann.no",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "820868382",
+      "name": "P.E. GAARUD AS",
+      "url": "https://pe-gaarud.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "923710930",
+      "name": "STRØMMEN TANNLEGESENTER AS",
+      "url": "https://strommentannlegesenter.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "923393528",
+      "name": "PRIVATKLINIKKEN I SKIEN AS",
+      "url": "https://privatklinikkeniskien.no",
+      "method": "legal_name_and_registered_phone"
+    },
+    {
+      "org": "925358916",
+      "name": "RENTALY AS",
+      "url": "https://www.rentaly.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "929034597",
+      "name": "TAKSTOLFABRIKKEN AS",
+      "url": "https://takstolfabrikken.com/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "926647288",
+      "name": "FJELLHEIMEN GALLERI AS",
+      "url": "https://fjellheimengalleri.no/",
+      "method": "labelled_organisation_number"
+    },
+    {
+      "org": "834547252",
+      "name": "LAPSEN & CO AS",
+      "url": "https://lapsen.no/",
+      "method": "legal_name_and_registered_address"
+    },
+    {
+      "org": "932738228",
+      "name": "A PLACE TO STAY STAVANGER AS",
+      "url": "https://aplacetostaystavanger.com",
+      "method": "registry_declared_homepage"
+    },
+    {
+      "org": "933775364",
+      "name": "GREENHEART AS",
+      "url": "https://greenheart-mindfulness.no/",
+      "method": "labelled_organisation_number"
+    }
+  ],
+  "limitation": "Literal source checks and identity-method listing are not an independent factual-precision score."
+}

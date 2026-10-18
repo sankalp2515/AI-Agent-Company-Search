@@ -1,0 +1,51 @@
+{
+  "kind": "historical_public_opportunity_comparison",
+  "companies": 100,
+  "website_host_agreement": {
+    "positive_companies": 97,
+    "covered_companies": 71,
+    "reference_facts": 97,
+    "matched_facts": 71,
+    "company_recall": 0.7319587628865979,
+    "fact_recall": 0.7319587628865979,
+    "70_30_recall": 0.7319587628865979
+  },
+  "social_url_agreement": {
+    "positive_companies": 44,
+    "covered_companies": 35,
+    "reference_facts": 91,
+    "matched_facts": 73,
+    "company_recall": 0.7954545454545454,
+    "fact_recall": 0.8021978021978022,
+    "70_30_recall": 0.7974775224775223
+  },
+  "description_companies_unscored": 61,
+  "website_mismatches_to_review": [
+    {
+      "org": "999614973",
+      "expected_historical_url": "https://studix.com/",
+      "found": [
+        "https://studix.no/"
+      ],
+      "review_required": "May be a legitimate change, parent, directory, or wrong entity; inspect evidence."
+    },
+    {
+      "org": "910608193",
+      "expected_historical_url": "https://www.kaefer.no/",
+      "found": [
+        "https://kaeferenergy.no/"
+      ],
+      "review_required": "May be a legitimate change, parent, directory, or wrong entity; inspect evidence."
+    }
+  ],
+  "new_websites_to_review": [],
+  "overall_score": null,
+  "official_recall_out_of_50": null,
+  "qualification": "not_determined",
+  "limitations": [
+    "Historical public sample is enriched and may be stale or misattributed.",
+    "URL agreement is not independent proof of source ownership or factual precision.",
+    "No current labels for news, jobs, descriptions, locations or reviews; no aggregate recall invented.",
+    "Official reference union, family weights, budgets, synthesis and UX ratings are unavailable."
+  ]
+}

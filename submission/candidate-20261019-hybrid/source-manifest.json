@@ -1,0 +1,51 @@
+{
+  "kind": "release_source_fingerprint",
+  "executable_commit": "7aa6649274b0c7d290d5e3dfa90165ff8de9a1a9",
+  "files": {
+    "pyproject.toml": "dcb114f5491159f634b5a29da08b0229a8b92b2211f15fe10de7675e221edde4",
+    "src/orglens/__init__.py": "26cdc3cb64883d3561c65aaa0825e36d32ee58bf27503f1fa312e640e08ebf34",
+    "src/orglens/agent.py": "e1e6d036b100ac57f6e09e6a3eeaecf405e3fc8c4c70af7dd14a5e8b6bd24874",
+    "src/orglens/cli.py": "bdb1bd1101f58ec6e0f4ef140a27e90826c185ad9f96cea7ff956ee1b7e901f6",
+    "src/orglens/core.py": "fa8b062cb061f4ba79d1918006c5b17aad95f82bd0184228c82fec00a7c1ec78",
+    "src/orglens/costs.py": "ffe57a9c6266c310d76bba33d4a4e847896eb1971a34a4037ef8b36852f41832",
+    "src/orglens/discovery.py": "d6e243777b7846d8695b51cabedbd2950ffa3f5f3fae83e0e322225f65f35a80",
+    "src/orglens/names.py": "535a26f68570a4688a43ef6cccc3365a45efb755284ba668470c3254379d2768",
+    "src/orglens/navjobs.py": "253b86924fdb0e07284066582d54ed40253001db9323bca376ca13816de64c3e",
+    "src/orglens/quotes.py": "007e38a0f761b717191a088cc7253654e5b04416d6332d58a96a6ab0739fb4d4",
+    "src/orglens/replay.py": "4c337c72e3483e7b68c903de69e4334935f46e54c55ff1d6cb28ab3249e08950",
+    "src/orglens/simulator.py": "8e5a117d3b0ef0ee9e36099fe9272845f8299cf8005103ccd0ba2fac144d2d09",
+    "src/orglens/viewer.py": "7e2b38585a03762489f926bdde8e3fc9fb32235c646f69db6908d0d8a159da0f",
+    "uv.lock": "0e5e4419d9910d7af251d419ee9d33df16f9e33cf06f28a3ecd28a342229f2f4"
+  },
+  "source_sha256": "cf5aa27222e1cbcef921116293defc072ed553fde78c6f71f2320b6032df72d6",
+  "normalization": "UTF-8 source/dependency/report text, CRLF converted to LF; matches Git canonical text",
+  "reports": {
+    "public100-run-report.json": {
+      "executable_commit": "7aa6649274b0c7d290d5e3dfa90165ff8de9a1a9",
+      "sha256": "4001f9f0a38ba65469befa9a55fe8af9e87e6ba6b5f671e0c1cd7e83d02a1313",
+      "interpretation": "live enriched public sample; previously used in development; no aggregate score"
+    },
+    "smoke-run-report.json": {
+      "executable_commit": "7aa6649274b0c7d290d5e3dfa90165ff8de9a1a9",
+      "sha256": "f2dae57a9a4919520fd088e157dc0ea6f5adb0f31c5911a46ecf26e329787b80",
+      "interpretation": "live broader random-universe smoke; same previously used sample, no hidden labels"
+    },
+    "scale-replay-run-report.json": {
+      "executable_commit": "7aa6649274b0c7d290d5e3dfa90165ff8de9a1a9",
+      "sha256": "513f0f45ff10455a86e397e400edc17199c91bf6dbe437e3e59bcfe96e44afeb",
+      "interpretation": "saved-source replay; jobs/search/models/guesses disabled; not fresh scale research"
+    },
+    "prior-random-run-report.json": {
+      "executable_commit": "32f1d3410d4b20d96fe54cf463a6bf8de84fbc29",
+      "sha256": "c95f46b8c0638ab85764bbbe63e0dd1e8db1b648bec93d62e1ec05acaeacd723",
+      "interpretation": "live before adaptive fallback and NAV token retry; retains observed NAV failure"
+    },
+    "clean-live-run-report.json": {
+      "executable_commit": "3dcc68d88822be15dc7a3b9c0007ad0688baa850",
+      "sha256": "bf90bed22bfb5e1c328f5ee8a792ed6ffae97a3c9b2c6d8dc95188dd3a5000af",
+      "interpretation": "live keyless clean clone; three previously audited identity cases; predates fallback/token change"
+    }
+  },
+  "official_score": null,
+  "push_performed": false
+}

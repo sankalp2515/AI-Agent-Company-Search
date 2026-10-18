@@ -12,7 +12,7 @@
 
 </div>
 
-> **19 October 2026: verified revision candidate.** Version 1 was submitted previously. The local release adds external-first allocation, stricter evidence checks and a cited comparison view. It passes 127 tests and a clean-clone 100-company live smoke test. See [verification and limits](docs/READINESS-2026-10-19.md) and [submission instructions](SUBMISSION.md). No official score is claimed; revision-window acceptance remains unconfirmed.
+> **19 October 2026: hybrid revision candidate.** Version 1 was submitted previously. The local revision combines verified search, bounded AI quotation selection, dated news-card extraction and protected source budgets. It passes 154 tests in a clean locked clone. See [current measurements and limits](docs/QUALIFICATION-CANDIDATE-2026-10-19.md) and [submission instructions](SUBMISSION.md). No official score is claimed; revision-window acceptance remains unconfirmed.
 
 **18 October update:** participant reports version 1 submitted at `29daa24`. See the [current materials review and revision priorities](docs/REVISION-STRATEGY-2026-10-18.md): budget allocation, external coverage, targeted AI and a changed provisional leaderboard. Search added at `0f51c30` remains opt-in; the submitted default command executes no LLM.
 
@@ -29,7 +29,7 @@ Evidence-first research agent for Norwegian companies. Give it a batch of organi
 
 Every claim carries a source URL, retrieval time, SHA-256 of the exact response bytes, an evidence locator and an identity method. Unknowns are explicit states (`available`, `not_available`, `blocked`, `not_applicable`, `ambiguous`, `failed`) and are never turned into zero.
 
-The default command needs **no API keys and has $0 external API cost**.
+The recommended hybrid command requires organizer-approved search/model credentials. A separate keyless fallback has **$0 external API cost**; see [both commands and the cost declaration](SUBMISSION.md).
 
 ## Install (clean machine)
 
@@ -43,10 +43,11 @@ uv sync --frozen
 ## One evaluator command
 
 ```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --no-discover
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --discover --max-search-queries 1200 --extract-ai --providers groq --max-model-calls 400
 ```
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
+- Credentials: organizer-approved `GROQ_API_KEY` plus SerpAPI and/or Tavily search credentials. Keep keys in the evaluator's secret environment. [SUBMISSION.md](SUBMISSION.md) declares provider costs and the keyless fallback.
 - Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are local release-test settings, **not confirmed official limits**. Builderr supplies the official budget. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
 - Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
@@ -74,7 +75,10 @@ The agent runs in phases. Each phase covers every company before the next phase 
    1. the registry-declared homepage
    2. the employer homepage from an orgnr-verified NAV ad
    3. the website verified in the previous run
-   4. name-derived domain hypotheses, checked by DNS first
+   4. a non-personal registered email domain, independently verified
+   5. name-derived domain hypotheses, checked by DNS first
+
+   Optional search follows unresolved websites. Another provider is queried after rejected candidates, stopping once publisher identity is proven. Registry-listed group portals can lead to an explicitly linked, independently verified company site.
 
    A candidate is published only with an exact identity proof:
    - a labelled organisation number or the `NO … MVA` VAT format on the homepage, in the footer, or on the company's own contact/about page;

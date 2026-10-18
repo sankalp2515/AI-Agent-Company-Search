@@ -1,5 +1,9 @@
 # Sources, models, APIs and licensing
 
+Current 19 October hybrid candidate: [SUBMISSION.md](SUBMISSION.md) explicitly enables approved search and Groq quotation selection. Statements below about the default/keyless command describe that fallback and the historical submission, not the hybrid command. Groq serves `openai/gpt-oss-20b`; its model licence and Groq's service terms are separate from this repository's MIT licence. SerpAPI/Tavily results remain transient URL hints, independently fetched and verified before publication. Current pricing scenarios and unverified billing are declared in [the experiment record](docs/QUALIFICATION-CANDIDATE-2026-10-19.md).
+
+The upstream gpt-oss repository declares [Apache License 2.0](https://github.com/openai/gpt-oss/blob/main/LICENSE). This application calls the hosted model and does not redistribute model weights. Provider service terms and company-content rights still apply separately.
+
 Implementation: original OrgLens code, MIT. The downloaded Builderr reference archive was inspected for requirements and replayed during preparation; it is not redistributed in the implementation package. No starter source files are imported by OrgLens.
 
 Dependencies: Beautiful Soup (MIT), soupsieve (MIT), typing-extensions (PSF). The uv lockfile pins transitive dependencies. Test tooling is pytest (MIT) and its locked dependencies. Build tooling is hatchling (MIT). Review licence metadata at release using the installed distributions.

@@ -1,0 +1,92 @@
+{
+  "run_id": "clean-clone-live3",
+  "completed_at": "2026-10-18T19:46:02.851257Z",
+  "companies": 3,
+  "envelopes": 3,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 3
+  },
+  "requests": 29,
+  "bytes": 1999729,
+  "runtime_seconds": 25.844,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 150,
+    "seconds": 180
+  },
+  "p50_company_ms": 5884,
+  "p95_company_ms": 24912,
+  "coverage": {
+    "legal_identity": 3,
+    "financials": 3,
+    "leadership": 3,
+    "locations": 3,
+    "official_website": 1,
+    "description": 1,
+    "jobs": 0,
+    "activity": 3,
+    "owned_profiles": 1,
+    "contact": 2
+  },
+  "states": {
+    "not_applicable": 0,
+    "blocked": 0,
+    "not_available": 4,
+    "failed": 3,
+    "ambiguous": 3,
+    "available": 20
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 14,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 3,
+      "request_ceiling": 150,
+      "time_ceiling_seconds": 120.0
+    },
+    {
+      "stage": "website",
+      "requests": 17,
+      "request_ceiling": 91,
+      "time_ceiling_seconds": 54.526
+    },
+    {
+      "stage": "financials",
+      "requests": 3,
+      "request_ceiling": 150,
+      "time_ceiling_seconds": 55.002
+    },
+    {
+      "stage": "leadership",
+      "requests": 3,
+      "request_ceiling": 150,
+      "time_ceiling_seconds": 71.728
+    },
+    {
+      "stage": "locations",
+      "requests": 3,
+      "request_ceiling": 150,
+      "time_ceiling_seconds": 120.0
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 1
+  },
+  "discovery": null
+}

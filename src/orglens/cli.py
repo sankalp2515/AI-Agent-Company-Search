@@ -5,6 +5,7 @@ import gzip
 import json
 import random
 import os
+import sys
 import math
 from pathlib import Path
 
@@ -94,11 +95,17 @@ def main():
         discovery = None
         agent = None
         quote_selector = None
+        ai_unavailable = False
         if args.extract_ai:
             if args.replay:parser.error('Model quote selection cannot be used in offline replay')
             from .agent import providers_from_env
             from .quotes import QuoteSelector
-            quote_selector = QuoteSelector(providers_from_env(args.providers.split(','))[0], args.max_model_calls)
+            try:
+                quote_selector = QuoteSelector(providers_from_env(args.providers.split(','))[0], args.max_model_calls)
+            except ValueError:
+                # A missing evaluator credential must never fail the batch: fall back to literal-text extraction.
+                print("orglens: --extract-ai requested but no model credential is configured; continuing without AI extraction", file=sys.stderr)
+                ai_unavailable = True
         if args.ai:
             if args.replay or args.discover_brave:
                 parser.error("AI mode cannot be combined with offline replay or Brave discovery")
@@ -125,6 +132,11 @@ def main():
                                  previous=previous, pages=args.pages, modules=modules,
                                  registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent,
                                  jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess, strategy=args.strategy, quote_selector=quote_selector)
+        if ai_unavailable:
+            from .core import write_json
+            report["quote_selector"] = {"requested": True, "executed": False,
+                                        "reason": "no model credential configured; literal-text extraction used"}
+            write_json(Path(args.output) / "run-report.json", report)
         render(rows, Path(args.output) / "index.html")
         print(json.dumps(report, ensure_ascii=False, indent=2))
         raise SystemExit(0 if report["validation"]["passed"] else 1)

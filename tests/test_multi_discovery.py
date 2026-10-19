@@ -217,3 +217,30 @@ def test_evaluator_command_stays_keyless_even_when_keys_exist(monkeypatch, tmp_p
         except SystemExit:
             pass
         assert (seen["discovery"] is None) if expected is None else seen["discovery"].provider_name.startswith(expected)
+
+
+def test_extract_ai_without_credentials_completes_instead_of_failing(monkeypatch, tmp_path):
+    import json
+    import sys
+    import orglens.cli as cli
+    for key in ("GROQ_API_KEY", "NVIDIA_API_KEY", "NVDIA_API_KEY", "COHERE_API_KEY", "CLOUDFLARE_API_KEY", "Cloudflare_API_KEY", "MISTRAL_API_KEY"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run_batch(orgs, output, **kwargs):
+        assert kwargs.get("quote_selector") is None
+        report = {"validation": {"passed": True}}
+        (tmp_path / "o").mkdir(exist_ok=True)
+        return [], report
+
+    monkeypatch.setattr(cli, "run_batch", fake_run_batch)
+    monkeypatch.setattr(cli, "render", lambda rows, path: None)
+    source = tmp_path / "in.txt"
+    source.write_text("123456789\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["orglens", "run", "--input", str(source), "--output", str(tmp_path / "o"), "--extract-ai", "--providers", "groq"])
+    try:
+        cli.main()
+    except SystemExit as exc:
+        assert exc.code == 0
+    report = json.loads((tmp_path / "o" / "run-report.json").read_text(encoding="utf-8"))
+    assert report["quote_selector"]["executed"] is False

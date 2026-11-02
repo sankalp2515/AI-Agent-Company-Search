@@ -842,6 +842,13 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
     proof_snap, proof_locator, method = proof
+    weak = method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"} or (
+        isinstance(proof_locator, dict) and proof_locator.get("page_role") == "contact_or_about")
+    if weak and not domain_matches_name(home["source_url"], legal):
+        # Weaker proofs on a domain that does not carry the company's name usually mean a parent-group or
+        # portfolio site listing this entity: publishing its social accounts, news or jobs would be wrong.
+        site_fail(row, "ambiguous", f"{final_host}: identity shown only on a page of a differently named domain (possible parent/group site)")
+        return False
     for field in SITE_FIELDS:
         if row["availability"].get(field) != "available":
             row["availability"][field] = "not_available"
@@ -859,8 +866,30 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             attach(row, feed_snap)
             if availability(feed_snap) == "available":
                 extract_feed(row, feed_snap)
+    elif feed is None and "wp-content" in home["text"]:
+        # WordPress serves a dated post feed at /feed/ even when the theme does not link it.
+        feed_url = urllib.parse.urljoin(urllib.parse.urlunsplit(urllib.parse.urlsplit(home["source_url"])[:2] + ("/", "", "")), "feed/")
+        if robot.can_fetch(UA, feed_url):
+            feed_snap = transport.get(feed_url, "company_owned")
+            attach(row, feed_snap)
+            if availability(feed_snap) == "available" and "<rss" in feed_snap["text"][:2000].lower():
+                extract_feed(row, feed_snap)
     extract_site_facts(row, body, pages, method, getattr(transport, "quote_selector", None), transport)
     return True
+
+
+NEWS_MAX_AGE_DAYS = 3 * 366
+
+
+def news_date(raw):
+    """ISO date for a published news item, or None when unusable (unparseable, future or older than three years)."""
+    text = str(raw or "")
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", text)
+    when = parsed_date(match.group(1) if match else text)
+    today = datetime.now(timezone.utc)
+    if when.year < 2000 or when.date() > today.date() or (today - when).days > NEWS_MAX_AGE_DAYS:
+        return None
+    return when.date().isoformat()
 
 
 def extract_feed(row, snap):
@@ -879,15 +908,20 @@ def extract_feed(row, snap):
         children = {local(n.tag): n for n in item}
         content = lambda key: ''.join(children[key].itertext()).strip() if key in children else ''
         title = content('title')
-        date = content('pubdate') or content('published') or content('updated') or content('date')
-        if not title or not date:
+        date = content('pubdate') or content('published') or content('date')
+        if not title or not date or len(title.split()) < 3:
+            continue
+        if parsed_date(date).date() > datetime.now(timezone.utc).date() or parsed_date(date).year < 2000:
             continue
         links = [n for n in item if local(n.tag) == 'link' and n.get('rel', 'alternate') == 'alternate']
         href = next((n.get('href') or (n.text or '').strip() for n in links if n.get('href') or (n.text or '').strip()), None)
         href = urllib.parse.urljoin(snap['source_url'], href) if href else snap['source_url']
         if urllib.parse.urlsplit(href).scheme not in {'http', 'https'}:
             continue
-        claim(row, "activity", {"headline": title[:300], "published_at": date, "url": href,
+        iso = news_date(date)
+        if not iso:
+            continue
+        claim(row, "activity", {"headline": title[:300], "published_at": iso, "published_raw": date, "url": href,
                                 "kind": "company_owned_feed_item"}, snap, {"feed_item": count, "title": title[:120]},
               period={"published_at": date}, identity_method="verified_company_site_feed")
         row["availability"]["activity"] = "available"
@@ -944,7 +978,7 @@ def extract_dated_news_cards(row, snap, parsed):
                 continue
             link,url,label=links[0]
             key=(url,date.isoformat())
-            if key not in known:
+            if key not in known and news_date(date.isoformat()):
                 claim(row,'activity',{'headline':label,'published_at':date.isoformat(),'url':url,'kind':'company_owned_news_card'},snap,
                       {'link_href':link['href'],'text_quote':label,'date_quote':raw_date},period={'published_at':date.isoformat()},identity_method='verified_company_site_dated_card')
                 row['availability']['activity']='available'
@@ -1023,8 +1057,11 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 row["availability"]["jobs"] = "available"
             static_page = re.search(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|salgsbetingelser|kj[oø]psbetingelser|career|karriere|ledige[- /]stillinger|kontakt|contact|forside|home",
                                     (str(node.get("url") or snap["source_url"]) + " " + str(node.get("headline") or "")).lower())
-            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and (not static_page or "NewsArticle" in types or "PressRelease" in types) and snap is not pages[0][0]:
-                claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": node["datePublished"], "url": node.get("url") or snap["source_url"],
+            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and (not static_page or (("NewsArticle" in types or "PressRelease" in types)
+                         and re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?)/", urllib.parse.urlsplit(str(node.get("url") or snap["source_url"])).path.lower())))                     and snap is not pages[0][0]:
+                if not news_date(node["datePublished"]):
+                    continue
+                claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": news_date(node["datePublished"]), "published_raw": node["datePublished"], "url": node.get("url") or snap["source_url"],
                       "kind": "company_owned_article"}, snap, {"jsonld": {k: node.get(k) for k in ("headline", "datePublished")}}, identity_method="verified_company_site")
                 row["availability"]["activity"] = "available"
         url = snap["source_url"].lower()
@@ -1034,20 +1071,50 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 container = t.find_parent(["article", "li"]) or t.parent
                 heading = container.find(["h1", "h2", "h3", "h4", "a"]) if container else None
                 title = heading.get_text(" ", strip=True) if heading else ""
-                if not re.match(r"\d{4}-\d{2}-\d{2}", t["datetime"]) or len(title) < 8:
+                if not re.match(r"\d{4}-\d{2}-\d{2}", t["datetime"]) or len(title) < 8 or len(title.split()) < 3                         or parsed_date(t["datetime"]).date() > datetime.now(timezone.utc).date():
                     continue
                 link = heading.get("href") if heading and heading.name == "a" else (heading.find("a", href=True) or {}).get("href") if heading else None
-                claim(row, "activity", {"headline": title[:300], "published_at": t["datetime"], "url": urllib.parse.urljoin(snap["source_url"], link) if link else snap["source_url"],
+                if not news_date(t["datetime"]):
+                    continue
+                claim(row, "activity", {"headline": title[:300], "published_at": news_date(t["datetime"]), "published_raw": t["datetime"], "url": urllib.parse.urljoin(snap["source_url"], link) if link else snap["source_url"],
                       "kind": "company_news_page_item"}, snap, {"css_selector": "time[datetime]", "datetime": t["datetime"], "text_quote": title[:120]}, identity_method="verified_company_site")
                 row["availability"]["activity"] = "available"
                 seen += 1
                 if seen >= 6:
                     break
         extract_dated_news_cards(row,snap,parsed)
+    from .names import name_tokens, translit, registrable
+    site_label = translit(registrable(urllib.parse.urlsplit(home["source_url"]).hostname).split(".")[0]).replace("-", "")
+    brand = next((c["value"] for c in row["claims"] if c["field"] == "public_brand" and isinstance(c["value"], str)), "")
+    own_words = {t for t in name_tokens(body.get("navn", "")) + name_tokens(brand) if len(t) >= 4} | ({site_label} if len(site_label) >= 4 else set())
+    own_compact = {"".join(name_tokens(body.get("navn", ""))), "".join(name_tokens(brand)), site_label} - {""}
+
+    def belongs(profile):
+        handle = re.sub(r"[^a-z0-9]", "", translit(urllib.parse.urlsplit(profile["url"]).path.rsplit("/", 1)[-1] or ""))
+        if not handle:
+            return False
+        if "profile.php" in profile["url"] or re.fullmatch(r"[0-9]{8,}", handle):
+            return True  # numeric page id published by the verified site itself
+        return any(w in handle for w in own_words) or any(len(handle) >= 4 and handle in c for c in own_compact)
+
+    socials = {k: v for k, v in socials.items() if belongs(v[0])}
     for key, (profile, snap, locator) in list(socials.items())[:10]:
         claim(row, "owned_profiles", {"platform": profile["platform"], "url": profile["url"], "relation": "linked from verified company website; profile content not fetched"},
               snap, locator, identity_method="outbound_link_on_verified_company_site")
         row["availability"]["owned_profiles"] = "available"
+    careers = None
+    for snap, parsed, visible in pages:
+        if careers:
+            break
+        for a in parsed.find_all("a", href=True):
+            target = urllib.parse.urljoin(snap["source_url"], a["href"]).split("#")[0]
+            label = (urllib.parse.urlsplit(target).path + " " + a.get_text(" ", strip=True)).lower()
+            if registrable(urllib.parse.urlsplit(target).hostname) == registrable(urllib.parse.urlsplit(home["source_url"]).hostname) \
+                    and re.search(r"karriere|career|ledige[- ]stillinger|jobb[- ]hos|jobs?\b|stillinger", label):
+                careers = (target, snap, a.get_text(" ", strip=True)[:120])
+                break
+    if careers:
+        claim(row, "careers_page", careers[0], careers[1], {"link_href": careers[0], "text_quote": careers[2]}, identity_method="link_on_verified_company_site")
     for email, snap in list(emails.items())[:3]:
         claim(row, "contact", {"type": "email", "value": email}, snap, {"link_href": "mailto:" + email}, identity_method="verified_company_site")
         row["availability"]["contact"] = "available"
@@ -1219,13 +1286,16 @@ def synthesize(row):
     flags = [c for c in (first("bankrupt"), first("liquidating")) if c and c["value"] is True]
     if flags:
         say("Warning: the registry flags this entity as " + " and ".join("bankrupt" if c["field"] == "bankrupt" else "under liquidation" for c in flags) + ".", flags, "risk")
+    fin = [c for c in row["claims"] if c["field"].startswith("financials.") and isinstance(c.get("reporting_period"), dict)]
     latest = {}
-    for c in row["claims"]:
-        if c["field"].startswith("financials.") and isinstance(c.get("reporting_period"), dict):
-            end = c["reporting_period"].get("tilDato") or ""
-            key = c["field"].split(".", 1)[1]
-            if key not in latest or end > (latest[key].get("reporting_period") or {}).get("tilDato", ""):
-                latest[key] = c
+    if fin:
+        # One newest period only (company accounts preferred over group accounts): never mix years in a sentence.
+        def rank(c):
+            return (str(c["reporting_period"].get("tilDato") or ""), str(c["value"].get("account_type") or "").upper() == "SELSKAP")
+        newest = max(fin, key=rank)
+        end, kind = newest["reporting_period"].get("tilDato"), newest["value"].get("account_type")
+        latest = {c["field"].split(".", 1)[1]: c for c in fin
+                  if c["reporting_period"].get("tilDato") == end and c["value"].get("account_type") == kind}
     if latest:
         sample = next(iter(latest.values()))
         period = sample["reporting_period"]
@@ -1237,7 +1307,14 @@ def synthesize(row):
         equity = latest.get("equity", {}).get("value", {}).get("amount") if "equity" in latest else None
         if isinstance(equity, (int, float)) and equity < 0:
             verdict += " Reported equity is negative."
-        say(f"Latest filed accounts ({period.get('fraDato')} to {period.get('tilDato')}, {sample['value'].get('account_type') or 'company'} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
+        year = str(period.get("tilDato") or "")[:4]
+        registry_year = str(row["legal_identity"].get("latest_accounts_year") or "")
+        label = "Latest filed accounts" if not registry_year or registry_year <= year else "Most recent accounts figures available"
+        say(f"{label} ({period.get('fraDato')} to {period.get('tilDato')}, {sample['value'].get('account_type') or 'company'} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
+        if registry_year and year and registry_year > year:
+            first_claim = next((c for c in row["claims"] if c["field"] == "latest_accounts_year"), None)
+            say(f"The register records a {registry_year} annual-accounts filing, but Regnskapsregisteret did not return its figures at retrieval time; {year} figures are shown and are not the latest filing.",
+                [first_claim] if first_claim else list(latest.values())[:1], "financials")
     employees = first("employees")
     if employees is not None:
         say(f"Registered employees: {employees['value']}.", [employees], "size")
@@ -1279,6 +1356,34 @@ def synthesize(row):
     return {"text": " ".join(s["text"] for s in statements), "statements": statements,
             "unknowns": [{"field": k, "state": v} for k, v in row["availability"].items() if v != "available"],
             "changes": len(row.get("changes", [])), "method": "evidence_bounded_templates_v2"}
+
+
+def external_footprint(row):
+    """Plainly named view of external families; every entry points back to its claim and evidence."""
+    ev = {e["id"]: e for e in row["evidence"]}
+
+    def item(c, **fields):
+        e = ev.get((c.get("evidence_ids") or [None])[0], {})
+        return {**fields, "claim_id": c["id"], "evidence_ids": c["evidence_ids"], "source_url": e.get("source_url"),
+                "retrieved_at": e.get("retrieved_at"), "identity_method": e.get("identity_method")}
+
+    by = {}
+    for c in row["claims"]:
+        by.setdefault(c["field"], []).append(c)
+    site = (by.get("official_website") or [None])[0]
+    news = [c for c in by.get("activity", []) if isinstance(c["value"], dict) and c["value"].get("kind") != "official_registry_event"]
+    return {
+        "website": item(site, url=site["value"]) if site else None,
+        "social_links": [item(c, platform=c["value"].get("platform"), url=c["value"].get("url")) for c in by.get("owned_profiles", [])],
+        "news": [item(c, headline=c["value"].get("headline"), published_at=c["value"].get("published_at"), url=c["value"].get("url"))
+                 for c in sorted(news, key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)],
+        "job_postings": [item(c, title=c["value"].get("title"), date_posted=c["value"].get("date_posted"),
+                              valid_through=c["value"].get("valid_through"), url=c["value"].get("url"), source=c["value"].get("source"))
+                         for c in by.get("jobs", [])],
+        "careers_page": item(by["careers_page"][0], url=by["careers_page"][0]["value"]) if by.get("careers_page") else None,
+        "description": item(by["description"][0], text=by["description"][0]["value"]) if by.get("description") else None,
+        "availability": {k: row["availability"].get(k) for k in ("official_website", "owned_profiles", "activity", "jobs", "description")},
+    }
 
 
 def finish(row, previous=None):
@@ -1340,6 +1445,7 @@ def finish(row, previous=None):
     if latest_end and expected_year and str(latest_end)[:4] != expected_year:
         row["errors"].append({"module": "financials", "message": f"Accounts retrieved end {latest_end}; registry indicates filing year {expected_year}. Latest filing values remain unverified."})
     row["summary"] = synthesize(row)
+    row["external_footprint"] = external_footprint(row)
     row["field_availability"] = {"employees": "available" if "employees" in facts else "not_available",
                                  "latest_filing_values": "available" if row["financial_freshness"]["latest_filing_covered"] else "not_available"}
     for field, state in row["field_availability"].items():
@@ -1414,9 +1520,12 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     if replay and (Path(replay) / "envelopes.jsonl").exists():
         replay_seeds = {r["organisation_number"]: r for r in (json.loads(line) for line in (Path(replay) / "envelopes.jsonl").read_text(encoding="utf-8").splitlines() if line.strip())}
     registry_rows = {}
+    registry_time_source = "supplied"
     if registry:
         if not registry_retrieved_at:
-            raise ValueError("Frozen registry requires its actual retrieval timestamp")
+            # Builderr passes the frozen file without a timestamp; record its file time and say so.
+            registry_retrieved_at = datetime.fromtimestamp(Path(registry).stat().st_mtime, timezone.utc).isoformat().replace("+00:00", "Z")
+            registry_time_source = "file_modified_time"
         # JSONL accepts original official entity objects. CSV supports BRREG's public bulk layout.
         source = Path(registry)
         with source.open("rb") as source_bytes:
@@ -1562,11 +1671,11 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 fraction = .60 if module == "website" else .30
                 transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
             if strategy == "balanced" and module == "jobs" and jobs_source and not replay:
-                jobs_source.load(transport, min(100, max(0, requests - transport.requests) // 2))
+                jobs_source.load(transport, min(60, max(0, requests - transport.requests) // 6))
             if strategy == "baseline" and module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
                 # The shared job index loads once per run, overlapping the official-record phases.
                 official_cost = sum(1 for m in modules if m in {"financials", "leadership", "locations"}) * len(bodies)
-                cap = int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.3)
+                cap = min(60, int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.12))
                 nav_thread = threading.Thread(target=jobs_source.load, args=(transport, cap), daemon=True)
                 nav_thread.start()
             selected = rows if module == "identity" else [r for r in rows if r["organisation_number"] in bodies]
@@ -1605,7 +1714,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
               "coverage": {f: sum(r["availability"][f] == "available" for r in rows) for f in FIELDS},
               "states": {s: sum(v == s for r in rows for v in r["availability"].values()) for s in STATES},
               "score": None, "score_note": "Operational smoke test; no hidden labels or official competition score"}
-    report["registry_snapshot"] = {"path": str(registry), "retrieved_at": registry_retrieved_at, "sha256": snapshot_hash} if registry else None
+    report["registry_snapshot"] = {"path": str(registry), "retrieved_at": registry_retrieved_at, "retrieved_at_source": registry_time_source, "sha256": snapshot_hash} if registry else None
+    report["external_footprint_coverage"] = {k: sum(bool((r.get("external_footprint") or {}).get(k)) for r in rows)
+                                             for k in ("website", "social_links", "news", "job_postings", "careers_page", "description")}
     report["strategy"] = strategy
     report["company_source_cache"] = {"scope": "this run only", "hits": transport.site_cache_hits,
                                       "unique_urls": len(transport.site_cache),

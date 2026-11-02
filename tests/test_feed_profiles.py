@@ -12,7 +12,7 @@ def test_rss_keeps_article_url_and_decodes_title():
 
 def test_atom_keeps_alternate_article_url():
     row=envelope('123456789','test')
-    xml='<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>A new office</title><updated>2026-10-12T12:00:00Z</updated><link rel="self" href="https://example.no/api/1"/><link rel="alternate" href="https://example.no/news/office"/></entry></feed>'
+    xml='<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>A new office</title><published>2026-10-12T12:00:00Z</published><updated>2026-10-13T12:00:00Z</updated><link rel="self" href="https://example.no/api/1"/><link rel="alternate" href="https://example.no/news/office"/></entry></feed>'
     extract_feed(row,snapshot(xml,'https://example.no/feed'))
     assert row['claims'][0]['value']['url']=='https://example.no/news/office'
 
@@ -55,3 +55,10 @@ def test_social_evidence_preserves_actual_anchor_and_jsonld_locator():
     assert profiles['facebook']['value']['url']=='https://facebook.com/profile.php?id=123456789'
     assert evidence[profiles['facebook']['evidence_ids'][0]]['locator']=={'link_href':href}
     assert evidence[profiles['linkedin']['evidence_ids'][0]]['locator']=={'jsonld':{'sameAs':'https://linkedin.com/company/example?trk=site'}}
+
+
+def test_feed_updated_timestamp_is_not_a_publication_date():
+    row=envelope('123456789','test')
+    xml='<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>Menu label item here</title><updated>2026-10-12T12:00:00Z</updated><link rel="alternate" href="https://example.no/news/x"/></entry></feed>'
+    extract_feed(row,snapshot(xml,'https://example.no/feed'))
+    assert [c for c in row['claims'] if c['field']=='activity'] == []

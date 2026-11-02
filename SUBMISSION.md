@@ -1,57 +1,43 @@
-# Signalpost revision candidate — OrgLens
+# Signalpost submission — OrgLens version 3
 
-Prepared 19 October 2026. The recommended score-focused candidate enables verified search and bounded AI extraction. It is locally committed, not pushed or submitted. [Version 1](docs/SUBMISSION-V1-HISTORICAL.md) and the [preceding keyless candidate](submission/candidate-20261019/README.md) remain historical records.
+Prepared 3 November 2026 in response to Builderr's audit of version 2 (`84223ae`).
 
 | Required item | Value |
 | --- | --- |
 | Agent | OrgLens — evidence-first Norwegian company research |
 | Repository | https://github.com/sankalp2515/AI-Agent-Company-Search |
-| Executable commit | `7aa6649274b0c7d290d5e3dfa90165ff8de9a1a9`; the following release commit adds reports/docs only. Use the full release hash from `git rev-parse HEAD` when submitting. It must first be accessible on GitHub. |
-| Install | `python -m pip install uv==0.10.9` then `uv sync --frozen` |
-| Smoke and verification | [Hybrid candidate artifacts](submission/candidate-20261019-hybrid/README.md), with source/run relationships |
-| Model | Groq `openai/gpt-oss-20b`, bounded literal paragraph selection; no model-written claims |
-| Search | Approved SerpAPI and/or Tavily credentials, supplied through the environment |
-| Other APIs | Enhetsregisteret, Regnskapsregisteret, NAV Job Vacancy Feed and verified company websites under robots.txt |
-| Cost | Plan-dependent. Tavily-only scenario: at most $9.60 list-price search with 1,200 basic queries, plus metered Groq tokens. Mixed-provider cost is not verified. See the cost declaration below. |
-| Licences | MIT application; beautifulsoup4/soupsieve MIT; certifi MPL-2.0; model/provider and source terms separately declared in [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) |
+| Exact commit | `[FILLED AFTER PUSH]` |
+| Install | `uv sync --frozen` |
+| One command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700` |
+| Frozen registry | Append `--bulk <registry file>`. `--registry` is the same option. `--registry-retrieved-at <timestamp>` is optional; without it, the file's own time is recorded and labelled as such. |
+| Models / search | None. The command is keyless. Optional `--discover` / `--extract-ai` modes exist but are not used. |
+| APIs | Brønnøysundregistrene (Enhetsregisteret entities, roles, subunits; Regnskapsregisteret accounts), NAV Job Vacancy Feed (published public token), and verified company websites under robots.txt |
+| Licences | MIT application; beautifulsoup4/soupsieve MIT; certifi MPL-2.0; data-source terms in [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) |
+| Cost | $0 external API cost |
 | Contact | Sankalp Wanjari — wanjarisankalp@gmail.com |
 
-## One command for the hybrid candidate
+## How each audit point is addressed
 
-After Builderr supplies approved search/model credentials through its secret environment:
+| Builderr feedback | Change in version 3 |
+| --- | --- |
+| Fit 2,000 requests per 100 companies | `--requests-per-company 20` sets the cap from the batch size. The NAV job index is capped at 60 pages, so it can't starve company research. |
+| 2024 called latest when 2025 existed | Summaries use one newest period (company accounts preferred) and never mix years or account types. If the register lists a newer filing than the accounts API returned, the summary says so explicitly. |
+| Not a parent group's website | Weaker proofs (legal name plus phone or address, or an org number on a sub-page) now also require a domain carrying the company's name. Group or portfolio pages are rejected, so their social accounts, news and jobs are never published. |
+| Real, dated news only | Dates must be publication dates; a feed's `updated` is not used. Contact, privacy and terms pages are never news. One-word or menu items, future dates and items older than three years are dropped. Dates are normalised to ISO, and the raw value is kept in the evidence. |
+| No social, news or jobs seen | Every envelope now has a plainly named `external_footprint` section: `website`, `social_links`, `news`, `job_postings`, `careers_page` and `description`, each linked to its evidence. Social links must belong to the company, which excludes web-agency credits and unrelated accounts. Careers pages linked from the verified site are published. WordPress sites' post feeds are read. |
+| Registry file | `--bulk` is accepted, and the retrieval timestamp is optional. |
 
-```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --discover --max-search-queries 1200 --extract-ai --providers groq --max-model-calls 400
-```
+## Verification (local, not an official score)
 
-The request/time/API caps are engineering settings, **not confirmed official allowances**. Substitute the supplied shared limits before freezing the submission command. The declared 1,200 search / 400 model caps are scale settings, not counts measured on an official batch. The fresh 100-company hybrid tests use 3,000 requests, 900 seconds, 160 searches and 80 model attempts.
+All runs used the exact command above, with no keys: 20 requests per company and 2,700 seconds.
 
-Configure `GROQ_API_KEY` and the approved `SERPAPI_API_KEY` and/or `TAVILY_API_KEY`. Personal-account credentials are not a reproducible competition dependency. The CLI deliberately fails if AI extraction is requested without a configured model; do not omit credentials and assume an AI run happened. With multiple search providers, the next is queried only after the previous candidates fail verification. Inputs always come from Builderr's supplied company file.
+| Run | Valid | Requests used / allowed | Runtime | Website | Social links | News | Careers page | Description | Contact |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100-company smoke (seed 20261005) | 100/100 | 969 / 2,000 | 250 s | 9 | 4 | 2 | 1 | 8 | 39 |
+| Live refresh of the same 100 | 100/100 | 965 / 2,000 | 246 s | 9 | 4 | 2 | 1 | 8 | 39 |
+| Fresh 300-company sample (seed 20261103) | 300/300 | 2,598 / 6,000 | 553 s | 32 | 14 | 2 | 6 | 25 | 106 |
 
-If a frozen registry is supplied, append `--registry registry.jsonl --registry-retrieved-at <actual retrieval timestamp>`. For refresh, append `--previous <previous envelopes.jsonl>` and retain its snapshot directory.
-
-## Cost declaration
-
-The [experiment record](docs/QUALIFICATION-CANDIDATE-2026-10-19.md) links current primary pricing sources and retains measured tokens/query counts. At Tavily's published $0.008 per basic-search credit, 1,200 queries allocate up to $9.60 before taxes and plan/free-allowance effects. For that **Tavily-only** scenario, configure only the approved Tavily search key and append `--search-cost-per-request 0.008 --max-api-cost 9.60`. Do not apply that rate to a mixed SerpAPI subscription chain without checking its plan.
-
-Groq's list-price token component is `input_tokens × 0.075 / 1,000,000 + output_tokens × 0.30 / 1,000,000` USD. The protected public 100-company run used 10,946 input / 877 output tokens, about $0.001084 for the model component. Actual scale usage is unknown. Search spending flags do not cap model billing. The report preserves measured usage and leaves unverified total billing null.
-
-The keyless fallback remains runnable with no personal credential and $0 external API cost, excluding compute/bandwidth:
-
-```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --no-discover
-```
-
-This fallback executes no LLM or search API. The measured random-sample gain from hybrid research remains modest; the stronger public-example results must not be substituted for that sample. Use the hybrid revision when approved search/model access is available.
-
-## User experience and evidence
-
-Open `out/evaluation/index.html` directly on desktop or mobile. It provides company search, filters, cited summaries, two-company comparison, evidence locators and JSON export. No frontend installation or hosting is required. [Desktop](docs/images/comparison-desktop.png) and [mobile](docs/images/comparison-mobile.png) captures show the unchanged viewer layout using earlier development data; they are not an awarded UX score.
-
-All inputs receive a terminal envelope, including failed, blocked and ambiguous research. Sources retain retrieval time, reporting period and exact-byte hashes. Raw snapshots remain local and ignored because third-party responses can embed credentials; do not upload them to GitHub.
-
-## Readiness and acceptance
-
-The selected implementation passes 154 tests in the working checkout and a clean locked clone. [Current measurements](docs/QUALIFICATION-CANDIDATE-2026-10-19.md) distinguish live public examples, the weaker random smoke, saved-source scale checks and historical runs. No local aggregate score or official 65/100 result is asserted.
-
-Before activation, Builderr must confirm approved provider credentials, the shared budgets and revision acceptance. The [live page](https://www.builderr.ai/challenges/signalpost) advertises October 21 but still says revised hashes before October 18. No revised email has been sent, and the current instruction prohibits pushing.
+- **Refresh:** 0 changes and 0 false stale facts. Accounts, roles and workplaces are returned for every company.
+- **Tests:** 164 pass.
+- **Evidence:** every verified website and every news item in the 300 sample was reviewed by hand. News items are dated posts from the last three years; static and menu pages are excluded.
+- **Artifacts:** in `submission/release/` (smoke, refresh, and 300-company profiles with viewer). Raw snapshots stay local.

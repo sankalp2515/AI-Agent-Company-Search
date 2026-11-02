@@ -32,7 +32,8 @@ def main():
     run.add_argument("--modules", default="financials,leadership,locations,jobs,website")
     run.add_argument("--nav-days", type=int, default=40, help="Window of NAV job-feed changes indexed for active ads")
     run.add_argument("--no-guess", action="store_true", help="Disable keyless name-derived website candidates")
-    run.add_argument("--registry", help="Evaluator frozen BRREG original-object JSONL or semicolon CSV")
+    run.add_argument("--registry", "--bulk", dest="registry", help="Evaluator frozen BRREG registry file (original-object JSONL or semicolon CSV); --bulk is an alias")
+    run.add_argument("--requests-per-company", type=int, help="Request budget per input company (Builderr: 20, i.e. 2,000 per 100); overrides --max-requests")
     run.add_argument("--registry-retrieved-at", help="Actual timestamp of supplied registry snapshot")
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
     run.add_argument("--discover", action="store_true", help="Opt-in search discovery (SerpAPI, Tavily) using keys from the environment; not part of the evaluator command")
@@ -88,6 +89,10 @@ def main():
     elif args.command == "run":
         if min(args.max_requests, args.max_seconds, args.workers, args.pages) < 1:
             parser.error("Budgets, workers and pages must be positive")
+        if args.requests_per_company:
+            if args.requests_per_company < 1:
+                parser.error("--requests-per-company must be positive")
+            args.max_requests = args.requests_per_company * len(read_inputs(args.input))
         modules = tuple(m for m in args.modules.split(",") if m)
         if set(modules) - {"financials", "leadership", "locations", "jobs", "website"}:
             parser.error("Unknown module")

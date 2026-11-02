@@ -6,7 +6,7 @@ Prepared 3 November 2026 in response to Builderr's audit of version 2 (`84223ae`
 | --- | --- |
 | Agent | OrgLens — evidence-first Norwegian company research |
 | Repository | https://github.com/sankalp2515/AI-Agent-Company-Search |
-| Exact commit | `[FILLED AFTER PUSH]` |
+| Exact commit | `e5d5a013512d8c4535f469dc3a361dc629a01571` (verified from a clean GitHub clone: locked install, 164 tests, keyless run with `--bulk`; Linux CI green) |
 | Install | `uv sync --frozen` |
 | One command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700` |
 | Frozen registry | Append `--bulk <registry file>`. `--registry` is the same option. `--registry-retrieved-at <timestamp>` is optional; without it, the file's own time is recorded and labelled as such. |

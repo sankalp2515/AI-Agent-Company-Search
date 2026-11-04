@@ -108,13 +108,22 @@ class NavJobs:
         starts = [now - timedelta(days=self.days) + timedelta(days=self.days) * i / self.segments for i in range(self.segments)]
         bounds = list(zip(starts, starts[1:] + [now + timedelta(days=1)]))
         latest = {}
-        per_segment = max(1, cap // self.segments)
+        # One shared page pool: segments differ greatly in size, and a fixed per-segment
+        # share left every segment unfinished while pages sat unused in the small ones.
+        pool_left = [cap]
+
+        def take_page():
+            with self.lock:
+                if pool_left[0] <= 0:
+                    return False
+                pool_left[0] -= 1
+                return True
 
         def walk(segment):
             begin, end = segment
             url, headers = BASE + "/api/v1/feed", {**self.headers(), "If-Modified-Since": format_datetime(begin, usegmt=True)}
             items = []
-            for _ in range(per_segment):
+            while take_page():
                 snap = transport.get(url, "official_public_api", headers=headers)
                 if snap.get("status") != 200:
                     return items, False, "NAV feed request failed"
@@ -179,8 +188,11 @@ class NavJobs:
                     self.org_index.setdefault(orgnr, {})[uuid] = item
         self.state = "loaded" if self.complete_segments == self.segments else ("partial" if self.pages else "failed")
 
-    def candidates(self, names, orgnrs=()):
-        """Rank discovery hints only; every result still needs employer identity proof."""
+    def candidates(self, names, orgnrs=(), strong_only=False):
+        """Rank discovery hints only; every result still needs employer identity proof.
+
+        strong_only keeps orgnr hits, exact or near-identical spellings, and employer names that contain every
+        word of ours. A single shared word ("eiendom") is not worth a detail request."""
         found = {}
         for org in orgnrs:
             for uuid, item in self.org_index.get(str(org), {}).items():
@@ -200,6 +212,11 @@ class NavJobs:
                     compact, other = key.replace(" ", ""), candidate.replace(" ", "")
                     if compact in other or other in compact:
                         score += 50
+                    short, long_ = sorted((compact, other), key=len)
+                    strong = candidate == key or words <= set(candidate.split()) or (
+                        short in long_ and len(short) >= 6 and len(short) >= 0.7 * len(long_))
+                    if strong_only and not strong:
+                        continue
                     for uuid, item in self.index.get(candidate, {}).items():
                         if score > found.get(uuid, (-1, None))[0]:
                             found[uuid] = (score, item)
@@ -222,7 +239,7 @@ class NavJobs:
                  if c["field"] == "locations" and isinstance(c["value"], dict)}
         names = [body.get("navn", "")] + [n for n in units.values() if n] + [h.get("navn", "") for h in body.get("historiskeNavn", [])[-2:]]
         accepted, homepages, detail_failures = 0, [], 0
-        candidates = self.candidates(names, [org, *units])
+        candidates = self.candidates(names, [org, *units], strong_only=True)
         limit = min(self.max_ads * 2, self.max_candidate_details)
         partial = self.state == "partial" or len(candidates) > limit
         researched = 0

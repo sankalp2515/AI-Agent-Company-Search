@@ -849,6 +849,11 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         # portfolio site listing this entity: publishing its social accounts, news or jobs would be wrong.
         site_fail(row, "ambiguous", f"{final_host}: identity shown only on a page of a differently named domain (possible parent/group site)")
         return False
+    if weak and not domain_is_full_name(home["source_url"], legal) and any(publisher_labels)             and not any(text_contains_name(label, legal) for label in publisher_labels):
+        # A shared brand word is not publisher scope: "Fjordbakst Group" listing "Fjordbakst Vest AS"
+        # on its contact page is the group's site. The homepage itself must name this company.
+        site_fail(row, "ambiguous", f"{final_host}: homepage names a different publisher than {legal} (possible parent/group site)")
+        return False
     for field in SITE_FIELDS:
         if row["availability"].get(field) != "available":
             row["availability"][field] = "not_available"
@@ -865,7 +870,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             feed_snap = transport.get(feed_url, "company_owned")
             attach(row, feed_snap)
             if availability(feed_snap) == "available":
-                extract_feed(row, feed_snap)
+                extract_feed(row, feed_snap, body)
     elif feed is None and "wp-content" in home["text"]:
         # WordPress serves a dated post feed at /feed/ even when the theme does not link it.
         feed_url = urllib.parse.urljoin(urllib.parse.urlunsplit(urllib.parse.urlsplit(home["source_url"])[:2] + ("/", "", "")), "feed/")
@@ -873,12 +878,14 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             feed_snap = transport.get(feed_url, "company_owned")
             attach(row, feed_snap)
             if availability(feed_snap) == "available" and "<rss" in feed_snap["text"][:2000].lower():
-                extract_feed(row, feed_snap)
+                extract_feed(row, feed_snap, body)
     extract_site_facts(row, body, pages, method, getattr(transport, "quote_selector", None), transport)
     return True
 
 
 NEWS_MAX_AGE_DAYS = 3 * 366
+# A complete 45-day NAV index took 81 pages on 4 November 2026; leave headroom for busy weeks.
+NAV_FEED_PAGE_CAP = 160
 
 
 def news_date(raw):
@@ -892,7 +899,40 @@ def news_date(raw):
     return when.date().isoformat()
 
 
-def extract_feed(row, snap):
+STATIC_PAGE = re.compile(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|salgsbetingelser|kj[oø]psbetingelser|career|karriere|"
+                         r"ledige[- /]stillinger|kontakt|contact|forside|home|kategori|category|/tag/|/shop|/produkt|/product")
+# Broadcasting, newspaper/periodical publishing and news agencies: their articles are editorial output, not news about the company.
+MEDIA_INDUSTRY = re.compile(r"^(?:58\.1[34]|60\.|63\.9)")
+
+
+def news_url_ok(url, site_url):
+    """One acceptance rule for every news path: an individual article URL on the verified site, never a static page."""
+    from .names import registrable
+    parts = urllib.parse.urlsplit(str(url or ""))
+    if parts.scheme not in {"http", "https"} or registrable(parts.hostname) != registrable(urllib.parse.urlsplit(site_url).hostname):
+        return False
+    path = parts.path.rstrip("/").lower()
+    if not path or re.search(r"/(?:feed|rss|atom)(?:\.xml)?$", path):
+        return False
+    if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg)/[^/]+|/20\d\d/\d{1,2}/[^/]+", path):
+        return True  # inside a news section or a dated permalink
+    if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg|arkiv|archive)$", path):
+        return False  # the section index lists posts; it is not one
+    return not any(STATIC_PAGE.match(segment) for segment in path.split("/") if segment)
+
+
+def news_about_company(body, title, summary=""):
+    """Media companies publish stories about others; keep only their items that name the company itself."""
+    from .names import name_tokens, distinctive
+    code = str(((body or {}).get("naeringskode1") or {}).get("kode") or "")
+    if not MEDIA_INDUSTRY.match(code):
+        return True
+    words = distinctive(name_tokens((body or {}).get("navn", ""))) or name_tokens((body or {}).get("navn", ""))
+    text = translit_text(title + " " + summary)
+    return bool(words) and all(w in text for w in words)
+
+
+def extract_feed(row, snap, body=None):
     import xml.etree.ElementTree as ET
     try:
         if re.search(r'<!DOCTYPE|<!ENTITY', snap['text'], re.I):
@@ -915,8 +955,13 @@ def extract_feed(row, snap):
             continue
         links = [n for n in item if local(n.tag) == 'link' and n.get('rel', 'alternate') == 'alternate']
         href = next((n.get('href') or (n.text or '').strip() for n in links if n.get('href') or (n.text or '').strip()), None)
-        href = urllib.parse.urljoin(snap['source_url'], href) if href else snap['source_url']
-        if urllib.parse.urlsplit(href).scheme not in {'http', 'https'}:
+        if not href:
+            continue  # an item without its own article link is not a citable post
+        href = urllib.parse.urljoin(snap['source_url'], href)
+        if not news_url_ok(href, snap['source_url']):
+            continue
+        summary = re.sub(r"<[^>]+>", " ", content('description') or content('summary'))
+        if not news_about_company(body, title, summary):
             continue
         iso = news_date(date)
         if not iso:
@@ -988,6 +1033,21 @@ def extract_dated_news_cards(row, snap, parsed):
             break
 
 
+CREDIT_CONTEXT = re.compile(r"(?:levert|laget|utviklet|designet|design|produsert|driftet|levert)\s+(?:av|by)|made\s+by|developed\s+by|designed\s+by|"
+                            r"powered\s+by|built\s+by|created\s+by|website\s+by|web\s*design|webbyr[aå]|nettside\s+av|hjemmeside\s+av|reklamebyr[aå]|(?:web|digital|design)\s*agency", re.I)
+
+
+def vendor_credit(anchor):
+    """True when a link sits in a site-credit line (agency, developer, platform) rather than the company's own links."""
+    for node in [anchor, *list(anchor.parents)[:2]]:
+        if node is not anchor and len(node.find_all("a")) > 1:
+            break  # a shared footer or link list: one credit line must not taint the company's own links
+        text = node.get_text(" ", strip=True) if hasattr(node, "get_text") else ""
+        if text and len(text) <= 160 and CREDIT_CONTEXT.search(text + " " + str(anchor.get("title", "")) + " " + str(anchor.get("aria-label", ""))):
+            return True
+    return False
+
+
 def extract_site_facts(row, body, pages, method, quote_selector=None, transport=None):
     from .names import core_name
     org = row["organisation_number"]
@@ -1023,6 +1083,8 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                     phones.setdefault(digits, snap)
             else:
                 profile = social_profile(urllib.parse.urljoin(snap["source_url"], href))
+                if profile and vendor_credit(a):
+                    continue  # "website made by <agency>": the agency's account, not the company's
                 if profile:
                     if profile['platform'] == 'facebook' and re.fullmatch(r'/\d+', urllib.parse.urlsplit(profile['url']).path):
                         # Bare numeric URLs can be photos as well as pages. Require
@@ -1055,13 +1117,13 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                       "url": node.get("url", snap["source_url"]), "source": "company website JobPosting"}, snap,
                       {"jsonld": {k: node.get(k) for k in ("title", "datePosted", "validThrough")}}, identity_method="verified_site_and_exact_hiring_name")
                 row["availability"]["jobs"] = "available"
-            static_page = re.search(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|salgsbetingelser|kj[oø]psbetingelser|career|karriere|ledige[- /]stillinger|kontakt|contact|forside|home",
-                                    (str(node.get("url") or snap["source_url"]) + " " + str(node.get("headline") or "")).lower())
-            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and (not static_page or (("NewsArticle" in types or "PressRelease" in types)
-                         and re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?)/", urllib.parse.urlsplit(str(node.get("url") or snap["source_url"])).path.lower())))                     and snap is not pages[0][0]:
+            article_url = str(node.get("url") or snap["source_url"])
+            static_page = STATIC_PAGE.search((urllib.parse.urlsplit(article_url).path + " " + str(node.get("headline") or "")).lower())
+            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and news_url_ok(article_url, home["source_url"]) and news_about_company(body, str(node["headline"]), str(node.get("description") or ""))                     and (not static_page or (("NewsArticle" in types or "PressRelease" in types)
+                         and re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?)/", urllib.parse.urlsplit(article_url).path.lower())))                     and snap is not pages[0][0]:
                 if not news_date(node["datePublished"]):
                     continue
-                claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": news_date(node["datePublished"]), "published_raw": node["datePublished"], "url": node.get("url") or snap["source_url"],
+                claim(row, "activity", {"headline": str(node["headline"])[:300], "published_at": news_date(node["datePublished"]), "published_raw": node["datePublished"], "url": article_url,
                       "kind": "company_owned_article"}, snap, {"jsonld": {k: node.get(k) for k in ("headline", "datePublished")}}, identity_method="verified_company_site")
                 row["availability"]["activity"] = "available"
         url = snap["source_url"].lower()
@@ -1074,9 +1136,11 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 if not re.match(r"\d{4}-\d{2}-\d{2}", t["datetime"]) or len(title) < 8 or len(title.split()) < 3                         or parsed_date(t["datetime"]).date() > datetime.now(timezone.utc).date():
                     continue
                 link = heading.get("href") if heading and heading.name == "a" else (heading.find("a", href=True) or {}).get("href") if heading else None
-                if not news_date(t["datetime"]):
+                # Without a link the item can only be the page itself, which must then be an article page.
+                article = urllib.parse.urljoin(snap["source_url"], link) if link else snap["source_url"]
+                if not news_date(t["datetime"]) or not news_url_ok(article, home["source_url"]) or not news_about_company(body, title):
                     continue
-                claim(row, "activity", {"headline": title[:300], "published_at": news_date(t["datetime"]), "published_raw": t["datetime"], "url": urllib.parse.urljoin(snap["source_url"], link) if link else snap["source_url"],
+                claim(row, "activity", {"headline": title[:300], "published_at": news_date(t["datetime"]), "published_raw": t["datetime"], "url": article,
                       "kind": "company_news_page_item"}, snap, {"css_selector": "time[datetime]", "datetime": t["datetime"], "text_quote": title[:120]}, identity_method="verified_company_site")
                 row["availability"]["activity"] = "available"
                 seen += 1
@@ -1160,7 +1224,7 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 return
 
 
-def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2):
+def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False):
     """Candidate ladder: registry homepage, NAV-verified employer homepage, previous verified site, name guesses."""
     from .names import guess_domains, resolves, registrable
     candidates, seen = [], set()
@@ -1174,13 +1238,18 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
             seen.add(key)
             candidates.append((url, origin))
 
-    add(body.get("hjemmeside"), "registry")
+    if only_extra:
+        # Skip domains the first pass already tried.
+        seen.update(registrable(urllib.parse.urlsplit(c["url"]).hostname) for c in row.get("website_research", {}).get("candidates", []))
+    else:
+        add(body.get("hjemmeside"), "registry")
     for url in extra:
         add(url, "nav_employer")
-    add(body.get("_previous_website"), "previous")
+    if not only_extra:
+        add(body.get("_previous_website"), "previous")
     personal_mail = {'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.no', 'outlook.com', 'live.com', 'live.no',
                      'msn.com', 'yahoo.com', 'yahoo.no', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com', 'online.no'}
-    for domain in re.findall(r'@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)', str(body.get('epostadresse') or ''), re.I):
+    for domain in [] if only_extra else re.findall(r'@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)', str(body.get('epostadresse') or ''), re.I):
         if domain.lower() not in personal_mail:
             # A registered contact domain is a hypothesis, never publisher proof.
             # Accountants, managers and group domains must still pass crawl_site.
@@ -1598,6 +1667,11 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 depth = max(2, min(pages, int(share) - 2))
                 research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
                                  guesses=guesses and share >= (3 if strategy == "balanced" else 6), max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
+            elif module == "website_hints":
+                # Second, bounded pass: NAV employer homepages exist only after the jobs phase.
+                body = bodies[row["organisation_number"]]
+                research_website(row, body, transport, max(2, min(pages, 4)), extra=nav_homepages.get(row["organisation_number"], ()),
+                                 guesses=False, only_extra=True)
             elif module == "jobs":
                 if jobs_source is None:
                     row["availability"]["jobs"] = row["availability"].get("jobs", "not_available")
@@ -1653,7 +1727,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     # Breadth before depth prevents early entities consuming every request.
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         for stage_index,module in enumerate(phase_order):
-            stage_begin = transport.requests
+            stage_begin, stage_clock = transport.requests, time.monotonic()
             transport.limit = requests
             transport.deadline = network_deadline
             if strategy == 'balanced':
@@ -1671,11 +1745,11 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 fraction = .60 if module == "website" else .30
                 transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
             if strategy == "balanced" and module == "jobs" and jobs_source and not replay:
-                jobs_source.load(transport, min(60, max(0, requests - transport.requests) // 6))
+                jobs_source.load(transport, min(NAV_FEED_PAGE_CAP, max(0, requests - transport.requests) // 4))
             if strategy == "baseline" and module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
                 # The shared job index loads once per run, overlapping the official-record phases.
                 official_cost = sum(1 for m in modules if m in {"financials", "leadership", "locations"}) * len(bodies)
-                cap = min(60, int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.12))
+                cap = min(NAV_FEED_PAGE_CAP, int(max(0, transport.limit - transport.requests - official_cost - 6 * len(bodies)) * 0.12))
                 nav_thread = threading.Thread(target=jobs_source.load, args=(transport, cap), daemon=True)
                 nav_thread.start()
             selected = rows if module == "identity" else [r for r in rows if r["organisation_number"] in bodies]
@@ -1693,8 +1767,16 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                         transport.retries_left = max(getattr(transport, "retries_left", 0), len(again))
                     list(pool.map(lambda r: task(r, module), again))
             write_rows(output / "checkpoint.jsonl", rows)
-            stage_metrics.append({"stage": module, "requests": transport.requests-stage_begin,
+            stage_metrics.append({"stage": module, "requests": transport.requests-stage_begin, "seconds": round(time.monotonic()-stage_clock, 1),
                                   "request_ceiling": transport.limit,"time_ceiling_seconds":stage_time_ceiling})
+        hinted = [r for r in rows if r["organisation_number"] in bodies and nav_homepages.get(r["organisation_number"])
+                  and r["availability"].get("official_website") != "available"]
+        if strategy == "balanced" and hinted and not replay and time.monotonic() < network_deadline - 30:
+            stage_begin = transport.requests
+            transport.limit, transport.deadline = requests, network_deadline
+            list(pool.map(lambda r: task(r, "website_hints"), hinted))
+            stage_metrics.append({"stage": "website_hints", "requests": transport.requests-stage_begin, "companies": len(hinted),
+                                  "request_ceiling": transport.limit, "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
         transport.limit = requests
         transport.deadline = network_deadline
     for row in rows:

@@ -1,6 +1,6 @@
 {
-  "run_id": "local-v6-smoke",
-  "completed_at": "2026-11-02T20:27:45.128884Z",
+  "run_id": "local-v7-smoke",
+  "completed_at": "2026-11-03T23:45:04.578149Z",
   "companies": 100,
   "envelopes": 100,
   "validation": {
@@ -8,16 +8,16 @@
     "errors": [],
     "envelopes": 100
   },
-  "requests": 969,
-  "bytes": 47369168,
-  "runtime_seconds": 249.657,
+  "requests": 822,
+  "bytes": 54631332,
+  "runtime_seconds": 669.594,
   "third_party_cost_usd": 0,
   "limits": {
     "requests": 2000,
     "seconds": 2700
   },
-  "p50_company_ms": 12638,
-  "p95_company_ms": 52167,
+  "p50_company_ms": 14169,
+  "p95_company_ms": 280497,
   "coverage": {
     "legal_identity": 100,
     "financials": 100,
@@ -31,12 +31,12 @@
     "contact": 39
   },
   "states": {
+    "ambiguous": 21,
+    "failed": 24,
     "not_applicable": 0,
-    "available": 560,
     "blocked": 0,
-    "not_available": 295,
-    "failed": 124,
-    "ambiguous": 21
+    "available": 560,
+    "not_available": 395
   },
   "score": null,
   "score_note": "Operational smoke test; no hidden labels or official competition score",
@@ -52,44 +52,50 @@
   "strategy": "balanced",
   "company_source_cache": {
     "scope": "this run only",
-    "hits": 6,
-    "unique_urls": 190,
+    "hits": 5,
+    "unique_urls": 177,
     "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
   },
   "stages": [
     {
       "stage": "identity",
       "requests": 100,
+      "seconds": 22.0,
       "request_ceiling": 2000,
       "time_ceiling_seconds": 2484.0
     },
     {
       "stage": "website",
-      "requests": 352,
+      "requests": 339,
+      "seconds": 467.9,
       "request_ceiling": 1240,
-      "time_ceiling_seconds": 1123.953
+      "time_ceiling_seconds": 1130.321
     },
     {
       "stage": "financials",
       "requests": 100,
+      "seconds": 18.4,
       "request_ceiling": 2000,
-      "time_ceiling_seconds": 874.375
+      "time_ceiling_seconds": 1115.083
     },
     {
       "stage": "leadership",
       "requests": 100,
+      "seconds": 20.6,
       "request_ceiling": 2000,
-      "time_ceiling_seconds": 1252.391
+      "time_ceiling_seconds": 1436.508
     },
     {
       "stage": "locations",
       "requests": 100,
+      "seconds": 18.3,
       "request_ceiling": 2000,
       "time_ceiling_seconds": 2364.0
     },
     {
       "stage": "jobs",
-      "requests": 217,
+      "requests": 83,
+      "seconds": 65.0,
       "request_ceiling": 2000,
       "time_ceiling_seconds": 2484.0
     }
@@ -100,18 +106,18 @@
   "quote_selector": null,
   "jobs_source": {
     "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
-    "state": "partial",
+    "state": "loaded",
     "window_days": 40,
-    "feed_pages": 60,
-    "detail_requests": 91,
-    "cache_hits": 30,
+    "feed_pages": 80,
+    "detail_requests": 1,
+    "cache_hits": 0,
     "max_candidate_details": 4,
     "max_detail_requests": 200,
-    "completed_segments": 0,
+    "completed_segments": 6,
     "total_segments": 6,
-    "error": "NAV feed page limit reached",
-    "indexed_active_employers": 5448,
-    "indexed_active_ads": 8836,
+    "error": null,
+    "indexed_active_employers": 5013,
+    "indexed_active_ads": 8112,
     "token": "NAV published public token"
   },
   "website_methods": {

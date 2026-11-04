@@ -92,7 +92,7 @@ def test_joined_employer_words_find_exact_entity(monkeypatch):
 
 
 def test_candidate_expansion_is_bounded_and_keeps_identity_gate(monkeypatch):
-    nav = loaded([entry(str(i), "Charlottes " + str(i)) for i in range(25)], monkeypatch)
+    nav = loaded([entry(str(i), "Charlottes Hobby " + str(i)) for i in range(25)], monkeypatch)
     nav.max_ads = 2
     row = envelope("123456789", "t")
     transport = Transport({BASE + "/api/v1/feedentry/" + str(i): (200, ad("987654321")) for i in range(25)})
@@ -111,3 +111,12 @@ def test_budget_too_small_is_unknown_not_no_jobs(monkeypatch):
     nav.research(row, {"navn": "Example AS"}, Transport({}), claim)
     assert row["availability"]["jobs"] == "failed"
     assert row["research_sources"]["nav_jobs"]["state"] == "not_queried"
+
+
+def test_one_shared_word_is_not_worth_a_detail_request(monkeypatch):
+    nav = loaded([entry(str(i), "Lund Eiendom " + str(i)) for i in range(25)], monkeypatch)
+    row = envelope("123456789", "t")
+    nav.research(row, {"navn": "ISA EIENDOM AS"}, Transport({}), claim)
+    assert nav.details == 0
+    # A complete index with no plausible employer is a real negative check.
+    assert row["availability"]["jobs"] == "not_available"

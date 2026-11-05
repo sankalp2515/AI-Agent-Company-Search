@@ -127,32 +127,35 @@ def matched_name_span(text, legal_name):
     return None
 
 
-def guess_domains(legal_name, legal_form_code=None, limit=6):
-    """Deterministic brand-domain hypotheses from the legal name only."""
+def guess_domains(legal_name, legal_form_code=None, limit=7):
+    """Deterministic brand-domain hypotheses from the legal name only, likeliest first."""
     if (legal_form_code or "").upper() in NO_GUESS_FORMS:
         return []
     tokens = name_tokens(legal_name)
     if not tokens or len("".join(tokens)) < 4 or len(tokens) > 4:
         return []
-    labels = []
     joined, hyphen = "".join(tokens), "-".join(tokens)
-    labels.append(joined)
-    if len(tokens) > 1:
-        labels.append(hyphen)
     raw = re.findall(r"[a-z0-9æøå]+", str(legal_name).casefold())
     alt = "".join(w.replace("ø", "oe").replace("æ", "ae").replace("å", "aa") for w in raw if translit(w) in tokens)
-    if alt and alt not in labels:
-        labels.append(alt)
-    if len(tokens) > 1 and len(tokens[0]) >= 6 and tokens[0] not in GENERIC:
-        labels.append(tokens[0])
+    multi = len(tokens) > 1
+    labelled = [(joined, "no")]
+    if multi:
+        labelled.append((hyphen, "no"))
+    labelled.append((alt, "no"))
+    labelled.append((joined, "com"))
+    # Longer names are often shortened to their first words: "Amdam Sag og Høvleri" at amdamsag.no.
+    if len(tokens) > 2 and len(tokens[0]) >= 3 and tokens[0] not in GENERIC:
+        labelled.append(("".join(tokens[:2]), "no"))
+    # A lone first word is a weak hypothesis: only the Norwegian TLD, and only after full-name domains.
+    if multi and len(tokens[0]) >= 6 and tokens[0] not in GENERIC:
+        labelled.append((tokens[0], "no"))
+    if multi:
+        labelled.append((hyphen, "com"))
     out = []
-    for i, label in enumerate(labels):
-        if not 3 <= len(label) <= 63:
-            continue
-        single = len(tokens) > 1 and label == tokens[0]
-        # A lone first word is a weak hypothesis: only the Norwegian TLD, and only after full-name domains.
-        for tld in (("no",) if single else ("no", "com")):
-            out.append(f"https://{label}.{tld}/")
+    for label, tld in labelled:
+        address = f"https://{label}.{tld}/"
+        if 3 <= len(label) <= 63 and address not in out:
+            out.append(address)
     return out[:limit]
 
 

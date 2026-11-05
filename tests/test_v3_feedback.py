@@ -16,7 +16,7 @@ def test_summary_uses_one_newest_period_even_when_a_figure_is_missing():
     fin(row, "annual_result", 7, "2025-12-31")
     fin(row, "revenue", 999, "2025-12-31", kind="KONSERN")
     text = [s["text"] for s in synthesize(row)["statements"] if s["kind"] == "financials"][0]
-    assert "2025-01-01 to 2025-12-31" in text and "SELSKAP" in text and "2024" not in text
+    assert "2025-01-01 to 2025-12-31" in text and "company accounts" in text and "2024" not in text
 
 
 def test_older_figures_are_never_called_latest_when_registry_lists_newer_filing():

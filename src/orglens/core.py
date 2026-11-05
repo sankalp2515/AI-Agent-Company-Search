@@ -336,7 +336,7 @@ def official_extras(row, body, snapshot):
         if body.get(date_key):
             events.append((str(body[date_key])[:10], label, "/" + date_key))
     if isinstance(capital, dict) and capital.get("innfortDato"):
-        events.append((str(capital["innfortDato"])[:10], f"Share capital registered as {capital.get('belop')} {capital.get('valuta') or ''}".strip(), "/kapital/innfortDato"))
+        events.append((str(capital["innfortDato"])[:10], "Share capital registered as " + fmt_amount_exact(capital.get("belop"), capital.get("valuta")), "/kapital/innfortDato"))
     for i, old in enumerate(body.get("historiskeNavn") or []):
         if old.get("tilDato"):
             events.append((str(old["tilDato"])[:10], f"Changed name from {old.get('navn')}", f"/historiskeNavn/{i}"))
@@ -415,7 +415,10 @@ def official(row, transport, module):
                     continue
                 name = (role.get("person") or {}).get("navn") or {}
                 display = " ".join(str(name[k]) for k in ("fornavn", "mellomnavn", "etternavn") if name.get(k))
-                display = display or (role.get("enhet") or {}).get("navn")
+                if not display:
+                    # The register returns a firm's name as a list of name parts.
+                    firm = (role.get("enhet") or {}).get("navn")
+                    display = " ".join(str(part) for part in firm if part) if isinstance(firm, list) else firm
                 if display:
                     claim(row, "leadership", {"name": display, "role": (role.get("type") or {}).get("beskrivelse"),
                           "last_changed": group.get("sistEndret")}, snap, {"json_pointer": f"/rollegrupper/{i}/roller/{j}"})
@@ -717,7 +720,46 @@ def fetch_robots(row, base, host, transport):
     return None, availability(robot_snap)
 
 
-def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
+SELF_DECLARED_ORIGINS = {"registry", "registry_email", "nav_employer", "previous"}
+
+
+def alternate_addresses(url, origin=None):
+    """The same host's other usual addresses, tried only after a connection or certificate failure.
+
+    Plain HTTP is only for a domain the company itself declared. Unencrypted guessed domains are
+    mostly parked or compromised: two served malware-flagged scripts in testing, and none proved."""
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if parts.scheme != "https" or not host:
+        return []
+    other = host[4:] if host.startswith("www.") else "www." + host
+    rest = (parts.path, parts.query, "")
+    addresses = [urllib.parse.urlunsplit(("https", other, *rest))]
+    if origin in SELF_DECLARED_ORIGINS:
+        addresses.append(urllib.parse.urlunsplit(("http", host, *rest)))
+    return addresses
+
+
+def declared_domain_legal_statement(org, legal_name, pages):
+    """The site's own legal page states this exact legal name directly followed by this exact number.
+
+    Shared sites name several companies, so `numbers == {org}` cannot hold there. Only for a domain
+    the company itself declared in the register: a parent's site listing subsidiaries stays unproven."""
+    from .names import matched_name_span
+    for snapshot, soup, text in pages[1:]:
+        if not re.search(r"personvern|privacy|vilkar|vilk%c3%a5r|terms|kontakt|contact|om-oss|about|gdpr|cookie", snapshot["source_url"].lower()):
+            continue
+        name = matched_name_span(text, legal_name)
+        numbers = set(labelled_numbers(text))
+        if not name or org not in numbers or len(numbers) > 3:
+            continue
+        match = re.search(re.escape(name) + r"(?:\s+(?:AS|ASA|SA|DA|ANS|NUF|KS|BA))?[\s,;:()\-–]{0,6}" + ORG_LABEL + r"\s*[:.#-]?\s*(?:NO\s*)?((?:\d[\s.]*){9})(?!\d)", text, re.I)
+        if match and re.sub(r"\D", "", match.group(1)) == org:
+            return snapshot, {"text_quote": match.group(0), "page_role": "legal_statement"}, "legal_name_adjacent_organisation_number"
+    return None
+
+
+def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, _address_fallback=False):
     """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
     from .names import is_aggregator, registrable, domain_matches_name, text_contains_name, domain_is_full_name, NO_GUESS_FORMS, national_mismatch
     raw_url = url or body.get("hjemmeside")
@@ -743,6 +785,13 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         discovered_page, url = url, base
     robot, state = fetch_robots(row, base, host, transport)
     if robot is None:
+        if state == "failed" and not _address_fallback:
+            # The address failed, not the identity check. Certificate valid only for
+            # the www host and HTTP-only hosting are common on small company sites.
+            # Certificate checks stay on, and each address must pass the same proof.
+            for alternate in alternate_addresses(url, origin):
+                if crawl_site(row, body, transport, page_limit, origin=origin, url=alternate, _address_fallback=True):
+                    return True
         site_fail(row, state)
         return False
     if not robot.can_fetch(UA, url):
@@ -751,13 +800,12 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
     home = transport.get(url, "company_owned")
     attach(row, home)
     if availability(home) != "available":
-        if home.get("status") == 0 and origin == "registry" and url.startswith("https://"):
-            # Many registry entries are bare hostnames served only over HTTP.
-            home = transport.get("http://" + url[8:], "company_owned")
-            attach(row, home)
-        if availability(home) != "available":
-            site_fail(row, availability(home))
-            return False
+        if home.get("status") == 0 and not _address_fallback:
+            for alternate in alternate_addresses(url, origin):
+                if crawl_site(row, body, transport, page_limit, origin=origin, url=alternate, _address_fallback=True):
+                    return True
+        site_fail(row, availability(home))
+        return False
     final_host = (urllib.parse.urlsplit(home["source_url"]).hostname or "").lower()
     if registrable(final_host) != registrable(host):
         # A redirect to another registrable domain is a new, untrusted candidate.
@@ -839,6 +887,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         conflict = conflicting_number(org, pages)
         if not proof and not conflict and not managed:
             proof = corroborated(body, pages, row, domain_is_full_name(home['source_url'], legal))
+    if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
+        proof = declared_domain_legal_statement(org, legal, pages)
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
@@ -1398,7 +1448,8 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
     if not only_extra:
         add(body.get("_previous_website"), "previous")
     personal_mail = {'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.no', 'outlook.com', 'live.com', 'live.no',
-                     'msn.com', 'yahoo.com', 'yahoo.no', 'icloud.com', 'me.com', 'proton.me', 'protonmail.com', 'online.no'}
+                     'msn.com', 'yahoo.com', 'yahoo.no', 'icloud.com', 'me.com', 'mac.com', 'proton.me', 'protonmail.com', 'online.no',
+                     'lyse.net', 'getmail.no', 'broadpark.no', 'c2i.net', 'altibox.no', 'sdsl.no', 'frisurf.no', 'tele2.no', 'start.no'}
     for domain in [] if only_extra else re.findall(r'@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)', str(body.get('epostadresse') or ''), re.I):
         if domain.lower() not in personal_mail:
             # A registered contact domain is a hypothesis, never publisher proof.
@@ -1419,7 +1470,7 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
     fetched = 0
     form = (body.get("organisasjonsform") or {}).get("kode")
     hypotheses = [(u, 'name_guess') for u in guess_domains(body.get('navn', ''), form)]
-    for old in body.get('historiskeNavn', [])[-2:]:
+    for old in (body.get('historiskeNavn') or [])[-2:]:
         hypotheses.extend((u, 'historical_name_guess') for u in guess_domains(old.get('navn', ''), form))
     for url, guess_origin in hypotheses:
         if time.monotonic() >= getattr(transport,'deadline',float('inf')) or getattr(transport,'requests',0) >= getattr(transport,'limit',float('inf')):
@@ -1447,6 +1498,36 @@ FAMILY = {"public_brand": "official_website", "registered_activity": "legal_iden
 
 def family_of(field):
     return "financials" if field.startswith("financials.") else field if field in FIELDS else FAMILY.get(field, "legal_identity")
+
+
+ENGLISH_LEGAL_FORMS = {"AS": "a private limited company", "ASA": "a public limited company", "ANS": "a general partnership",
+                       "DA": "a partnership with shared liability", "ENK": "a sole proprietorship", "NUF": "a Norwegian branch of a foreign company",
+                       "SA": "a cooperative", "STI": "a foundation", "BRL": "a housing cooperative", "ESEK": "a condominium association",
+                       "KS": "a limited partnership", "FLI": "an association", "BA": "a company with limited liability",
+                       "SPA": "a savings bank", "KOMM": "a municipality", "ORGL": "an organisational unit"}
+ENGLISH_ROLES = {"Daglig leder": "managing director", "Styrets leder": "chair of the board", "Nestleder": "deputy chair",
+                 "Styremedlem": "board member", "Varamedlem": "deputy board member", "Regnskapsfører": "accountant",
+                 "Revisor": "auditor", "Forretningsfører": "business manager", "Innehaver": "owner", "Kontaktperson": "contact person"}
+
+
+def english_legal_form(form):
+    """The register's form in English, keeping its Norwegian name so the source term stays checkable."""
+    if not isinstance(form, dict):
+        return "a Norwegian registered entity"
+    norwegian = str(form.get("beskrivelse") or form.get("kode") or "").lower()
+    english = ENGLISH_LEGAL_FORMS.get(str(form.get("kode") or "").upper())
+    if english:
+        return f"{english} ({norwegian})" if norwegian else english
+    return f"registered as {norwegian}" if norwegian else "a Norwegian registered entity"
+
+
+def fmt_amount_exact(amount, currency=None):
+    """A full figure for a sentence: 30000.0 becomes NOK 30,000."""
+    if isinstance(amount, (int, float)) and not isinstance(amount, bool):
+        shown = f"{amount:,.0f}" if float(amount).is_integer() else f"{amount:,.2f}"
+    else:
+        shown = str(amount)
+    return f"{currency or ''} {shown}".strip()
 
 
 def fmt_amount(value):
@@ -1491,10 +1572,10 @@ def synthesize(row):
 
     name, form, industry, municipality = first("legal_name"), first("legal_form"), first("industry"), first("municipality")
     if name:
-        lead = f"{name['value']} is a " + (str(form["value"].get("beskrivelse", form["value"].get("kode"))).lower() if form and isinstance(form["value"], dict) else "Norwegian registered entity")
+        lead = f"{name['value']} is " + english_legal_form(form["value"] if form else None)
         details = []
-        if industry and isinstance(industry["value"], dict):
-            details.append(f"in {str(industry['value'].get('beskrivelse', '')).lower()} (NACE {industry['value'].get('kode')})")
+        if industry and isinstance(industry["value"], dict) and str(industry["value"].get("kode")) != "00.000":
+            details.append(f"registered under {str(industry['value'].get('beskrivelse', '')).lower()} (NACE {industry['value'].get('kode')})")
         if municipality:
             details.append(f"based in {str(municipality['value']).title()}")
         founded = first("founded_on") or first("registered_on")
@@ -1503,7 +1584,7 @@ def synthesize(row):
         say(lead + (" " + ", ".join(details) if details else "") + ".", [name, form, industry, municipality, founded], "identity")
     description, purpose, brand = first("description"), first("registered_activity"), first("public_brand")
     if description:
-        say(f"Its verified website describes it as: “{description['value'][:280]}”" + (f" Public brand: {brand['value']}." if brand else ""), [description, brand], "what_it_does")
+        say(f"Its verified website describes it as: “{' '.join(str(description['value']).split())[:280]}”" + (f" Public brand: {brand['value']}." if brand else ""), [description, brand], "what_it_does")
     if purpose:
         say(f"Registered activity: {purpose['value'][:280].rstrip('.')}.", [purpose], "what_it_does")
     flags = [c for c in (first("bankrupt"), first("liquidating")) if c and c["value"] is True]
@@ -1533,7 +1614,8 @@ def synthesize(row):
         year = str(period.get("tilDato") or "")[:4]
         registry_year = str(row["legal_identity"].get("latest_accounts_year") or "")
         label = "Latest filed accounts" if not registry_year or registry_year <= year else "Most recent accounts figures available"
-        say(f"{label} ({period.get('fraDato')} to {period.get('tilDato')}, {sample['value'].get('account_type') or 'company'} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
+        account_kind = {"SELSKAP": "company", "KONSERN": "group"}.get(str(sample["value"].get("account_type") or "").upper(), "company")
+        say(f"{label} ({period.get('fraDato')} to {period.get('tilDato')}, {account_kind} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
         if registry_year and year and registry_year > year:
             first_claim = next((c for c in row["claims"] if c["field"] == "latest_accounts_year"), None)
             say(f"The register records a {registry_year} annual-accounts filing, but Regnskapsregisteret did not return its figures at retrieval time; {year} figures are shown and are not the latest filing.",
@@ -1546,7 +1628,7 @@ def synthesize(row):
         priority = ("daglig leder", "styrets leder", "innehaver", "kontaktperson", "nestleder", "styremedlem")
         ranked = sorted(leaders, key=lambda c: next((i for i, p in enumerate(priority) if p in str(c["value"].get("role", "")).lower()), 99))
         shown = ranked[:4]
-        say("Leadership in the official register: " + "; ".join(f"{c['value'].get('name')} ({c['value'].get('role')})" for c in shown) + (f"; plus {len(leaders) - len(shown)} further roles." if len(leaders) > len(shown) else "."), shown, "leadership")
+        say("Leadership in the official register: " + "; ".join(f"{c['value'].get('name')} ({ENGLISH_ROLES.get(c['value'].get('role'), c['value'].get('role'))})" for c in shown) + (f"; plus {len(leaders) - len(shown)} further role{'s' if len(leaders) - len(shown) != 1 else ''}." if len(leaders) > len(shown) else "."), shown, "leadership")
     places = by.get("locations", [])
     if places:
         cities = sorted({str((c["value"].get("address") or {}).get("poststed") or "").title() for c in places} - {""})

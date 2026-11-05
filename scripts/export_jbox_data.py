@@ -63,7 +63,7 @@ def clean(text):
     """Role holders that are firms reach the summary as a printed list, such as ['BDO AS']."""
     text = re.sub(r"\[((?:'[^']*'(?:, )?)+)\]", lambda match: ", ".join(re.findall(r"'([^']*)'", match[1])), str(text))
     for norwegian, english in LEGAL_FORMS.items():
-        text = re.sub(rf"\bis an? {re.escape(norwegian.lower())} in\b", f"is a {english.lower()} ({norwegian.lower()}) in", text)
+        text = re.sub(rf"\bis an? {re.escape(norwegian.lower())}\b", f"is a {english.lower()} ({norwegian.lower()})", text)
     for norwegian, english in ROLES.items():
         text = text.replace(f"({norwegian})", f"({english})")
     text = text.replace("SELSKAP accounts", "company accounts").replace("KONSERN accounts", "group accounts")

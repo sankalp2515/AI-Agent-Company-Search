@@ -144,3 +144,40 @@ def test_short_name_domain_needs_two_people_on_one_page():
 def test_a_firm_role_holder_never_counts_as_an_officer():
     pages = [page("https://www.edit.land/", "Linn Runeson with ECIT SERVICES AS")]
     assert registered_officers_on_pages(officers_row(), pages) is None
+
+
+INSPECTIONS = """orgnummer;navn;poststed;tilsynid;dato;total_karakter
+123456789;Egon;OSLO;a;05012026;0
+123456789;Egon;OSLO;b;05022026;2
+987654321;Filial;BERGEN;c;05032026;3
+111111111;Other;BODO;d;05032026;1
+123456789;Bad date;OSLO;e;notadate;1
+123456789;Not graded;OSLO;f;05032026;5
+"""
+
+
+def inspection_row(*units):
+    return {"organisation_number": "123456789", "availability": {}, "claims": [{"field": "locations", "value": {"organisation_number": u}} for u in units]}
+
+
+def run_inspections(row):
+    from orglens.openrecords import FoodInspections, parse_inspections
+    source = FoodInspections()
+    source.by_org, source.state, source.snapshot = parse_inspections(INSPECTIONS), "loaded", {"id": "s"}
+    claims = []
+    count = source.research(row, lambda r, field, value, snap, locator, period=None, identity_method=None: claims.append((value, identity_method)), lambda d: d)
+    return count, claims
+
+
+def test_inspections_use_only_the_exact_number_or_a_registered_workplace():
+    count, claims = run_inspections(inspection_row("987654321"))
+    assert count == 3
+    assert [c[0]["published_at"] for c in claims] == ["2026-03-05", "2026-02-05", "2026-01-05"]
+    assert claims[0][1] == "official_record_registered_subunit" and claims[1][1] == "official_record_exact_orgnr"
+    assert all("Other" not in c[0]["headline"] and "Not graded" not in c[0]["headline"] for c in claims)
+
+
+def test_inspection_outcome_is_reported_in_plain_words():
+    _, claims = run_inspections(inspection_row())
+    assert "violations requiring follow-up" in claims[0][0]["headline"]
+    assert claims[0][0]["kind"] == "official_food_inspection"

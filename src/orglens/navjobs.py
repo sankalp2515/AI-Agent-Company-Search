@@ -41,6 +41,7 @@ class NavJobs:
         self.org_index = {}
         self.word_index = {}
         self.compact_index = {}
+        self.short_word_index = {}
         self.pages = 0
         self.state = "not_loaded"
         self.error = None
@@ -78,6 +79,7 @@ class NavJobs:
         """Index active ads modified within the window; latest entry per ad wins."""
         cap = min(self.max_pages, page_cap if page_cap is not None else self.max_pages)
         self.index, self.org_index, self.word_index, self.compact_index = {}, {}, {}, {}
+        self.short_word_index = {}
         self.pages, self.complete_segments = 0, 0
         self.response_cache, self.response_locks = {}, {}
         self.details, self.cache_hits = 0, 0
@@ -180,6 +182,8 @@ class NavJobs:
                 for word in key.split():
                     if len(word) >= 5 and word not in GENERIC_EMPLOYER_WORDS:
                         self.word_index.setdefault(word, set()).add(key)
+                    if 3 <= len(word) < 5 and word not in GENERIC_EMPLOYER_WORDS:
+                        self.short_word_index.setdefault(word, set()).add(key)
             employer = entry.get("employer") if isinstance(entry.get("employer"), dict) else {}
             # Some feed versions include identifiers; they only discover candidates.
             for value in (entry.get("orgnr"), entry.get("businessOrgNumber"), employer.get("orgnr")):
@@ -204,6 +208,7 @@ class NavJobs:
                 words = set(key.split())
                 for word in words:
                     possible.update(self.word_index.get(word, ()))
+                    possible.update(self.short_word_index.get(word, ()))
                 # "UP LINK" and "Uplink" are the same spelling once spaces are ignored.
                 possible.update(self.compact_index.get(key.replace(" ", ""), ()))
                 for candidate in sorted(possible):
@@ -213,8 +218,16 @@ class NavJobs:
                     if compact in other or other in compact:
                         score += 50
                     short, long_ = sorted((compact, other), key=len)
-                    strong = candidate == key or words <= set(candidate.split()) or (
-                        short in long_ and len(short) >= 6 and len(short) >= 0.7 * len(long_))
+                    others = set(candidate.split())
+                    meaningful = {w for w in overlap if w not in GENERIC_EMPLOYER_WORDS}
+                    first = key.split()[0] if key else ""
+                    strong = candidate == key or words <= others or (
+                        short in long_ and len(short) >= 6 and len(short) >= 0.7 * len(long_)) or (
+                        # A trading name is often a shortened legal name, or the reverse. The ad's
+                        # organisation number decides identity; this only earns one detail lookup.
+                        len(meaningful) >= 2) or (
+                        others <= words and any(len(w) >= 4 for w in meaningful)) or (
+                        first in meaningful and len(first) >= 3 and candidate.split()[0] == first)
                     if strong_only and not strong:
                         continue
                     for uuid, item in self.index.get(candidate, {}).items():

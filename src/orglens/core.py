@@ -31,8 +31,12 @@ FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_w
 SITE_FIELDS = ("official_website", "description", "activity", "owned_profiles", "contact")
 ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organisation\s+number|organization\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
 UA = "OrgLens/0.1 (Norwegian company research; public sources only)"
+from .openrecords import FOOD_INSPECTIONS_MAX_BYTES, FOOD_INSPECTIONS_URL, FoodInspections
+
 MAX_BYTES = 4_000_000
 MAX_READ_SECONDS = 25
+# Named official bulk files only. Everything else keeps the general limit.
+LARGE_RESPONSE_LIMITS = {FOOD_INSPECTIONS_URL: FOOD_INSPECTIONS_MAX_BYTES}
 TLS = ssl.create_default_context(cafile=certifi.where())  # pinned CA bundle, identical on every OS
 FAST_HOSTS = {"data.brreg.no", "pam-stilling-feed.nav.no"}
 
@@ -188,7 +192,7 @@ class Transport:
                         if not chunk:
                             break
                         buffer += chunk
-                        if len(buffer) > MAX_BYTES:
+                        if len(buffer) > LARGE_RESPONSE_LIMITS.get(requested, MAX_BYTES):
                             raise ValueError("Response exceeds safe snapshot limit")
                         if time.monotonic() - read_started > MAX_READ_SECONDS or time.monotonic() >= self.deadline:
                             raise ValueError("Response body too slow; abandoned")
@@ -1820,10 +1824,13 @@ def synthesize(row):
         titles = "; ".join(str(c["value"].get("title"))[:90] for c in jobs[:3])
         say(f"Appears to be hiring: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} with an exact employer match ({titles}).", jobs[:3], "hiring")
     activity = by.get("activity", [])
-    news = sorted([c for c in activity if c["value"].get("kind") != "official_registry_event"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
+    news = sorted([c for c in activity if c["value"].get("kind") not in {"official_registry_event", "official_food_inspection"}], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
+    inspections = sorted([c for c in activity if c["value"].get("kind") == "official_food_inspection"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
     events = sorted([c for c in activity if c["value"].get("kind") == "official_registry_event"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
     if news:
         say(f"Latest company-published activity: “{news[0]['value'].get('headline')}” ({parsed_date(news[0]['value'].get('published_at')).date().isoformat()}).", news[:1], "activity")
+    if inspections:
+        say(f"Latest official food safety inspection ({inspections[0]['value'].get('published_at')}), {inspections[0]['value'].get('workplace')}: {inspections[0]['value'].get('outcome')}.", inspections[:1], "activity")
     if events:
         say(f"Most recent registry event: {events[0]['value'].get('headline')} ({events[0]['value'].get('published_at')}).", events[:1], "activity")
     if row.get("changes"):
@@ -2105,6 +2112,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 depth = max(2, min(pages, int(share) - 2))
                 research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
                                  guesses=guesses and share >= (3 if strategy == "balanced" else 6), max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
+            elif module == "food_inspections":
+                food_inspections.research(row, claim, news_date)
             elif module == "website_hints":
                 # Second, bounded pass: NAV employer homepages exist only after the jobs phase.
                 body = bodies[row["organisation_number"]]
@@ -2151,12 +2160,14 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
 
     nav_homepages, nav_thread = {}, None
     stage_metrics = []
+    food_inspections = FoodInspections()
     if strategy == "balanced":
         # Reserve the early opportunity for source-backed external facts. Official
         # identities and current leaders anchor website verification before research.
         phase_order = ("identity", *(("leadership",) if "leadership" in modules else ()), *(("website",) if "website" in modules else ()),
                        *(("discovery",) if discovery else ()), *(("agent",) if agent else ()),
                        *(m for m in modules if m not in {"website", "jobs", "leadership"}),
+                       *(("food_inspections",) if "locations" in modules and not replay else ()),
                        *(("jobs",) if "jobs" in modules else ()))
         if jobs_source:
             jobs_source.max_detail_requests = max(1, requests // 5)
@@ -2186,6 +2197,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             if strategy == "balanced" and module in {"website", "discovery", "agent"}:
                 fraction = .60 if module == "website" else .30
                 transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
+            if module == "food_inspections":
+                food_inspections.load(transport)
             if strategy == "balanced" and module == "jobs" and jobs_source and not replay:
                 remaining = max(0, requests - transport.requests)
                 detail_reserve = min(max(40, 2 * len(rows)), remaining // 3)

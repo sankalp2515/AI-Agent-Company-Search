@@ -767,6 +767,32 @@ def alternate_addresses(url, origin=None):
     return addresses
 
 
+def note_timed_out_candidate(row, url, origin, errors_before):
+    """Remember a candidate lost to a timeout. A slow moment says nothing about the company."""
+    if not any("timed out" in str(e.get("message")) for e in row["errors"][errors_before:]):
+        return
+    pending = row.setdefault("website_research", {"candidates": []}).setdefault("timed_out", [])
+    if not any(item["url"] == url for item in pending):
+        pending.append({"url": url, "origin": origin})
+
+
+def retry_timed_out_candidates(row, body, transport, page_limit):
+    """One late attempt at each timed-out candidate, on its original address only."""
+    research = row.get("website_research") or {}
+    for item in list(research.get("timed_out", [])):
+        if time.monotonic() >= getattr(transport, "deadline", float("inf")) or getattr(transport, "requests", 0) >= getattr(transport, "limit", float("inf")):
+            return False
+        before = dict(row["availability"])
+        errors = list(row["errors"])
+        if crawl_site(row, body, transport, page_limit, origin=item["origin"], url=item["url"], _address_fallback=True):
+            research["retry_recovered"] = item["url"]
+            return True
+        for field in SITE_FIELDS:
+            row["availability"][field] = before.get(field, "not_available")
+        row["errors"] = errors
+    return False
+
+
 def declared_domain_legal_statement(org, legal_name, pages):
     """The site's own legal page states this exact legal name directly followed by this exact number.
 
@@ -862,6 +888,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         # owner at its root/contact pages before using the discovered document.
         # Otherwise a directory's customer number becomes the site's identity.
         discovered_page, url = url, base
+    errors_before = len(row["errors"])
     robot, state = fetch_robots(row, base, host, transport)
     if robot is None:
         if state == "failed" and not _address_fallback:
@@ -871,6 +898,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             for alternate in alternate_addresses(url, origin):
                 if crawl_site(row, body, transport, page_limit, origin=origin, url=alternate, _address_fallback=True):
                     return True
+            note_timed_out_candidate(row, raw_url, origin, errors_before)
         site_fail(row, state)
         return False
     if not robot.can_fetch(UA, url):
@@ -883,6 +911,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             for alternate in alternate_addresses(url, origin):
                 if crawl_site(row, body, transport, page_limit, origin=origin, url=alternate, _address_fallback=True):
                     return True
+            note_timed_out_candidate(row, raw_url, origin, errors_before)
         site_fail(row, availability(home))
         return False
     final_host = (urllib.parse.urlsplit(home["source_url"]).hostname or "").lower()
@@ -1142,6 +1171,8 @@ def news_about_company(body, title, summary=""):
     """Media companies publish stories about others; keep only their items that name the company itself."""
     from .names import name_tokens, distinctive
     if re.search(r'^(?:how\s+to\b|how\s+can\b|tips\b|slik\b|guide\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)', title.strip(), re.I):
+        return False
+    if re.search(r'\b(?:vedtekter|husordens?regler|årsplan|åpningstider|prisliste)\b', title, re.I):
         return False
     code = str(((body or {}).get("naeringskode1") or {}).get("kode") or "")
     if not MEDIA_INDUSTRY.match(code):
@@ -2112,6 +2143,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 depth = max(2, min(pages, int(share) - 2))
                 research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
                                  guesses=guesses and share >= (3 if strategy == "balanced" else 6), max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
+            elif module == "website_retry":
+                retry_timed_out_candidates(row, bodies[row["organisation_number"]], transport, pages)
             elif module == "food_inspections":
                 food_inspections.research(row, claim, news_date)
             elif module == "website_hints":
@@ -2250,6 +2283,16 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             list(pool.map(lambda r: task(r, "website_hints"), hinted))
             stage_metrics.append({"stage": "website_hints", "requests": transport.requests-stage_begin, "companies": len(hinted),
                                   "request_ceiling": transport.limit, "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
+        retryable = [r for r in rows if r["organisation_number"] in bodies and r["availability"].get("official_website") != "available"
+                     and (r.get("website_research") or {}).get("timed_out")]
+        if strategy == "balanced" and retryable and not replay and time.monotonic() < network_deadline - 120:
+            stage_begin, stage_clock = transport.requests, time.monotonic()
+            transport.limit, transport.deadline = requests, network_deadline - 60
+            list(pool.map(lambda r: task(r, "website_retry"), retryable))
+            stage_metrics.append({"stage": "website_retry", "requests": transport.requests-stage_begin, "companies": len(retryable),
+                                  "recovered": sum(bool(r["website_research"].get("retry_recovered")) for r in retryable),
+                                  "seconds": round(time.monotonic()-stage_clock, 1), "request_ceiling": transport.limit,
+                                  "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
         transport.limit = requests
         transport.deadline = network_deadline
     for row in rows:

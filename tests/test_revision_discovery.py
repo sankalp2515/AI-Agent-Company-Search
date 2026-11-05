@@ -2,6 +2,7 @@
 from bs4 import BeautifulSoup
 
 from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_unused_snapshots, english_legal_form, explicit_publish_date, parse_sitemap, registered_officers_on_pages, validate, SITEMAP_ARTICLE, SITEMAP_CAREERS
+from orglens.core import news_about_company, note_timed_out_candidate
 from orglens.names import domain_spells_name, guess_domains
 
 
@@ -181,3 +182,20 @@ def test_inspection_outcome_is_reported_in_plain_words():
     _, claims = run_inspections(inspection_row())
     assert "violations requiring follow-up" in claims[0][0]["headline"]
     assert claims[0][0]["kind"] == "official_food_inspection"
+
+
+def test_only_timeouts_are_queued_for_a_late_retry():
+    row = {"errors": [{"message": "<urlopen error timed out>"}], "website_research": {"candidates": []}}
+    note_timed_out_candidate(row, "https://x.no/", "registry", 0)
+    note_timed_out_candidate(row, "https://x.no/", "registry", 0)
+    assert row["website_research"]["timed_out"] == [{"url": "https://x.no/", "origin": "registry"}]
+    other = {"errors": [{"message": "certificate verify failed"}], "website_research": {"candidates": []}}
+    note_timed_out_candidate(other, "https://y.no/", "registry", 0)
+    assert "timed_out" not in other["website_research"]
+
+
+def test_rules_and_plans_are_not_news():
+    body = {"navn": "SOFIENBERGGATE 13", "naeringskode1": {"kode": "68.209"}}
+    assert not news_about_company(body, "Vedtekter – Husordensregler")
+    assert not news_about_company(body, "Årsplan 2026-2027")
+    assert news_about_company(body, "Nytt tak på bygget")

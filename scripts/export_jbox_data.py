@@ -56,7 +56,7 @@ AVAILABILITY = ["official_website", "owned_profiles", "activity", "description",
 def clean(text):
     """Role holders that are firms reach the summary as a printed list, such as ['BDO AS']."""
     text = re.sub(r"\[((?:'[^']*'(?:, )?)+)\]", lambda match: ", ".join(re.findall(r"'([^']*)'", match[1])), str(text))
-    text = re.sub(r"is a (?=[aeiouyæøå])", "is an ", text)
+    text = re.sub(r"\bis a (?=[aeiouyæøå])", "is an ", text)
     return text.replace("plus 1 further roles", "plus 1 further role")
 
 

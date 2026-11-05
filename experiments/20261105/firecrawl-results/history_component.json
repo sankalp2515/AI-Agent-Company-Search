@@ -1,0 +1,91 @@
+{
+  "run_id": "history-crawl",
+  "completed_at": "2026-11-05T15:51:26.114217Z",
+  "companies": 27,
+  "envelopes": 27,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 27
+  },
+  "requests": 181,
+  "bytes": 6490792,
+  "runtime_seconds": 44.788,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 600,
+    "seconds": 600
+  },
+  "p50_company_ms": 8235,
+  "p95_company_ms": 32107,
+  "coverage": {
+    "legal_identity": 27,
+    "financials": 0,
+    "leadership": 27,
+    "locations": 0,
+    "official_website": 1,
+    "description": 1,
+    "jobs": 0,
+    "activity": 27,
+    "owned_profiles": 0,
+    "contact": 11
+  },
+  "states": {
+    "ambiguous": 6,
+    "available": 94,
+    "not_available": 83,
+    "not_applicable": 0,
+    "blocked": 0,
+    "failed": 87
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 1,
+    "social_links": 0,
+    "news": 0,
+    "job_postings": 0,
+    "careers_page": 0,
+    "description": 1
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 6,
+    "unique_urls": 69,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 27,
+      "seconds": 3.3,
+      "request_ceiling": 600,
+      "time_ceiling_seconds": 540.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 27,
+      "seconds": 3.4,
+      "request_ceiling": 573,
+      "time_ceiling_seconds": 540.0
+    },
+    {
+      "stage": "website",
+      "requests": 127,
+      "seconds": 36.2,
+      "request_ceiling": 381,
+      "time_ceiling_seconds": 246.683
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 1
+  },
+  "discovery": null
+}

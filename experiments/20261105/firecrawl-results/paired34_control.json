@@ -1,0 +1,96 @@
+{
+  "run_id": "fc-baseline-replay34",
+  "completed_at": "2026-11-05T15:47:57.058250Z",
+  "companies": 34,
+  "envelopes": 34,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 34
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 13.036,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 680,
+    "seconds": 600
+  },
+  "p50_company_ms": 1629,
+  "p95_company_ms": 8203,
+  "coverage": {
+    "legal_identity": 34,
+    "financials": 0,
+    "leadership": 34,
+    "locations": 0,
+    "official_website": 22,
+    "description": 18,
+    "jobs": 0,
+    "activity": 34,
+    "owned_profiles": 9,
+    "contact": 26
+  },
+  "states": {
+    "failed": 141,
+    "ambiguous": 3,
+    "blocked": 0,
+    "available": 177,
+    "not_available": 19,
+    "not_applicable": 0
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 22,
+    "social_links": 9,
+    "news": 1,
+    "job_postings": 0,
+    "careers_page": 5,
+    "description": 18
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 0,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 0,
+      "seconds": 0.1,
+      "request_ceiling": 680,
+      "time_ceiling_seconds": 599.969
+    },
+    {
+      "stage": "leadership",
+      "requests": 0,
+      "seconds": 0.0,
+      "request_ceiling": 646,
+      "time_ceiling_seconds": 599.969
+    },
+    {
+      "stage": "website",
+      "requests": 0,
+      "seconds": 9.5,
+      "request_ceiling": 408,
+      "time_ceiling_seconds": 270.076
+    }
+  ],
+  "mode": "saved_source_replay",
+  "replay_source": "out/experiments/firecrawl-patterns/sites34",
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "registry_declared_homepage": 3,
+    "full_name_domain_and_registered_operating_head": 5,
+    "labelled_organisation_number": 5,
+    "jsonld_organisation_identifier": 1,
+    "legal_name_and_registered_address": 4,
+    "legal_name_and_registered_phone": 4
+  },
+  "discovery": null
+}

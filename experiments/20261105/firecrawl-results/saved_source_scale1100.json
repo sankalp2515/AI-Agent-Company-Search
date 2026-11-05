@@ -1,0 +1,116 @@
+{
+  "run_id": "fc-audited-replay1100",
+  "completed_at": "2026-11-05T16:08:12.188926Z",
+  "companies": 1100,
+  "envelopes": 1100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1100
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 163.306,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 22000,
+    "seconds": 2700
+  },
+  "p50_company_ms": 43,
+  "p95_company_ms": 5865,
+  "coverage": {
+    "legal_identity": 1100,
+    "financials": 1097,
+    "leadership": 1097,
+    "locations": 1100,
+    "official_website": 83,
+    "description": 59,
+    "jobs": 0,
+    "activity": 1099,
+    "owned_profiles": 45,
+    "contact": 407
+  },
+  "states": {
+    "available": 6087,
+    "ambiguous": 137,
+    "not_applicable": 0,
+    "blocked": 9,
+    "not_available": 4279,
+    "failed": 488
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 83,
+    "social_links": 45,
+    "news": 19,
+    "job_postings": 0,
+    "careers_page": 13,
+    "description": 59
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 0,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 0,
+      "seconds": 1.8,
+      "request_ceiling": 22000,
+      "time_ceiling_seconds": 2699.19
+    },
+    {
+      "stage": "leadership",
+      "requests": 0,
+      "seconds": 1.1,
+      "request_ceiling": 20900,
+      "time_ceiling_seconds": 861.529
+    },
+    {
+      "stage": "website",
+      "requests": 0,
+      "seconds": 98.7,
+      "request_ceiling": 13200,
+      "time_ceiling_seconds": 1216.714
+    },
+    {
+      "stage": "financials",
+      "requests": 0,
+      "seconds": 6.1,
+      "request_ceiling": 22000,
+      "time_ceiling_seconds": 1340.837
+    },
+    {
+      "stage": "locations",
+      "requests": 0,
+      "seconds": 1.0,
+      "request_ceiling": 22000,
+      "time_ceiling_seconds": 2579.19
+    },
+    {
+      "stage": "jobs",
+      "requests": 0,
+      "seconds": 0.8,
+      "request_ceiling": 22000,
+      "time_ceiling_seconds": 2699.19
+    }
+  ],
+  "mode": "saved_source_replay",
+  "replay_source": "E:/Codex Projects/Company-Search/out/release-20261019/scale1100",
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 30,
+    "legal_name_and_registered_phone": 6,
+    "registry_declared_homepage": 12,
+    "legal_name_and_registered_address": 7,
+    "full_name_domain_and_registered_operating_head": 28
+  },
+  "discovery": null
+}

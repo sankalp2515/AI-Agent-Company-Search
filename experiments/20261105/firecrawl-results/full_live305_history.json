@@ -1,0 +1,147 @@
+{
+  "run_id": "fc-final305",
+  "completed_at": "2026-11-05T16:08:53.453849Z",
+  "companies": 305,
+  "envelopes": 305,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 305
+  },
+  "requests": 2667,
+  "bytes": 245138955,
+  "runtime_seconds": 554.604,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 6100,
+    "seconds": 2700
+  },
+  "p50_company_ms": 6804,
+  "p95_company_ms": 30560,
+  "coverage": {
+    "legal_identity": 305,
+    "financials": 305,
+    "leadership": 304,
+    "locations": 305,
+    "official_website": 36,
+    "description": 31,
+    "jobs": 5,
+    "activity": 304,
+    "owned_profiles": 17,
+    "contact": 110
+  },
+  "states": {
+    "blocked": 6,
+    "failed": 33,
+    "available": 1722,
+    "ambiguous": 84,
+    "not_applicable": 0,
+    "not_available": 1205
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 36,
+    "social_links": 17,
+    "news": 2,
+    "job_postings": 5,
+    "careers_page": 7,
+    "description": 31
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 34,
+    "unique_urls": 645,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 305,
+      "seconds": 31.3,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 305,
+      "seconds": 31.4,
+      "request_ceiling": 5795,
+      "time_ceiling_seconds": 808.867
+    },
+    {
+      "stage": "website",
+      "requests": 1040,
+      "seconds": 141.5,
+      "request_ceiling": 3904,
+      "time_ceiling_seconds": 1152.268
+    },
+    {
+      "stage": "financials",
+      "requests": 305,
+      "seconds": 31.7,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 1284.073
+    },
+    {
+      "stage": "locations",
+      "requests": 305,
+      "seconds": 33.3,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 2364.0
+    },
+    {
+      "stage": "jobs",
+      "requests": 391,
+      "seconds": 249.5,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "jobs_depth",
+      "companies": 1,
+      "requests": 8,
+      "seconds": 11.7,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "website_hints",
+      "requests": 8,
+      "companies": 4,
+      "request_ceiling": 6100,
+      "time_ceiling_seconds": 2484.0
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": {
+    "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
+    "state": "loaded",
+    "window_days": 186,
+    "feed_pages": 368,
+    "detail_requests": 26,
+    "cache_hits": 6,
+    "max_candidate_details": 12,
+    "max_detail_requests": 1717,
+    "completed_segments": 6,
+    "total_segments": 6,
+    "error": null,
+    "indexed_active_employers": 5870,
+    "indexed_active_ads": 9614,
+    "token": "NAV published public token"
+  },
+  "website_methods": {
+    "registry_declared_homepage": 3,
+    "legal_name_and_registered_phone": 5,
+    "full_name_domain_and_registered_operating_head": 9,
+    "labelled_organisation_number": 10,
+    "jsonld_organisation_identifier": 1,
+    "legal_name_and_registered_address": 8
+  },
+  "discovery": null
+}

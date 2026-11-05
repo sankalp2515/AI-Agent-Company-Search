@@ -1,0 +1,91 @@
+{
+  "run_id": "steinly-default-candidates",
+  "completed_at": "2026-11-05T15:58:08.530127Z",
+  "companies": 1,
+  "envelopes": 1,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 1
+  },
+  "requests": 11,
+  "bytes": 498964,
+  "runtime_seconds": 9.701,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 20,
+    "seconds": 300
+  },
+  "p50_company_ms": 9422,
+  "p95_company_ms": 9422,
+  "coverage": {
+    "legal_identity": 1,
+    "financials": 0,
+    "leadership": 1,
+    "locations": 0,
+    "official_website": 1,
+    "description": 1,
+    "jobs": 0,
+    "activity": 1,
+    "owned_profiles": 0,
+    "contact": 1
+  },
+  "states": {
+    "available": 6,
+    "blocked": 0,
+    "not_applicable": 0,
+    "failed": 3,
+    "ambiguous": 0,
+    "not_available": 1
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 1,
+    "social_links": 0,
+    "news": 0,
+    "job_postings": 0,
+    "careers_page": 0,
+    "description": 1
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 7,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 1,
+      "seconds": 0.8,
+      "request_ceiling": 20,
+      "time_ceiling_seconds": 240.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 1,
+      "seconds": 0.7,
+      "request_ceiling": 19,
+      "time_ceiling_seconds": 240.0
+    },
+    {
+      "stage": "website",
+      "requests": 9,
+      "seconds": 7.9,
+      "request_ceiling": 12,
+      "time_ceiling_seconds": 108.87
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 1
+  },
+  "discovery": null
+}

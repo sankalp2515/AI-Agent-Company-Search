@@ -1,0 +1,96 @@
+{
+  "run_id": "fc-patterns-sites34",
+  "completed_at": "2026-11-05T15:46:34.025169Z",
+  "companies": 34,
+  "envelopes": 34,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 34
+  },
+  "requests": 281,
+  "bytes": 18828381,
+  "runtime_seconds": 42.894,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 680,
+    "seconds": 600
+  },
+  "p50_company_ms": 7259,
+  "p95_company_ms": 25385,
+  "coverage": {
+    "legal_identity": 34,
+    "financials": 0,
+    "leadership": 34,
+    "locations": 0,
+    "official_website": 34,
+    "description": 29,
+    "jobs": 0,
+    "activity": 34,
+    "owned_profiles": 16,
+    "contact": 32
+  },
+  "states": {
+    "ambiguous": 0,
+    "blocked": 0,
+    "failed": 102,
+    "available": 213,
+    "not_available": 25,
+    "not_applicable": 0
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 34,
+    "social_links": 16,
+    "news": 2,
+    "job_postings": 0,
+    "careers_page": 6,
+    "description": 29
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 177,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 34,
+      "seconds": 4.2,
+      "request_ceiling": 680,
+      "time_ceiling_seconds": 540.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 34,
+      "seconds": 4.8,
+      "request_ceiling": 646,
+      "time_ceiling_seconds": 540.0
+    },
+    {
+      "stage": "website",
+      "requests": 213,
+      "seconds": 27.7,
+      "request_ceiling": 435,
+      "time_ceiling_seconds": 247.917
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "registry_declared_homepage": 3,
+    "legal_name_and_registered_phone": 5,
+    "full_name_domain_and_registered_operating_head": 9,
+    "labelled_organisation_number": 8,
+    "jsonld_organisation_identifier": 1,
+    "legal_name_and_registered_address": 8
+  },
+  "discovery": null
+}

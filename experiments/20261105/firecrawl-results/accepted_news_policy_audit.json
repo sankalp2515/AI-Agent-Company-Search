@@ -1,0 +1,305 @@
+{
+  "mode": "accepted-news policy audit using existing saved bytes; no HTTP and not a new live full-batch run",
+  "live_source_commit": "5a1a017bed8428d1d4694715bfaf69a9dfd475fa",
+  "audited_commit": "c78fa6509199926ff1f42d274e82bba8d03ad1e7",
+  "checked_websites": 36,
+  "all_accepted_news_unchanged": true,
+  "checks": [
+    {
+      "organisation_number": "994724118",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "916205910",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "998549159",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "924859946",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "995727064",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "930226823",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "919222050",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "932059037",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "933250059",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "976957792",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "832752932",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "914000076",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "971062029",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "923383433",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "997870506",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "938255865",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "988106542",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "926204300",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "998578280",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "965879528",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "917873844",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "927340860",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "925350281",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "994657607",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "998572797",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "992190256",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "923377956",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "812598902",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "989186140",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "971485612",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "922374678",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "923118926",
+      "before": [
+        [
+          "https://www.norsk-e-fuel.com/ceo_transition",
+          "2026-11-02"
+        ],
+        [
+          "https://www.norsk-e-fuel.com/press-release-european-esaf-coalition",
+          "2026-06-09"
+        ]
+      ],
+      "after": [
+        [
+          "https://www.norsk-e-fuel.com/ceo_transition",
+          "2026-11-02"
+        ],
+        [
+          "https://www.norsk-e-fuel.com/press-release-european-esaf-coalition",
+          "2026-06-09"
+        ]
+      ],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "934533283",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "915313760",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "941009697",
+      "before": [
+        [
+          "https://melbye.no/news/2026/09/elektrisk-kabelhenger-for-en-mer-stillegaende-og-enklere-arbeidsdag",
+          "2026-10-14"
+        ],
+        [
+          "https://melbye.no/news/2026/10/bruddet-er-bare-slutten-pa-historien",
+          "2026-10-28"
+        ],
+        [
+          "https://melbye.no/news/2026/11/jks-3500e-samarbeidet-bak-en-elektrisk-kabelhenger",
+          "2026-11-02"
+        ]
+      ],
+      "after": [
+        [
+          "https://melbye.no/news/2026/09/elektrisk-kabelhenger-for-en-mer-stillegaende-og-enklere-arbeidsdag",
+          "2026-10-14"
+        ],
+        [
+          "https://melbye.no/news/2026/10/bruddet-er-bare-slutten-pa-historien",
+          "2026-10-28"
+        ],
+        [
+          "https://melbye.no/news/2026/11/jks-3500e-samarbeidet-bak-en-elektrisk-kabelhenger",
+          "2026-11-02"
+        ]
+      ],
+      "dropped": [],
+      "added": []
+    },
+    {
+      "organisation_number": "983974694",
+      "before": [],
+      "after": [],
+      "dropped": [],
+      "added": []
+    }
+  ]
+}

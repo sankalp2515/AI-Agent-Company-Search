@@ -1,0 +1,198 @@
+{
+  "submitted_original300": {
+    "companies": 300,
+    "covered_companies": {
+      "website": 32,
+      "description": 25,
+      "social_links": 14,
+      "news": 1,
+      "job_postings": 0,
+      "careers_page": 6
+    },
+    "facts": {
+      "website": 32,
+      "description": 25,
+      "social_links": 24,
+      "news": 3,
+      "job_postings": 0,
+      "careers_page": 6
+    }
+  },
+  "first_experiment_original300": {
+    "companies": 300,
+    "covered_companies": {
+      "website": 34,
+      "description": 27,
+      "social_links": 16,
+      "news": 1,
+      "job_postings": 0,
+      "careers_page": 6
+    },
+    "facts": {
+      "website": 34,
+      "description": 27,
+      "social_links": 28,
+      "news": 3,
+      "job_postings": 0,
+      "careers_page": 6
+    }
+  },
+  "followup_original300": {
+    "companies": 300,
+    "covered_companies": {
+      "website": 35,
+      "description": 30,
+      "social_links": 16,
+      "news": 2,
+      "job_postings": 0,
+      "careers_page": 6
+    },
+    "facts": {
+      "website": 35,
+      "description": 30,
+      "social_links": 28,
+      "news": 5,
+      "job_postings": 0,
+      "careers_page": 6
+    }
+  },
+  "followup_selected5": {
+    "companies": 5,
+    "covered_companies": {
+      "website": 1,
+      "description": 1,
+      "social_links": 1,
+      "news": 0,
+      "job_postings": 5,
+      "careers_page": 1
+    },
+    "facts": {
+      "website": 1,
+      "description": 1,
+      "social_links": 2,
+      "news": 0,
+      "job_postings": 18,
+      "careers_page": 1
+    }
+  },
+  "previously_accepted_sites_lost": [],
+  "sites_added": [
+    {
+      "organisation_number": "924859946",
+      "name": "ARBEIDSARK AS",
+      "website": {
+        "url": "https://arbeidsark.no/",
+        "claim_id": "9a151a60ab2c813258ed115f",
+        "evidence_ids": [
+          "eddc9bf245503e5de268b7f1"
+        ],
+        "source_url": "https://arbeidsark.no/om-oss/",
+        "retrieved_at": "2026-11-05T16:00:55.825119Z",
+        "identity_method": "full_name_domain_and_registered_operating_head"
+      }
+    },
+    {
+      "organisation_number": "997870506",
+      "name": "STEINLY MARIN SENJA AS",
+      "website": {
+        "url": "https://www.senja.steinly.no",
+        "claim_id": "75b44efd1dcb39321d1c1249",
+        "evidence_ids": [
+          "4d106885e9ee1505c826832f"
+        ],
+        "source_url": "https://www.senja.steinly.no",
+        "retrieved_at": "2026-11-05T16:01:40.450559Z",
+        "identity_method": "labelled_organisation_number"
+      }
+    },
+    {
+      "organisation_number": "923377956",
+      "name": "MAGENT AS",
+      "website": {
+        "url": "https://www.magent.no/",
+        "claim_id": "c5b7dffa43115148b650f423",
+        "evidence_ids": [
+          "46e72cd9414873539d7a10fd"
+        ],
+        "source_url": "https://www.magent.no/om-oss",
+        "retrieved_at": "2026-11-05T16:02:07.509189Z",
+        "identity_method": "full_name_domain_and_registered_operating_head"
+      }
+    }
+  ],
+  "runs": {
+    "news_only_live305.json": {
+      "runtime_commit": "8be344274d0bd6cdfd718ede6cb3e15100cb95f2",
+      "companies": 305,
+      "requests": 2573,
+      "seconds": 542.544,
+      "mode": "live"
+    },
+    "full_live305_history.json": {
+      "runtime_commit": "5a1a017bed8428d1d4694715bfaf69a9dfd475fa",
+      "companies": 305,
+      "requests": 2667,
+      "seconds": 554.604,
+      "mode": "live"
+    },
+    "clean_smoke100.json": {
+      "runtime_commit": "c78fa6509199926ff1f42d274e82bba8d03ad1e7",
+      "companies": 100,
+      "requests": 1124,
+      "seconds": 357.202,
+      "mode": "live"
+    },
+    "saved_source_scale1100.json": {
+      "runtime_commit": "c78fa6509199926ff1f42d274e82bba8d03ad1e7",
+      "companies": 1100,
+      "requests": 0,
+      "seconds": 163.306,
+      "mode": "saved_source_replay"
+    },
+    "sites34.json": {
+      "runtime_commit": "8be344274d0bd6cdfd718ede6cb3e15100cb95f2",
+      "companies": 34,
+      "requests": 281,
+      "seconds": 42.894,
+      "mode": "live"
+    },
+    "paired34_control.json": {
+      "runtime_commit": "ecd555dbc4655dd46c4eb3d60c34e0e93b2345b6",
+      "companies": 34,
+      "requests": 0,
+      "seconds": 13.036,
+      "mode": "saved_source_replay"
+    },
+    "paired34_candidate.json": {
+      "runtime_commit": "8be344274d0bd6cdfd718ede6cb3e15100cb95f2",
+      "companies": 34,
+      "requests": 0,
+      "seconds": 12.862,
+      "mode": "saved_source_replay"
+    },
+    "history_component.json": {
+      "runtime_commit": "8be344274d0bd6cdfd718ede6cb3e15100cb95f2",
+      "companies": 27,
+      "requests": 181,
+      "seconds": 44.788,
+      "mode": "live"
+    },
+    "steinly_default_cli.json": {
+      "runtime_commit": "5a1a017bed8428d1d4694715bfaf69a9dfd475fa",
+      "companies": 1,
+      "requests": 11,
+      "seconds": 9.701,
+      "mode": "live"
+    }
+  },
+  "tests_passed": 195,
+  "official_score": null,
+  "notes": [
+    "No push, merge or submission.",
+    "Five diagnostic job cases are separate from original300.",
+    "The leadership-advice smoke gain was rejected and excluded.",
+    "The final precision policy leaves all accepted full305 news unchanged; its own fresh100 and offline1100 runs are recorded."
+  ],
+  "runtime_source_tree": "66f226e5287e5635c7f9658d60fe06a6811e1000",
+  "tests_tree": "b7992e4e9dea5eb3b4f889c4548b168fd3d410fa"
+}

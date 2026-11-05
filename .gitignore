@@ -15,3 +15,6 @@ PROJECT-READINESS.md
 .claude/
 # Exact third-party response bytes can contain embedded credentials. Keep local only.
 submission/**/snapshots/
+
+# JBOX bulk exports; the site reads jbox/site-data instead.
+jbox/seed/

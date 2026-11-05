@@ -1,0 +1,239 @@
+<title>Signalpost Design Reference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Concept: a nautical chart of a company. Every fact is a charted position with a bearing back to its source; what nobody has checked is drawn as unsurveyed water. */
+:root{
+  --water:#F3F8F9;--shoal:#DDECF1;--land:#F2E8CC;--paper:#FFFFFF;--ink:#10303C;--muted:#49646E;--line:#B9CFD6;
+  --mark:#A3115C;--mark-soft:#F7E3EE;--good:#0C6B58;--warn:#8A5A00;--bad:#B3261E;--hatch:#9DB9C2;
+  --ui:"Schibsted Grotesk","Segoe UI",system-ui,sans-serif;--note:"Newsreader",Georgia,serif;--fig:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:72px;
+  --r:3px;--quick:160ms;--bearing:520ms;--ease:cubic-bezier(.2,.7,.2,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--water:#0B1A22;--shoal:#12303C;--land:#2B2A1E;--paper:#0F232D;--ink:#E4EEF1;--muted:#9DB6BF;--line:#2B4C59;--mark:#F27AB3;--mark-soft:#3A1830;--good:#5FD0B5;--warn:#E6B85C;--bad:#F2938B;--hatch:#3C6070;color-scheme:dark}}
+:root[data-theme="dark"]{--water:#0B1A22;--shoal:#12303C;--land:#2B2A1E;--paper:#0F232D;--ink:#E4EEF1;--muted:#9DB6BF;--line:#2B4C59;--mark:#F27AB3;--mark-soft:#3A1830;--good:#5FD0B5;--warn:#E6B85C;--bad:#F2938B;--hatch:#3C6070;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--water);color:var(--ink);font:400 16px/1.5 var(--ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 96px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--water)}
+.wrap{max-width:1160px;margin-inline:auto}
+a{color:inherit;text-underline-offset:3px}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--water);display:flex;flex-wrap:wrap;gap:var(--s2) var(--s5);align-items:center;padding-block:var(--s3);border-bottom:1px solid var(--line)}
+.brand{font-weight:800;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:var(--s2);background:none;border:0;padding:0;cursor:pointer}
+.nav{display:flex;gap:var(--s1);flex-wrap:wrap}
+.nav button{background:none;border:0;min-height:44px;padding-inline:var(--s3);cursor:pointer;color:var(--muted);font-weight:500;border-radius:var(--r)}
+.nav button:hover{color:var(--ink);background:var(--shoal)}
+.nav button[aria-current="page"]{color:var(--ink);box-shadow:inset 0 -2px 0 var(--mark);border-radius:0}
+.ref{margin-left:auto;font:italic 400 15px var(--note);color:var(--muted)}
+.view{padding-top:var(--s6)}
+h1,h2,h3{text-wrap:balance;margin:0}
+.note{font:italic 400 1.05em/1.4 var(--note);color:var(--muted)}
+.num{font-family:var(--fig);font-variant-numeric:tabular-nums}
+/* Home */
+.hero{position:relative;display:grid;gap:var(--s6);padding-block:var(--s5) var(--s7);isolation:isolate}
+.hero canvas{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.hero h1{font-size:clamp(38px,7vw,76px);line-height:1;font-weight:800;letter-spacing:-.035em;max-width:13ch}
+.hero .lede{max-width:52ch;font-size:18px;margin:var(--s4) 0 0}
+.bearing{display:grid;grid-template-columns:minmax(0,1fr) 88px minmax(0,1fr);align-items:center;max-width:860px}
+.chartcard{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4);min-width:0}
+.chartcard .big{font:500 clamp(24px,4vw,34px)/1.1 var(--fig);letter-spacing:-.02em;display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+.line{height:2px;background:repeating-linear-gradient(90deg,var(--mark) 0 8px,transparent 8px 13px);transform-origin:left;animation:draw var(--bearing) var(--ease) .25s both}
+@keyframes draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.lbl{font-size:13px;color:var(--muted);font-weight:500}
+.search{display:grid;gap:var(--s2);max-width:720px}
+.search label{font-weight:600}
+.search input{width:100%;min-height:56px;padding-inline:var(--s4);font-size:18px;background:var(--paper);border:2px solid var(--ink);border-radius:var(--r)}
+.results{display:grid;margin-top:var(--s5);border-top:1px solid var(--line)}
+.result{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s2) var(--s4);padding-block:var(--s3);border-bottom:1px solid var(--line);align-items:center}
+.result button.open{all:unset;cursor:pointer;display:block;min-width:0}
+.result button.open:focus-visible{outline:2px solid var(--mark);outline-offset:2px}
+.result strong{font-weight:700;font-size:17px;display:block;overflow-wrap:anywhere}
+.result strong:hover{color:var(--mark)}
+.btn{min-height:44px;padding-inline:var(--s4);border:1px solid var(--ink);background:transparent;border-radius:var(--r);font-weight:600;cursor:pointer;transition:background var(--quick),color var(--quick)}
+.btn:hover{background:var(--ink);color:var(--water)}
+.btn[aria-pressed="true"]{background:var(--mark);border-color:var(--mark);color:var(--paper)}
+/* Fix mark: the chart symbol for a confirmed position. */
+.fix{appearance:none;border:0;background:none;width:44px;height:44px;margin:-12px -8px -12px -6px;padding:0;display:inline-grid;place-items:center;cursor:pointer;vertical-align:middle;flex:none;border-radius:50%}
+.fix i{display:block;width:16px;height:16px;border:1.5px solid var(--mark);border-radius:50%;position:relative;transition:transform var(--quick) var(--ease),background var(--quick)}
+.fix i::after{content:"";position:absolute;inset:4.5px;border-radius:50%;background:var(--mark);transition:background var(--quick)}
+.fix:hover i{transform:scale(1.25);background:var(--mark)}
+.fix:hover i::after{background:var(--paper)}
+/* Unsurveyed: absence has its own texture, so it can never read as zero. */
+.unsurveyed{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--hatch) 5px 6px);border:1px dashed var(--hatch);border-radius:var(--r);padding:var(--s2) var(--s3)}
+.unsurveyed span{background:var(--water);padding:1px 6px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.state{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--s1)}
+/* Profile */
+.head{display:grid;gap:var(--s2);padding-bottom:var(--s5);border-bottom:2px solid var(--ink)}
+.head h1{font-size:clamp(30px,5.5vw,56px);line-height:1.02;letter-spacing:-.03em;font-weight:800;overflow-wrap:anywhere}
+.cols{display:grid;gap:var(--s6);padding-top:var(--s5);grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.cols{grid-template-columns:minmax(0,1fr) 280px}.rail{position:sticky;top:88px;align-self:start}}
+section.block{display:grid;gap:var(--s3);padding-bottom:var(--s6);min-width:0}
+section.block h2{font-size:22px;font-weight:700;letter-spacing:-.015em}
+.story{display:grid;gap:var(--s3);max-width:65ch;font-size:17px}
+.story p{margin:0}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{padding:var(--s2) var(--s3);text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+thead th{font-weight:600;font-size:13px;color:var(--muted)}
+td.neg{color:var(--bad)}
+.list{display:grid}
+.row{display:flex;justify-content:space-between;gap:var(--s4);padding-block:var(--s2);border-bottom:1px solid var(--line);align-items:center;min-height:44px}
+.row>div{min-width:0;overflow-wrap:anywhere}
+.rail h2{font-size:15px;font-weight:700;margin-bottom:var(--s2)}
+.survey{display:grid;grid-template-columns:18px minmax(0,1fr);gap:var(--s2);padding-block:6px;font-size:14px;border-bottom:1px solid var(--line)}
+.dot{width:12px;height:12px;border-radius:50%;margin-top:5px;background:var(--good)}
+.dot.no{background:repeating-linear-gradient(135deg,transparent 0 2px,var(--muted) 2px 3px);border:1px solid var(--muted)}
+.dot.warn{background:var(--warn);border-radius:0;transform:rotate(45deg)}
+/* Compare */
+.pickers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3);position:sticky;top:60px;background:var(--water);z-index:3;padding-block:var(--s3);border-bottom:2px solid var(--ink)}
+.pickers label{display:grid;gap:var(--s1);min-width:0;font-size:13px;color:var(--muted);font-weight:500}
+.pickers select{width:100%;min-height:48px;padding-inline:var(--s2);background:var(--paper);color:var(--ink);border:1px solid var(--ink);border-radius:var(--r);font-weight:700;font-size:15px}
+.cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--s3);padding-block:var(--s3);border-bottom:1px solid var(--line)}
+.cmp .lab{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:var(--s1)}
+.cmp .cell{min-width:0;overflow-wrap:anywhere}
+.val{display:flex;gap:var(--s1);align-items:center;flex-wrap:wrap;font-family:var(--fig);font-size:clamp(15px,2.4vw,19px)}
+.val.text{font-family:var(--ui);font-size:15px}
+.bar{height:10px;margin-top:6px;background:var(--shoal);position:relative;overflow:hidden}
+.bar b{display:block;height:100%;background:var(--ink);transform-origin:left;transition:transform var(--bearing) var(--ease)}
+.bar b.loss{background:repeating-linear-gradient(135deg,var(--bad) 0 3px,transparent 3px 5px);border:1px solid var(--bad)}
+.tray{position:fixed;bottom:0;left:0;right:0;z-index:6;background:var(--ink);color:var(--water);padding:var(--s3) max(16px,env(safe-area-inset-right,0px)) calc(var(--s3) + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;gap:var(--s3);align-items:center;justify-content:space-between;flex-wrap:wrap}
+.tray .btn{border-color:var(--water);color:var(--water)}
+/* Source sheet */
+.scrim{position:fixed;inset:0;background:color-mix(in srgb,var(--ink) 45%,transparent);z-index:20}
+.sheet{position:fixed;z-index:21;background:var(--paper);display:grid;align-content:start;gap:var(--s3);overflow:auto;padding:var(--s5) max(var(--s5),env(safe-area-inset-right,0px)) calc(var(--s5) + env(safe-area-inset-bottom,0px)) var(--s5);bottom:0;left:0;right:0;max-height:88%;border-top:3px solid var(--mark);animation:rise 220ms var(--ease)}
+@keyframes rise{from{transform:translateY(24px)}}
+@media (min-width:760px){.sheet{left:auto;top:0;width:440px;max-height:none;border-top:0;border-left:3px solid var(--mark);animation-name:slide}@keyframes slide{from{transform:translateX(24px)}}}
+.sheet h2{font-size:15px;font-weight:600;color:var(--muted)}
+.sheet .answer{font:500 24px/1.2 var(--fig);overflow-wrap:anywhere}
+.sheet dl{margin:0;display:grid;gap:var(--s3)}
+.sheet dt{font-size:13px;font-weight:600;color:var(--muted)}
+.sheet dd{margin:0;overflow-wrap:anywhere}
+.sheet .x{justify-self:end}
+/* System */
+.sys{display:grid;gap:var(--s7)}
+.sys h2{font-size:clamp(26px,4vw,36px);letter-spacing:-.025em;font-weight:800;margin-bottom:var(--s2)}
+.sys p{margin:0 0 var(--s3);max-width:65ch}
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--s3)}
+.sw{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--paper);font-size:13px}
+.sw i{display:block;height:64px}
+.sw div{padding:var(--s2)}
+.grid12{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s4)}
+@media (min-width:760px){.grid12{grid-template-columns:repeat(12,1fr);gap:var(--s5)}}
+.grid12 i{height:72px;background:var(--mark-soft);border:1px solid var(--mark)}
+.grid12 i:nth-child(n+5){display:none}
+@media (min-width:760px){.grid12 i:nth-child(n+5){display:block}}
+.space{display:flex;align-items:flex-end;gap:var(--s3);flex-wrap:wrap}
+.space i{display:block;background:var(--mark)}
+.space div{display:grid;gap:var(--s1);font:12px var(--fig);justify-items:center}
+.flow{display:grid;gap:var(--s3);padding:0;margin:0;list-style:none;counter-reset:s;max-width:70ch}
+.flow li{counter-increment:s;display:grid;grid-template-columns:32px minmax(0,1fr)}
+.flow li::before{content:counter(s);font:500 15px var(--fig);color:var(--mark)}
+.decisions{display:grid;gap:var(--s4)}
+.decisions div{border-top:1px solid var(--line);padding-top:var(--s3);max-width:70ch}
+.decisions strong{display:block}
+@media (max-width:899px){.ref{display:none}}
+@media (max-width:640px){.top{position:static;padding-block:var(--s2)}.nav button{padding-inline:var(--s2)}.pickers{top:0}
+.bearing{grid-template-columns:minmax(0,1fr);justify-items:start}.bearing .chartcard{width:100%}.bearing .line{width:2px;height:36px;margin-left:var(--s5);background:repeating-linear-gradient(180deg,var(--mark) 0 8px,transparent 8px 13px);transform-origin:top;animation-name:drop}}
+@keyframes drop{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <button class="brand" id="brand" aria-label="Signalpost home"><svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="9.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="11" cy="11" r="3.5" fill="var(--mark)"/></svg>Signalpost</button>
+    <nav class="nav" aria-label="Sections"><button data-go="home">Find</button><button data-go="profile">Profile</button><button data-go="compare">Compare</button><button data-go="system">Design system</button></nav>
+    <span class="ref">Design reference for the JBOX build</span>
+  </header>
+  <main id="app"></main>
+</div>
+<div class="tray" id="tray" hidden></div>
+<div id="layer"></div>
+
+<script>
+const D=__DATA__;
+const $=(t,a={},...k)=>{const n=document.createElement(t);for(const[x,y]of Object.entries(a)){if(x==='class')n.className=y;else if(x==='text')n.textContent=y;else if(x.startsWith('on'))n[x]=y;else if(y!==false&&y!=null)n.setAttribute(x,y)}n.append(...k.filter(v=>v!=null));return n};
+const company=o=>D.companies.find(c=>c.org_number===o);
+const factsOf=(o,s)=>D.facts.filter(f=>f.org_number===o&&(!s||f.section===s));
+const fact=id=>D.facts.find(f=>f.id===id);
+const nok=(v,u='NOK')=>{if(v===''||v==null)return'';const a=Math.abs(v),s=v<0?'-':'';if(u==='people')return String(v);return u+' '+s+(a>=1e9?(a/1e9).toFixed(1)+' bn':a>=1e6?(a/1e6).toFixed(1)+' m':a>=1e3?(a/1e3).toFixed(0)+' k':a.toFixed(0))};
+const full=f=>f.value_number!=null&&f.value_number!==''?(f.unit==='people'?f.value_number+' people':f.unit+' '+Math.round(f.value_number).toLocaleString('en-US')):f.value_text;
+const year=p=>(p||'').split(' to ').pop().slice(0,4);
+const when=t=>(t||'').slice(0,10);
+const STATE={not_available:'We looked and found nothing.',blocked:'The source refused the request.',ambiguous:'Not sure it is the right company, so nothing is published.',failed:'The check failed on this run.',not_applicable:'Does not apply to this company.'};
+const SRC={official_registry:'Official register',company_owned:"The company's own website"};
+let last;
+function fix(f){if(!f)return null;return $('button',{class:'fix','aria-label':'Check the source of '+f.label,title:'Check the source',onclick:e=>{last=e.currentTarget;sheet(f)}},$('i'))}
+function sheet(f){const L=document.getElementById('layer');L.innerHTML='';const close=()=>{L.innerHTML='';document.removeEventListener('keydown',esc);if(last)last.focus()};const esc=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',esc);
+ const rows=[['Where it came from',$('span',{},f.source_name+'. '+(SRC[f.source_class]||''))],['Retrieved',$('span',{class:'num',text:when(f.retrieved_at)})],f.period?['Reporting period',$('span',{class:'num',text:f.period})]:null,['Exact place in the source',$('span',{text:f.where_in_source})],['Why this is the right company',$('span',{text:f.identity_check})],['Fingerprint of the saved source',$('span',{class:'num',text:(f.content_sha256||'').slice(0,16)})]].filter(Boolean);
+ const x=$('button',{class:'btn x',onclick:close},'Close');
+ const s=$('div',{class:'sheet',role:'dialog','aria-modal':'true','aria-label':'Source of '+f.label},x,$('h2',{text:f.label}),$('div',{class:'answer',text:full(f)}),$('dl',{},...rows.flatMap(([a,b])=>[$('dt',{text:a}),$('dd',{},b)])),$('a',{class:'btn',href:f.source_url,target:'_blank',rel:'noopener',style:'display:grid;place-items:center;text-decoration:none'},'Open the original source'));
+ L.append($('div',{class:'scrim',onclick:close}),s);x.focus()}
+function missing(state){return $('div',{class:'unsurveyed'},$('span',{text:STATE[state]||STATE.not_available}))}
+let pair=['941009697','915313760'],cur='941009697',view='home',q='',picks=[];
+function go(v){view=v;try{history.replaceState(null,'','#'+v)}catch(e){}render();window.scrollTo(0,0)}
+function open(o){cur=o;go('profile')}
+function contour(cv){const r=cv.getBoundingClientRect();const dpr=Math.min(devicePixelRatio||1,2);cv.width=r.width*dpr;cv.height=r.height*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);const st=getComputedStyle(document.documentElement);const line=st.getPropertyValue('--line').trim();c.lineWidth=1;c.strokeStyle=line;const cx=r.width*.86,cy=r.height*.3;for(let k=1;k<=11;k++){c.beginPath();for(let a=0;a<=6.3;a+=.04){const rad=k*38*(1+.22*Math.sin(a*3+k*.5)+.12*Math.sin(a*5-k*.3)+.07*Math.cos(a*2+k));const x=cx+Math.cos(a)*rad*1.25,y=cy+Math.sin(a)*rad*.85;a===0?c.moveTo(x,y):c.lineTo(x,y)}c.closePath();c.globalAlpha=k%4===0?.95:.5;c.stroke()}c.globalAlpha=1}
+function home(){const rev=D.facts.filter(f=>f.org_number==='941009697'&&f.label==='Revenue').sort((a,b)=>year(b.period)-year(a.period))[0];
+ const cv=$('canvas',{'aria-hidden':'true'});
+ const hero=$('section',{class:'hero'},cv,$('div',{},$('h1',{text:'Every fact has a way back.'}),$('p',{class:'lede',text:'Look up a Norwegian company, compare two, and check where any fact came from. Where nobody could confirm something, we say so.'})),
+  $('div',{class:'bearing'},$('div',{class:'chartcard'},$('div',{class:'lbl',text:'Melbye AS, revenue '+year(rev.period)}),$('div',{class:'big'},nok(rev.value_number),fix(rev))),$('div',{class:'line','aria-hidden':'true'}),$('div',{class:'chartcard'},$('div',{class:'lbl',text:'Source'}),$('div',{style:'font-weight:600',text:rev.source_name}),$('div',{class:'note',text:'Retrieved '+when(rev.retrieved_at)}))));
+ const input=$('input',{id:'q',type:'search',placeholder:'Name, organisation number, town or industry',value:q,autocomplete:'off'});
+ const box=$('div',{class:'results'});
+ const draw=()=>{const t=q.trim().toLowerCase();const hits=D.companies.filter(c=>[c.name,c.org_number,c.municipality,c.industry].join(' ').toLowerCase().includes(t));box.replaceChildren(...(hits.length?hits.map(c=>{const on=picks.includes(c.org_number);return $('div',{class:'result'},$('button',{class:'open',onclick:()=>open(c.org_number)},$('strong',{text:c.name}),$('span',{class:'lbl'},$('span',{class:'num',text:c.org_number}),' · '+[c.municipality,c.industry].filter(Boolean).join(' · '))),$('button',{class:'btn','aria-pressed':String(on),onclick:()=>{picks=on?picks.filter(x=>x!==c.org_number):[...picks,c.org_number].slice(-2);draw();tray()}},on?'Added':'Compare'))}):[$('div',{class:'unsurveyed',style:'margin-top:12px'},$('span',{text:'No match in this sample. The finished site holds 400 researched companies, not all of Norway.'}))]))};
+ input.oninput=e=>{q=e.target.value;draw()};draw();
+ const v=$('div',{class:'view'},hero,$('div',{class:'search'},$('label',{for:'q',text:'Find a company'}),input),box);requestAnimationFrame(()=>contour(cv));return v}
+function tray(){const t=document.getElementById('tray');t.hidden=!picks.length||view!=='home';t.replaceChildren($('span',{text:picks.map(o=>company(o).name).join(' and ')}),picks.length===2?$('button',{class:'btn',onclick:()=>{pair=[...picks];picks=[];go('compare')}},'Compare these two'):$('span',{class:'note',style:'color:inherit',text:'Pick one more'}))}
+function profile(){const c=company(cur);const st=D.statements.filter(s=>s.org_number===cur&&s.fact_ids);
+ const fin=factsOf(cur,'financials');const years=[...new Set(fin.map(f=>year(f.period)))].sort().reverse();const labels=['Revenue','Operating result','Net result','Total assets','Equity'];
+ const table=$('table',{},$('thead',{},$('tr',{},$('th',{scope:'col',text:'NOK'}),...years.map(y=>$('th',{scope:'col',class:'num',text:y})))),$('tbody',{},...labels.map(l=>$('tr',{},$('td',{text:l}),...years.map(y=>{const f=fin.find(x=>x.label===l&&year(x.period)===y);return f?$('td',{class:'num'+(f.value_number<0?' neg':'')},nok(f.value_number,'').trim(),fix(f)):$('td',{},$('span',{class:'lbl',text:'Not filed'}))})))));
+ const peopleAll=factsOf(cur,'people');const web=factsOf(cur,'web');const news=factsOf(cur,'news');const places=factsOf(cur,'workplaces');const ev=factsOf(cur,'registry_events').slice(0,5);
+ const line=(a,b,f)=>$('div',{class:'row'},$('div',{},$('div',{style:'font-weight:600',text:a}),$('div',{class:'lbl',text:b})),fix(f));
+ const rail=[['Website','state_official_website'],['Linked profiles','state_owned_profiles'],['Job ads','state_jobs'],['Accounts','state_financials'],['Leadership','state_leadership'],['Workplaces','state_locations'],['Contact','state_contact']];
+ return $('div',{class:'view'},$('div',{class:'head'},$('h1',{text:c.name}),$('div',{class:'lbl'},$('span',{class:'num',text:c.org_number}),' · '+[c.legal_form,c.municipality,c.industry].filter(Boolean).join(' · ')),$('div',{},$('button',{class:'btn',onclick:()=>{pair=[cur,pair[0]===cur?pair[1]:pair[0]];go('compare')}},'Compare with another'))),
+ $('div',{class:'cols'},$('div',{style:'min-width:0'},
+  $('section',{class:'block'},$('h2',{text:'In brief'}),$('div',{class:'story'},...st.slice(0,5).map(s=>{const f=fact(s.fact_ids.split('|')[0]);return $('p',{},s.text,' ',fix(f))}))),
+  $('section',{class:'block'},$('h2',{text:'Filed accounts'}),$('p',{class:'note',style:'margin:0',text:'Each figure opens its line in the annual accounts.'}),$('div',{class:'scroll',tabindex:'0'},table)),
+  $('section',{class:'block'},$('h2',{text:'On the web'}),web.length?$('div',{class:'list'},...web.map(f=>line(f.label,f.link_url||f.value_text,f))):missing(c.state_official_website)),
+  $('section',{class:'block'},$('h2',{text:'News from the company'}),news.length?$('div',{class:'list'},...news.map(f=>line(f.value_text,f.label,f))):missing('not_available')),
+  $('section',{class:'block'},$('h2',{text:'Hiring'}),missing(c.state_jobs)),
+  $('section',{class:'block'},$('h2',{text:'People'}),$('div',{class:'list'},...peopleAll.slice(0,8).map(f=>line(f.value_text,f.label,f)))),
+  places.length?$('section',{class:'block'},$('h2',{text:'Registered workplaces'}),$('div',{class:'list'},...places.slice(0,6).map(f=>line(f.label,f.value_text,f)))):null,
+  $('section',{class:'block'},$('h2',{text:'Recent register events'}),$('div',{class:'list'},...ev.map(f=>line(f.value_text,f.label,f))))),
+ $('aside',{class:'rail'},$('h2',{text:'What we checked'}),...rail.map(([n,k])=>{const s=c[k];return $('div',{class:'survey'},$('i',{class:'dot'+(s==='available'?'':(s==='not_available'?' no':' warn'))}),$('div',{},$('div',{style:'font-weight:500',text:n}),s==='available'?null:$('div',{class:'lbl',text:STATE[s]||s})))}),$('p',{class:'note',style:'margin-top:12px',text:'Last checked '+when(c.last_checked)+(c.rechecked?'. Rechecked with '+c.material_changes+' material changes.':'.')}))))}
+function compare(){const[a,b]=pair.map(company);
+ const pick=(i,lab)=>{const s=$('select',{id:'pick'+i,onchange:e=>{pair[i]=e.target.value;render()}},...D.companies.map(c=>$('option',{value:c.org_number,selected:c.org_number===pair[i]?'selected':null,text:c.name})));return $('label',{for:'pick'+i},lab,s)};
+ const row=(lab,fn)=>$('div',{class:'cmp'},$('div',{class:'lab',text:lab}),fn(a),fn(b));
+ const money=(lab,key)=>{const vals=[a,b].map(c=>c[key]).filter(v=>v!==''&&v!=null);const max=Math.max(...vals.map(Math.abs),1);return row(lab,c=>{const f=factsOf(c.org_number,'financials').filter(x=>x.label===lab).sort((x,y)=>year(y.period)-year(x.period))[0];const v=c[key];if(v===''||v==null)return $('div',{class:'cell'},missing('not_available'));return $('div',{class:'cell'},$('div',{class:'val'},nok(v),fix(f)),$('div',{class:'bar','aria-hidden':'true'},$('b',{class:v<0?'loss':'',style:`transform:scaleX(${Math.max(.01,Math.abs(v)/max)})`})))})};
+ const text=(lab,fn)=>row(lab,c=>{const[t,f,state]=fn(c);return $('div',{class:'cell'},t?$('div',{class:'val text'},t,fix(f)):missing(state))});
+ const first=(c,s,l)=>factsOf(c.org_number,s).find(f=>f.label===l);
+ return $('div',{class:'view'},$('h1',{style:'font-size:clamp(28px,5vw,44px);letter-spacing:-.03em;font-weight:800;margin-bottom:8px',text:'Compare two companies'}),$('p',{class:'note',style:'margin:0',text:'Bars share one scale per row. Figures come from each company\'s latest filed accounts.'}),
+  $('div',{class:'pickers'},pick(0,'First company'),pick(1,'Second company')),
+  money('Revenue','revenue'),money('Operating result','operating_result'),money('Net result','net_result'),money('Total assets','assets'),money('Equity','equity'),
+  text('Employees in the register',c=>{const f=first(c,'identity','Employees in the register');return[f&&String(f.value_number),f,'not_available']}),
+  text('Accounts year',c=>[c.latest_period_end.slice(0,4),factsOf(c.org_number,'financials')[0],'not_available']),
+  text('Founded',c=>{const f=first(c,'identity','Founded on');return[f&&f.value_text,f,'not_available']}),
+  text('Website',c=>{const f=first(c,'web','Official website');return[f&&f.link_url.replace(/^https?:\/\/(www\.)?/,''),f,c.state_official_website]}),
+  text('Linked profiles',c=>{const f=factsOf(c.org_number,'web').filter(x=>x.link_url&&!/website|Careers/i.test(x.label));return[f.length?f.map(x=>x.label).join(', '):'',f[0],c.state_owned_profiles]}),
+  text('News from the company',c=>{const f=factsOf(c.org_number,'news');return[f.length?f.length+' dated '+(f.length===1?'post':'posts'):'',f[0],'not_available']}),
+  text('Job ads',c=>['',null,c.state_jobs]))}
+function system(){const sw=(n,v,why)=>$('div',{class:'sw'},$('i',{style:`background:var(${v})`}),$('div',{},$('strong',{text:n}),$('div',{class:'lbl',text:why})));
+ const spaces=[4,8,12,16,24,32,48,72];
+ const dec=(t,w)=>$('div',{},$('strong',{text:t}),w);
+ return $('div',{class:'view sys'},
+ $('section',{},$('h2',{text:'The idea'}),$('p',{text:'A signal post tells you where you are and how far to trust it. So the site borrows from the Norwegian nautical chart. Every fact is a confirmed position with a line back to its source, and anything unconfirmed is drawn as unsurveyed water.'}),$('p',{class:'note',text:'One thing to remember the site by: tap any number and it shows you where it came from.'})),
+ $('section',{},$('h2',{text:'Colour'}),$('div',{class:'swatches'},sw('Water','--water','The page. A pale chart blue, cooler than the cream most editorial sites use.'),sw('Shoal','--shoal','Quiet fills and bar tracks. Shallow water on a chart.'),sw('Land','--land','Reserved for the Norwegian chart feel in illustration.'),sw('Ink','--ink','Text and primary marks. 13:1 on water.'),sw('Chart magenta','--mark','Only for tracing sources. Charts use magenta for navigational notes. 7:1 on water.'),sw('Hatch','--hatch','Unsurveyed. Absence gets a texture so it never reads as zero.')),$('p',{class:'note',style:'margin-top:12px',text:'Dark mode follows a ship\'s night chart. Switch your device theme to see it. All text pairs measured at 4.5:1 or better in both themes.'})),
+ $('section',{},$('h2',{text:'Type'}),$('div',{style:'font-weight:800;font-size:44px;letter-spacing:-.03em;line-height:1.05',text:'Schibsted Grotesk'}),$('p',{text:'Headings and interface. Drawn for Schibsted, the Norwegian media group, so æ, ø and å look native. Company names need that.'}),$('div',{class:'num',style:'font-size:28px',text:'NOK 353.7 m · 941 009 697'}),$('p',{text:'IBM Plex Mono for every figure and organisation number. Digits line up in columns, and a figure looks like a measurement.'}),$('div',{class:'note',style:'font-size:24px',text:'Retrieved 3 November, Regnskapsregisteret'}),$('p',{text:'Newsreader Italic for annotations only. Charts letter water features in italics and land in upright type, and this follows the same split: facts stand upright, notes about them lean.'})),
+ $('section',{},$('h2',{text:'Spacing and grid'}),$('div',{class:'space'},...spaces.map(s=>$('div',{},$('i',{style:`width:${s}px;height:${s}px`}),String(s)))),$('p',{style:'margin-top:16px',text:'Eight steps. Small steps group a fact with its label, large steps separate sections, so proximity carries the meaning and few boxes are needed.'}),$('div',{class:'grid12','aria-hidden':'true'},...Array.from({length:12},()=>$('i'))),$('p',{style:'margin-top:16px',text:'4 columns on phones, 12 from 760px, 1160px at most. Profiles use a reading column and a 280px rail.'})),
+ $('section',{},$('h2',{text:'Components'}),$('div',{style:'display:grid;gap:16px;max-width:560px'},(()=>{const f=D.facts.find(x=>x.label==='Revenue');return $('div',{class:'val'},nok(f.value_number),fix(f),$('span',{class:'note',style:'font-family:var(--note)',text:'Fix mark: the chart symbol for a confirmed position. Tap it.'}))})(),missing('not_available'),missing('ambiguous'),missing('blocked'),$('div',{style:'display:flex;gap:8px;flex-wrap:wrap'},$('button',{class:'btn',text:'Button'}),$('button',{class:'btn','aria-pressed':'true',text:'Selected'})),$('div',{class:'bar'},$('b',{style:'transform:scaleX(.7)'})),$('div',{class:'bar'},$('b',{class:'loss',style:'transform:scaleX(.3)'})),$('p',{class:'note',style:'margin:0',text:'A loss bar is hatched as well as red, so colour is never the only signal.'}))),
+ $('section',{},$('h2',{text:'Icons and illustration'}),$('p',{text:'Lucide outline icons at 1.5px for interface actions, always with a text label. No stock photos and no AI art. The one illustration is depth contours drawn by code, used only on the home page, so the data stays the picture.'})),
+ $('section',{},$('h2',{text:'Motion'}),$('p',{text:'One signature movement: the bearing line draws from a fact towards its source in 520ms. Everything else is 160ms feedback or a 220ms sheet. Nothing waits on scrolling, and reduced-motion settings turn it all off.'})),
+ $('section',{},$('h2',{text:'Story flow'}),$('ol',{class:'flow'},...['Promise: every fact has a way back. A real figure proves it on the first screen.','Find: search by name, number, town or industry.','Read: a short brief, then accounts, web, news, hiring and people.','Trace: tap any mark for source, date, exact place and why it is the right company.','Compare: two companies side by side, bars on one scale.','Trust: unknowns stay visible, with the reason.'].map(t=>$('li',{text:t})))),
+ $('section',{},$('h2',{text:'Why these decisions'}),$('div',{class:'decisions'},dec('Search first, no marketing page.',' Judges score ease of use, so the product is the hero.'),dec('A dedicated mark instead of a "sources" tab.',' Checking a fact is the task, so it takes one tap from the fact itself.'),dec('Two columns on phones.',' Comparing means seeing both at once. Sideways scrolling would hide one company.'),dec('Sheet from the bottom on phones, side panel on laptops.',' The fact stays on screen while you read its source, and the thumb reaches Close.'),dec('The skill database suggested navy, Exo and Roboto Mono.',' I kept its contrast and density rules but rejected those faces: Exo reads as science fiction, and mono body text tires readers.'),dec('Honest numbers.',' The site says 400 researched companies. It never implies all of Norway.'))))}
+function render(){const a=document.getElementById('app');document.querySelectorAll('[data-go]').forEach(b=>b.dataset.go===view?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'));a.replaceChildren(view==='profile'?profile():view==='compare'?compare():view==='system'?system():home());tray()}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));document.getElementById('brand').onclick=()=>go('home');
+const h=location.hash.slice(1);if(['home','profile','compare','system'].includes(h))view=h;render();
+</script>

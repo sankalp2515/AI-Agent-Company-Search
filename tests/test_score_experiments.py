@@ -106,3 +106,56 @@ def test_website_verifier_can_use_leadership_retrieved_in_this_run(tmp_path,monk
     rows,report=core.run_batch(['123456789'],tmp_path,run_id='t',modules=('website','leadership'),strategy='balanced')
     assert report['validation']['passed']
     assert seen==[True]
+
+
+def test_stopped_ad_with_future_expiry_is_not_published():
+    class Stopped(ActiveJobs):
+        def get(self,url,source_class='official_public_api',headers=None):
+            response=super().get(url,source_class,headers)
+            body=json.loads(response['text']);body['status']='INACTIVE'
+            return snapshot(json.dumps(body),url)
+    nav=NavJobs();nav.state='loaded';nav.token='test-token'
+    nav.index={'example':{'one':{'url':'/api/v1/feedentry/z-new','_feed_entry':{'uuid':'one','businessName':'Example AS'}}}}
+    row=core.envelope('123456789','t')
+    nav.research(row,{'navn':'Example AS'},Stopped(),core.claim)
+    assert not [c for c in row['claims'] if c['field']=='jobs']
+
+
+def test_job_depth_waits_for_all_companies_and_stays_within_shared_budget(tmp_path):
+    orgs=[str(100000000+i) for i in range(5)]
+    registry=tmp_path/'registry.jsonl'
+    core.write_rows(registry,[{'organisasjonsnummer':o,'navn':'Example '+o+' AS'} for o in orgs])
+    class Jobs:
+        max_ads=10
+        max_candidate_details=4
+        max_detail_requests=None
+        details=0
+        def __init__(self):self.calls=[];self.seen={}
+        def load(self,t,cap):self.transport=t
+        def research(self,row,body,t,claim):
+            org=row['organisation_number'];limit=min(6,self.max_candidate_details)
+            self.calls.append((org,self.max_candidate_details))
+            previous=self.seen.get(org,0)
+            for i in range(previous,limit):
+                if self.details>=self.max_detail_requests:break
+                t.reserve('https://pam-stilling-feed.nav.no/api/v1/feedentry/'+org+'-'+str(i));self.details+=1
+                raw=json.dumps({'org':org,'job':i}).encode();sha=core.digest(raw);(t.root/(sha+'.bin')).write_bytes(raw)
+                source={'id':sha[:24],'source_url':'https://pam-stilling-feed.nav.no/api/v1/feedentry/'+org+'-'+str(i),
+                        'status':200,'source_class':'official_public_api','retrieved_at':core.now(),
+                        'content_sha256':sha,'snapshot_path':'snapshots/'+sha+'.bin'}
+                claim(row,'jobs',{'title':'Vacancy '+str(i),'url':'https://example.no/jobs/'+str(i)},source,{'json_pointer':'/job'})
+                self.seen[org]=i+1
+            row['availability']['jobs']='available'
+            row.setdefault('research_sources',{})['nav_jobs']={'candidate_count':6,'detail_requests':self.seen.get(org,0),'accepted_ads':self.seen.get(org,0)}
+            return []
+        def report(self):return {'state':'loaded','detail_requests':self.details}
+    jobs=Jobs()
+    rows,report=core.run_batch(orgs,tmp_path/'output',run_id='t',requests=100,seconds=300,
+                              workers=1,registry=registry,modules=('jobs',),strategy='balanced',jobs_source=jobs)
+    assert report['validation']['passed']
+    assert len(jobs.calls)==10
+    assert all(depth==4 for _,depth in jobs.calls[:5])
+    assert {org for org,_ in jobs.calls[:5]}==set(orgs)
+    assert all(depth==12 for _,depth in jobs.calls[5:])
+    assert all(len([c for c in row['claims'] if c['field']=='jobs'])==6 for row in rows)
+    assert report['requests']==30 and report['requests']<=100

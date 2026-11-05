@@ -1761,7 +1761,8 @@ def finish(row, previous=None):
 
 def validate(rows, orgs, snapshots=None):
     errors = []
-    snapshot_hashes = []
+    warnings = []
+    snapshot_hashes = {}
     if [r["organisation_number"] for r in rows] != orgs:
         errors.append("Output membership/order differs from input")
     for row in rows:
@@ -1782,8 +1783,10 @@ def validate(rows, orgs, snapshots=None):
             if not all(e.get(k) for k in ("source_url", "retrieved_at", "content_sha256", "locator")):
                 errors.append("Incomplete evidence")
         if snapshots:
+            cited = {e.get("snapshot_id") for e in ev.values()}
             for s in row["source_snapshots"]:
-                snapshot_hashes.append(s["content_sha256"])
+                sha = s["content_sha256"]
+                snapshot_hashes[sha] = snapshot_hashes.get(sha, False) or s["id"] in cited
     if snapshot_hashes:
         def intact(sha):
             path = Path(snapshots) / (sha + ".bin")
@@ -1793,13 +1796,19 @@ def validate(rows, orgs, snapshots=None):
                 return False
         # Shared evidence is immutable within this check. Rehash it on every
         # validation invocation, with bounded I/O rather than serial file reads.
-        unique = list(dict.fromkeys(snapshot_hashes))
+        unique = list(snapshot_hashes)
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             checked = dict(zip(unique, pool.map(intact, unique)))
-        for sha in snapshot_hashes:
-            if not checked[sha]:
+        for sha in unique:
+            if checked[sha]:
+                continue
+            # Evidence behind a published fact must be intact. A page that backs nothing, such as a
+            # rejected guessed domain removed by antivirus, is reported but cannot sink the whole run.
+            if snapshot_hashes[sha]:
                 errors.append("Snapshot missing or corrupted")
-    return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
+            else:
+                warnings.append(f"Unused snapshot unavailable: {sha}")
+    return {"passed": not errors, "errors": errors, "warnings": warnings, "envelopes": len(rows)}
 
 
 def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):

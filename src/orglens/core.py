@@ -953,6 +953,8 @@ def news_url_ok(url, site_url):
 def news_about_company(body, title, summary=""):
     """Media companies publish stories about others; keep only their items that name the company itself."""
     from .names import name_tokens, distinctive
+    if re.search(r'^(?:how\s+to\b|how\s+can\b|tips\b|slik\b|guide\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)', title.strip(), re.I):
+        return False
     code = str(((body or {}).get("naeringskode1") or {}).get("kode") or "")
     if not MEDIA_INDUSTRY.match(code):
         return True
@@ -1010,6 +1012,23 @@ def literal_dateline(text):
     return (iso, quote) if iso else None
 
 
+def linked_news_subject(body, headline, summary=''):
+    """A publisher suffix or an instructional blog post is not company news."""
+    from .names import text_contains_name
+    legal = body.get('navn', '')
+    title = headline.strip()
+    for separator in (' | ', ' — ', ' – ', ' - '):
+        pieces = title.rsplit(separator, 1)
+        if len(pieces) == 2 and text_contains_name(pieces[1], legal):
+            title = pieces[0]
+    if re.search(r'^(?:how\s+to\b|how\s+can\b|tips\b|slik\b|guide\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)', title, re.I):
+        return False
+    if text_contains_name(title, legal):
+        return True
+    event = re.search(r'\b(?:launch\w*|open\w*|appoint\w*|becomes?|new|partnership\w*|partner\w*|sign\w*|join\w*|acquir\w*|invest\w*|award\w*|fund\w*|expan\w*|secur\w*|lanser\w*|åpn\w*|ansatt\w*|samarbeid\w*|etabler\w*|overtar|tildel\w*|vinner|ansett\w*)\b', title, re.I)
+    return bool(event and (text_contains_name(summary, legal) or re.match(r'^(?:we|our|vi|vår)\b', title, re.I)))
+
+
 def extract_linked_article(row, snap, parsed, body, site_url):
     """A verified-site news-card hop plus literal headline and publication dateline."""
     from .names import text_contains_name
@@ -1029,7 +1048,8 @@ def extract_linked_article(row, snap, parsed, body, site_url):
     following = [n for n in heading.find_all_next(['h2', 'h3', 'p', 'time'], limit=10)
                  if not n.find_parent(['nav', 'header', 'footer', 'aside'])]
     lead = ' '.join(n.get_text(' ', strip=True) for n in following[:4])
-    if not text_contains_name(title + ' ' + lead, body.get('navn', '')) or not news_about_company(body, title, lead):
+    if (not text_contains_name(title + ' ' + lead, body.get('navn', ''))
+            or not news_about_company(body, title, lead) or not linked_news_subject(body, title, lead)):
         return
     for node in following[:4]:
         text = node.get_text(' ', strip=True)
@@ -1234,7 +1254,7 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 row["availability"]["jobs"] = "available"
             article_url = str(node.get("url") or snap["source_url"])
             static_page = STATIC_PAGE.search((urllib.parse.urlsplit(article_url).path + " " + str(node.get("headline") or "")).lower())
-            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and news_url_ok(article_url, home["source_url"]) and news_about_company(body, str(node["headline"]), str(node.get("description") or ""))                     and (not static_page or (("NewsArticle" in types or "PressRelease" in types)
+            if any(t in ("NewsArticle", "Article", "BlogPosting", "PressRelease") for t in types) and node.get("headline") and node.get("datePublished")                     and news_url_ok(article_url, home["source_url"]) and news_about_company(body, str(node["headline"]), str(node.get("description") or ""))                     and (not snap.get('news_context') or linked_news_subject(body, str(node['headline']), str(node.get('description') or '')))                     and (not static_page or (("NewsArticle" in types or "PressRelease" in types)
                          and re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?)/", urllib.parse.urlsplit(article_url).path.lower())))                     and snap is not pages[0][0]:
                 if not news_date(node["datePublished"]):
                     continue

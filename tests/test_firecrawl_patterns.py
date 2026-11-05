@@ -82,3 +82,21 @@ def test_historical_name_does_not_authorize_a_different_entity(monkeypatch):
     row=core.envelope('123456789','t')
     assert not core.research_website(row,{'navn':'Newbrand AS','historiskeNavn':[{'navn':'Oldbrand AS'}]},t,3,max_guess_fetches=1)
     assert not [c for c in row['claims'] if c['field']=='official_website']
+
+
+def test_instructional_blog_post_is_not_company_news_despite_publisher_suffix():
+    import json
+    home='<h1>Example AS</h1>'
+    for title in ['How to Build Confidence as a Leader - Example', '5 Leadership Traits Every Woman Should Cultivate - Example']:
+        html='<h1>'+title+'</h1><script type="application/ld+json">'+json.dumps({'@type':'BlogPosting','headline':title,'datePublished':'2025-03-11','description':'Advice from Example AS about leadership.'})+'</script>'
+        snap={**site('https://example.no/leadership-advice',html),'news_context':{'index_url':'https://example.no/blog','link_label':title}}
+        row=core.envelope('123456789','t')
+        core.extract_site_facts(row,{'navn':'EXAMPLE AS'},[(site('https://example.no/',home),*core.soup_text(home)),(snap,*core.soup_text(html))],'labelled_organisation_number')
+        assert not [c for c in row['claims'] if c['field']=='activity']
+
+
+def test_instructional_headline_is_rejected_consistently_for_feeds():
+    xml='<rss><channel><item><title>How to Build Confidence as a Leader</title><pubDate>Tue, 11 Mar 2025 10:00:00 +0000</pubDate><link>https://example.no/news/leadership-advice</link></item></channel></rss>'
+    row=core.envelope('123456789','t')
+    core.extract_feed(row,site('https://example.no/feed',xml),{'navn':'Example AS'},'https://example.no/')
+    assert not [c for c in row['claims'] if c['field']=='activity']

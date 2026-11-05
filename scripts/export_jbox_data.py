@@ -66,8 +66,13 @@ def clean(text):
         text = re.sub(rf"\bis an? {re.escape(norwegian.lower())}\b", f"is a {english.lower()} ({norwegian.lower()})", text)
     for norwegian, english in ROLES.items():
         text = text.replace(f"({norwegian})", f"({english})")
-    text = text.replace("SELSKAP accounts", "company accounts").replace("KONSERN accounts", "group accounts")
+    text = text.replace("SELSKAP accounts", "company accounts").replace("KONSERN accounts", "group accounts").replace(" in uoppgitt (NACE 00.000)", "")
+    text = re.sub(r"\b(\d+)\.0 NOK\b", lambda match: f"NOK {int(match[1]):,}", text)
     return text.replace("plus 1 further roles", "plus 1 further role")
+
+
+def clean_industry(text):
+    return "Not specified in the register" if text == "Uoppgitt" else text
 
 
 def english_form(norwegian):
@@ -133,7 +138,7 @@ def describe(claim, identity):
     if field in {"legal_form", "industry"}:
         if field == "legal_form":
             return "identity", "Legal form", english_form(value.get("beskrivelse", "")), None, "", ""
-        return "identity", "Industry", value.get("beskrivelse", ""), None, "", ""
+        return "identity", "Industry", clean_industry(value.get("beskrivelse", "")), None, "", ""
     if field == "secondary_industries":
         return "identity", "Other industries", "; ".join(item["beskrivelse"] for item in value), None, "", ""
     if field == "business_address":
@@ -152,7 +157,7 @@ def describe(claim, identity):
         return "web", PLATFORMS.get(value["platform"], value["platform"].capitalize()), value["url"], None, "", value["url"]
     if field == "activity":
         if value.get("kind") == "official_registry_event":
-            return "registry_events", value.get("published_at", ""), value["headline"], None, "", ""
+            return "registry_events", value.get("published_at", ""), clean(value["headline"]), None, "", ""
         return "news", value.get("published_at", ""), value["headline"], None, "", value.get("url", "")
     if field == "jobs":
         return "hiring", value.get("title", "Job ad"), value.get("employer", ""), None, "", value.get("url", "")
@@ -184,7 +189,7 @@ def company_tables(row, sample, rechecked):
     state = row["availability"]
     company = {
         "org_number": org, "name": identity["legal_name"], "legal_form": english_form((identity.get("legal_form") or {}).get("beskrivelse", "")),
-        "industry_code": (identity.get("industry") or {}).get("kode", ""), "industry": (identity.get("industry") or {}).get("beskrivelse", ""),
+        "industry_code": (identity.get("industry") or {}).get("kode", ""), "industry": clean_industry((identity.get("industry") or {}).get("beskrivelse", "")),
         "municipality": identity.get("municipality", ""), "address": address(identity.get("business_address")),
         "founded_on": identity.get("founded_on", ""), "employees": identity.get("employees", ""),
         "latest_period_end": max((value[0] for value in latest.values()), default=""),

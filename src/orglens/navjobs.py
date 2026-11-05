@@ -29,7 +29,7 @@ def norm_employer(name):
 
 
 class NavJobs:
-    def __init__(self, days=45, max_pages=200, segments=6, max_ads_per_company=10, max_candidate_details=4, max_detail_requests=None):
+    def __init__(self, days=186, max_pages=600, segments=6, max_ads_per_company=10, max_candidate_details=4, max_detail_requests=None):
         self.days = days
         self.max_pages = max_pages
         self.segments = segments
@@ -220,7 +220,12 @@ class NavJobs:
                     for uuid, item in self.index.get(candidate, {}).items():
                         if score > found.get(uuid, (-1, None))[0]:
                             found[uuid] = (score, item)
-        return [item for _, item in sorted(found.values(), key=lambda pair: (-pair[0], pair[1].get("url", "")))]
+        def modified(item):
+            try:
+                return datetime.fromisoformat(str(item.get("date_modified", "")).replace("Z", "+00:00")).timestamp()
+            except (ValueError, TypeError, OverflowError):
+                return 0
+        return [item for _, item in sorted(found.values(), key=lambda pair: (-pair[0], -modified(pair[1]), pair[1].get("url", "")))]
 
     def research(self, row, body, transport, claim):
         """Publish active ads whose detail record names this exact employer orgnr."""
@@ -260,6 +265,8 @@ class NavJobs:
                     raise ValueError("invalid ad")
             except (ValueError, TypeError, KeyError):
                 detail_failures += 1
+                continue
+            if detail.get("status") and detail["status"] != "ACTIVE":
                 continue
             employer_org = re.sub(r"\D", "", str(employer.get("orgnr") or ""))
             parent_snap = None

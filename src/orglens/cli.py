@@ -30,7 +30,7 @@ def main():
     run.add_argument("--pages", type=int, default=5)
     run.add_argument("--strategy", choices=("baseline", "balanced"), default="baseline", help="Experimental bounded external-first allocation; baseline preserves original phase order")
     run.add_argument("--modules", default="financials,leadership,locations,jobs,website")
-    run.add_argument("--nav-days", type=int, default=40, help="Window of NAV job-feed changes indexed for active ads")
+    run.add_argument("--nav-days", type=int, default=186, help="NAV change-feed bootstrap horizon (186 days covers six calendar months)")
     run.add_argument("--no-guess", action="store_true", help="Disable keyless name-derived website candidates")
     run.add_argument("--registry", "--bulk", dest="registry", help="Evaluator frozen BRREG registry file (original-object JSONL or semicolon CSV); --bulk is an alias")
     run.add_argument("--requests-per-company", type=int, help="Request budget per input company (Builderr: 20, i.e. 2,000 per 100); overrides --max-requests")

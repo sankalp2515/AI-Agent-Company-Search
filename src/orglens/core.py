@@ -849,7 +849,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         # portfolio site listing this entity: publishing its social accounts, news or jobs would be wrong.
         site_fail(row, "ambiguous", f"{final_host}: identity shown only on a page of a differently named domain (possible parent/group site)")
         return False
-    if weak and not domain_is_full_name(home["source_url"], legal) and any(publisher_labels)             and not any(text_contains_name(label, legal) for label in publisher_labels):
+    if weak and not domain_is_full_name(home["source_url"], legal)             and not any(text_contains_name(label, legal) for label in publisher_labels):
         # A shared brand word is not publisher scope: "Fjordbakst Group" listing "Fjordbakst Vest AS"
         # on its contact page is the group's site. The homepage itself must name this company.
         site_fail(row, "ambiguous", f"{final_host}: homepage names a different publisher than {legal} (possible parent/group site)")
@@ -870,7 +870,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             feed_snap = transport.get(feed_url, "company_owned")
             attach(row, feed_snap)
             if availability(feed_snap) == "available":
-                extract_feed(row, feed_snap, body)
+                extract_feed(row, feed_snap, body, site_url=home["source_url"])
     elif feed is None and "wp-content" in home["text"]:
         # WordPress serves a dated post feed at /feed/ even when the theme does not link it.
         feed_url = urllib.parse.urljoin(urllib.parse.urlunsplit(urllib.parse.urlsplit(home["source_url"])[:2] + ("/", "", "")), "feed/")
@@ -878,14 +878,14 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
             feed_snap = transport.get(feed_url, "company_owned")
             attach(row, feed_snap)
             if availability(feed_snap) == "available" and "<rss" in feed_snap["text"][:2000].lower():
-                extract_feed(row, feed_snap, body)
+                extract_feed(row, feed_snap, body, site_url=home["source_url"])
     extract_site_facts(row, body, pages, method, getattr(transport, "quote_selector", None), transport)
     return True
 
 
 NEWS_MAX_AGE_DAYS = 3 * 366
 # A complete 45-day NAV index took 81 pages on 4 November 2026; leave headroom for busy weeks.
-NAV_FEED_PAGE_CAP = 160
+NAV_FEED_PAGE_CAP = 600
 
 
 def news_date(raw):
@@ -914,6 +914,8 @@ def news_url_ok(url, site_url):
     path = parts.path.rstrip("/").lower()
     if not path or re.search(r"/(?:feed|rss|atom)(?:\.xml)?$", path):
         return False
+    if re.fullmatch(r"(?:contact|kontakt|privacy(?:-policy)?|personvern(?:erklaering)?|terms(?:-and-conditions)?|om-oss|about|shop|products?)", path.rsplit("/", 1)[-1]):
+        return False
     if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg)/[^/]+|/20\d\d/\d{1,2}/[^/]+", path):
         return True  # inside a news section or a dated permalink
     if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg|arkiv|archive)$", path):
@@ -932,7 +934,7 @@ def news_about_company(body, title, summary=""):
     return bool(words) and all(w in text for w in words)
 
 
-def extract_feed(row, snap, body=None):
+def extract_feed(row, snap, body=None, site_url=None):
     import xml.etree.ElementTree as ET
     try:
         if re.search(r'<!DOCTYPE|<!ENTITY', snap['text'], re.I):
@@ -958,7 +960,7 @@ def extract_feed(row, snap, body=None):
         if not href:
             continue  # an item without its own article link is not a citable post
         href = urllib.parse.urljoin(snap['source_url'], href)
-        if not news_url_ok(href, snap['source_url']):
+        if not news_url_ok(href, site_url or snap['source_url']):
             continue
         summary = re.sub(r"<[^>]+>", " ", content('description') or content('summary'))
         if not news_about_company(body, title, summary):
@@ -975,7 +977,7 @@ def extract_feed(row, snap, body=None):
             break
 
 
-def extract_dated_news_cards(row, snap, parsed):
+def extract_dated_news_cards(row, snap, parsed, body=None, site_url=None):
     """Literal dated cards on an already verified site; no inferred event dates."""
     from .names import registrable
     months = {word:month for month,words in enumerate([
@@ -1022,6 +1024,8 @@ def extract_dated_news_cards(row, snap, parsed):
             if len(links)!=1:
                 continue
             link,url,label=links[0]
+            if not news_url_ok(url, site_url or snap['source_url']) or not news_about_company(body, label, parent.get_text(' ',strip=True)):
+                continue
             key=(url,date.isoformat())
             if key not in known and news_date(date.isoformat()):
                 claim(row,'activity',{'headline':label,'published_at':date.isoformat(),'url':url,'kind':'company_owned_news_card'},snap,
@@ -1033,7 +1037,7 @@ def extract_dated_news_cards(row, snap, parsed):
             break
 
 
-CREDIT_CONTEXT = re.compile(r"(?:levert|laget|utviklet|designet|design|produsert|driftet|levert)\s+(?:av|by)|made\s+by|developed\s+by|designed\s+by|"
+CREDIT_CONTEXT = re.compile(r"(?:levert|laget|utviklet|designet|design|produsert|driftet|levert)\s+(?:av|by)\b|made\s+by|developed\s+by|designed\s+by|"
                             r"powered\s+by|built\s+by|created\s+by|website\s+by|web\s*design|webbyr[aå]|nettside\s+av|hjemmeside\s+av|reklamebyr[aå]|(?:web|digital|design)\s*agency", re.I)
 
 
@@ -1146,7 +1150,7 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 seen += 1
                 if seen >= 6:
                     break
-        extract_dated_news_cards(row,snap,parsed)
+        extract_dated_news_cards(row,snap,parsed,body,home["source_url"])
     from .names import name_tokens, translit, registrable
     site_label = translit(registrable(urllib.parse.urlsplit(home["source_url"]).hostname).split(".")[0]).replace("-", "")
     brand = next((c["value"] for c in row["claims"] if c["field"] == "public_brand" and isinstance(c["value"], str)), "")
@@ -1159,6 +1163,8 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
             return False
         if "profile.php" in profile["url"] or re.fullmatch(r"[0-9]{8,}", handle):
             return True  # numeric page id published by the verified site itself
+        if len(handle) >= 3 and handle in own_compact:
+            return True  # exact verified brand/domain, not an ambiguous short substring
         return any(w in handle for w in own_words) or any(len(handle) >= 4 and handle in c for c in own_compact)
 
     socials = {k: v for k, v in socials.items() if belongs(v[0])}
@@ -1672,7 +1678,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 body = bodies[row["organisation_number"]]
                 research_website(row, body, transport, max(2, min(pages, 4)), extra=nav_homepages.get(row["organisation_number"], ()),
                                  guesses=False, only_extra=True)
-            elif module == "jobs":
+            elif module in {"jobs", "jobs_depth"}:
                 if jobs_source is None:
                     row["availability"]["jobs"] = row["availability"].get("jobs", "not_available")
                 else:
@@ -1715,13 +1721,13 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     stage_metrics = []
     if strategy == "balanced":
         # Reserve the early opportunity for source-backed external facts. Official
-        # identities still anchor every row; financials remain the first record phase.
-        phase_order = ("identity", *(("website",) if "website" in modules else ()),
+        # identities and current leaders anchor website verification before research.
+        phase_order = ("identity", *(("leadership",) if "leadership" in modules else ()), *(("website",) if "website" in modules else ()),
                        *(("discovery",) if discovery else ()), *(("agent",) if agent else ()),
-                       *(m for m in modules if m not in {"website", "jobs"}),
+                       *(m for m in modules if m not in {"website", "jobs", "leadership"}),
                        *(("jobs",) if "jobs" in modules else ()))
         if jobs_source:
-            jobs_source.max_detail_requests = max(1, requests // 10)
+            jobs_source.max_detail_requests = max(1, requests // 5)
     else:
         phase_order = ("identity", *modules, *(("discovery",) if discovery else ()), *(("agent",) if agent else ()))
     # Breadth before depth prevents early entities consuming every request.
@@ -1741,11 +1747,17 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                     allowance=max(1,(remaining_seconds-jobs_reserve)/max(1,records_left))
                     transport.deadline=min(network_deadline,time.monotonic()+allowance)
             stage_time_ceiling=round(max(0,transport.deadline-started),3)
+            if strategy == "balanced" and module == "leadership" and "website" in modules:
+                # Leaders improve verification, but a very small run budget must
+                # still leave requests for the first website breadth pass.
+                transport.limit = max(stage_begin, requests - len(bodies))
             if strategy == "balanced" and module in {"website", "discovery", "agent"}:
                 fraction = .60 if module == "website" else .30
                 transport.limit = min(requests, stage_begin + max(1, int((requests-stage_begin) * fraction)))
             if strategy == "balanced" and module == "jobs" and jobs_source and not replay:
-                jobs_source.load(transport, min(NAV_FEED_PAGE_CAP, max(0, requests - transport.requests) // 4))
+                remaining = max(0, requests - transport.requests)
+                detail_reserve = min(max(40, 2 * len(rows)), remaining // 3)
+                jobs_source.load(transport, min(NAV_FEED_PAGE_CAP, max(0, remaining - detail_reserve)))
             if strategy == "baseline" and module != "identity" and jobs_source is not None and nav_thread is None and "jobs" in modules and not replay:
                 # The shared job index loads once per run, overlapping the official-record phases.
                 official_cost = sum(1 for m in modules if m in {"financials", "leadership", "locations"}) * len(bodies)
@@ -1769,6 +1781,22 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             write_rows(output / "checkpoint.jsonl", rows)
             stage_metrics.append({"stage": module, "requests": transport.requests-stage_begin, "seconds": round(time.monotonic()-stage_clock, 1),
                                   "request_ceiling": transport.limit,"time_ceiling_seconds":stage_time_ceiling})
+        deeper = [r for r in rows if r["organisation_number"] in bodies
+                  and (r.get("research_sources", {}).get("nav_jobs", {}).get("candidate_count", 0)
+                       > r.get("research_sources", {}).get("nav_jobs", {}).get("detail_requests", 0))
+                  and r.get("research_sources", {}).get("nav_jobs", {}).get("accepted_ads", 0) < getattr(jobs_source, "max_ads", 10)]
+        if strategy == "balanced" and jobs_source and deeper and not replay and time.monotonic() < network_deadline - 30 and transport.requests < requests - 50:
+            # Every company has had its breadth pass. Spend only remaining budget on depth,
+            # prioritizing companies not yet covered, with a global detail ceiling.
+            deeper.sort(key=lambda r: r["availability"].get("jobs") == "available")
+            stage_begin, stage_clock = transport.requests, time.monotonic()
+            transport.limit, transport.deadline = requests, network_deadline
+            jobs_source.max_candidate_details = 12
+            jobs_source.max_detail_requests = max(jobs_source.details, min(requests // 3, jobs_source.details + (requests - transport.requests - 50) // 2))
+            list(pool.map(lambda r: task(r, "jobs_depth"), deeper))
+            stage_metrics.append({"stage":"jobs_depth", "companies":len(deeper), "requests":transport.requests-stage_begin,
+                                  "seconds":round(time.monotonic()-stage_clock,1), "request_ceiling":transport.limit,
+                                  "time_ceiling_seconds":round(max(0,transport.deadline-started),3)})
         hinted = [r for r in rows if r["organisation_number"] in bodies and nav_homepages.get(r["organisation_number"])
                   and r["availability"].get("official_website") != "available"]
         if strategy == "balanced" and hinted and not replay and time.monotonic() < network_deadline - 30:

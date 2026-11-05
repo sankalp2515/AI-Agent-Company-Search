@@ -1,0 +1,117 @@
+{
+  "run_id": "candidate-replay-300",
+  "completed_at": "2026-11-05T15:12:12.024404Z",
+  "companies": 300,
+  "envelopes": 300,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 300
+  },
+  "requests": 0,
+  "bytes": 0,
+  "runtime_seconds": 78.623,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 6000,
+    "seconds": 900
+  },
+  "p50_company_ms": 161,
+  "p95_company_ms": 8731,
+  "coverage": {
+    "legal_identity": 300,
+    "financials": 300,
+    "leadership": 300,
+    "locations": 300,
+    "official_website": 23,
+    "description": 19,
+    "jobs": 0,
+    "activity": 300,
+    "owned_profiles": 10,
+    "contact": 103
+  },
+  "states": {
+    "available": 1655,
+    "failed": 77,
+    "blocked": 3,
+    "not_available": 1193,
+    "not_applicable": 0,
+    "ambiguous": 72
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 23,
+    "social_links": 10,
+    "news": 1,
+    "job_postings": 0,
+    "careers_page": 5,
+    "description": 19
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 0,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 0,
+      "seconds": 0.6,
+      "request_ceiling": 6000,
+      "time_ceiling_seconds": 899.83
+    },
+    {
+      "stage": "leadership",
+      "requests": 0,
+      "seconds": 1.0,
+      "request_ceiling": 5700,
+      "time_ceiling_seconds": 270.507
+    },
+    {
+      "stage": "website",
+      "requests": 0,
+      "seconds": 45.2,
+      "request_ceiling": 3600,
+      "time_ceiling_seconds": 405.941
+    },
+    {
+      "stage": "financials",
+      "requests": 0,
+      "seconds": 1.0,
+      "request_ceiling": 6000,
+      "time_ceiling_seconds": 428.46
+    },
+    {
+      "stage": "locations",
+      "requests": 0,
+      "seconds": 0.8,
+      "request_ceiling": 6000,
+      "time_ceiling_seconds": 809.83
+    },
+    {
+      "stage": "jobs",
+      "requests": 0,
+      "seconds": 0.2,
+      "request_ceiling": 6000,
+      "time_ceiling_seconds": 899.83
+    }
+  ],
+  "mode": "saved_source_replay",
+  "replay_source": "E:/Codex Projects/Company-Search/out/v7-300",
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "registry_declared_homepage": 3,
+    "full_name_domain_and_registered_operating_head": 6,
+    "labelled_organisation_number": 5,
+    "jsonld_organisation_identifier": 1,
+    "legal_name_and_registered_address": 4,
+    "legal_name_and_registered_phone": 4
+  },
+  "discovery": null
+}

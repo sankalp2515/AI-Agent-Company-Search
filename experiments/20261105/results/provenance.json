@@ -1,0 +1,7 @@
+{
+  "baseline_commit": "a408d146deb1b4d24031400d140cfb38c326a8d7",
+  "runtime_commit": "73ba0d63c39e71074e37ffdcd198fa6cb7126567",
+  "clean_clone_commit": "ecd555dbc4655dd46c4eb3d60c34e0e93b2345b6",
+  "inputs305_sha256": "c8ad43031d6e2b9c456a54e20ce2f74356b4c9ed6814f007d076ebbed50c5d86",
+  "note": "First 300 original cohort; last 5 selected diagnostics. No official score."
+}

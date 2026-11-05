@@ -1,0 +1,974 @@
+{
+  "submitted_original300": {
+    "companies": 300,
+    "covered_companies": {
+      "website": 32,
+      "social_links": 14,
+      "news": 1,
+      "job_postings": 0,
+      "careers_page": 6,
+      "description": 25
+    },
+    "facts": {
+      "website": 32,
+      "social_links": 24,
+      "news": 3,
+      "job_postings": 0,
+      "careers_page": 6,
+      "description": 25
+    }
+  },
+  "experiment_original300": {
+    "companies": 300,
+    "covered_companies": {
+      "website": 34,
+      "social_links": 16,
+      "news": 1,
+      "job_postings": 0,
+      "careers_page": 6,
+      "description": 27
+    },
+    "facts": {
+      "website": 34,
+      "social_links": 28,
+      "news": 3,
+      "job_postings": 0,
+      "careers_page": 6,
+      "description": 27
+    }
+  },
+  "experiment_added5": {
+    "companies": 5,
+    "covered_companies": {
+      "website": 1,
+      "social_links": 1,
+      "news": 0,
+      "job_postings": 5,
+      "careers_page": 1,
+      "description": 1
+    },
+    "facts": {
+      "website": 1,
+      "social_links": 2,
+      "news": 0,
+      "job_postings": 18,
+      "careers_page": 1,
+      "description": 1
+    }
+  },
+  "websites_added": [
+    {
+      "org": "924859946",
+      "name": "ARBEIDSARK AS",
+      "website": {
+        "url": "https://arbeidsark.no/",
+        "claim_id": "9a151a60ab2c813258ed115f",
+        "evidence_ids": [
+          "928e5f62c85370f9abbd2ec4"
+        ],
+        "source_url": "https://arbeidsark.no/om-oss/",
+        "retrieved_at": "2026-11-05T15:10:42.331128Z",
+        "identity_method": "full_name_domain_and_registered_operating_head"
+      }
+    },
+    {
+      "org": "923377956",
+      "name": "MAGENT AS",
+      "website": {
+        "url": "https://www.magent.no/",
+        "claim_id": "c5b7dffa43115148b650f423",
+        "evidence_ids": [
+          "46e72cd9414873539d7a10fd"
+        ],
+        "source_url": "https://www.magent.no/om-oss",
+        "retrieved_at": "2026-11-05T15:12:08.721767Z",
+        "identity_method": "full_name_domain_and_registered_operating_head"
+      }
+    }
+  ],
+  "websites_removed": [],
+  "job_audit": [
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Er du vår nye logistikkmedarbeider?",
+        "job_title": "Lagerarbeider",
+        "date_posted": "2026-11-05T00:00:00+01:00",
+        "valid_through": "2026-11-15T00:00:00+01:00",
+        "location": "BERGEN",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/2932c6a4-6ce6-4c75-aaba-6162797c253f",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "973061933",
+          "name": "ADECCO NORGE AS AVD BERGEN"
+        }
+      },
+      "evidence": [
+        {
+          "id": "d74eaef01f6017cbce8dfe79",
+          "snapshot_id": "5cce036be818d2ab839bd330",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/2932c6a4-6ce6-4c75-aaba-6162797c253f",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:11.965457Z",
+          "content_sha256": "1061024b7180cf26b8a24a5c21183c9398aefb682b4a0e16fc06e4ed1116fc1a",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "973061933"
+          },
+          "reporting_period": {
+            "published": "2026-11-05T00:00:00+01:00",
+            "expires": "2026-11-15T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/2932c6a4-6ce6-4c75-aaba-6162797c253f",
+          "status": "ACTIVE",
+          "employer_org": "973061933",
+          "identity_proved": true,
+          "expires": "2026-11-15T00:00:00+01:00",
+          "published": "2026-11-05T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Bli med på lagetr til Ytterøy-kylling",
+        "job_title": "Produksjonsmedarbeider nnn",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-18T00:00:00+01:00",
+        "location": "STEINKJER",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/5b6be16c-6cfb-4531-92c7-37457b65c8c6",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "984793367",
+          "name": "ADECCO NORGE AS AVD STEINKJER"
+        }
+      },
+      "evidence": [
+        {
+          "id": "f63a0c6f976e0e935254d45d",
+          "snapshot_id": "06e46d9e2f312d28c09e33fc",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/5b6be16c-6cfb-4531-92c7-37457b65c8c6",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:13.571659Z",
+          "content_sha256": "6bbe8a4b6aa22a6ea1b664afe5951c8b28f7929f78ed6c8743274900fdc32e39",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "984793367"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-18T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/5b6be16c-6cfb-4531-92c7-37457b65c8c6",
+          "status": "ACTIVE",
+          "employer_org": "984793367",
+          "identity_proved": true,
+          "expires": "2026-11-18T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Ledig nå? - Prosjektadministrator til vikariat i Follo",
+        "job_title": "Prosjektadministrator",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-11T00:00:00+01:00",
+        "location": "ENEBAKK",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/f8e8876b-4505-4689-a36a-685089533cee",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "891205082",
+          "name": "ADECCO NORGE AS AVD ASKIM"
+        }
+      },
+      "evidence": [
+        {
+          "id": "cbeb92d8e3bf36aba56f21a5",
+          "snapshot_id": "86786dbc543d91b5d84a1131",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/f8e8876b-4505-4689-a36a-685089533cee",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:14.011624Z",
+          "content_sha256": "2271fccc154af65e0185083696d1402d779c6bc2633f7ed52d7e6a58af358bf4",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "891205082"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-11T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/f8e8876b-4505-4689-a36a-685089533cee",
+          "status": "ACTIVE",
+          "employer_org": "891205082",
+          "identity_proved": true,
+          "expires": "2026-11-11T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Vi søker produksjonsmedarbeidere med truckbevis.",
+        "job_title": "Produksjonsmedarbeider nnn",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-22T00:00:00+01:00",
+        "location": "FREDRIKSTAD",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/e4b28282-f351-4e6f-96ef-4fa9deb24876",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "985859736",
+          "name": "ADECCO NORGE AS AVD SARPSBORG"
+        }
+      },
+      "evidence": [
+        {
+          "id": "0a49336ef7ae06ecf14b4edd",
+          "snapshot_id": "4707f522f05553097ef30ecf",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/e4b28282-f351-4e6f-96ef-4fa9deb24876",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:15.590158Z",
+          "content_sha256": "02cf6c95eee5befa0d957f650e14cd283c446e7d3370079462ef6e2f00afbc4b",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "985859736"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-22T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/e4b28282-f351-4e6f-96ef-4fa9deb24876",
+          "status": "ACTIVE",
+          "employer_org": "985859736",
+          "identity_proved": true,
+          "expires": "2026-11-22T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Adecco søker erfaren lagermedarbeider!",
+        "job_title": "Lagerarbeider",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-13T00:00:00+01:00",
+        "location": "DRAMMEN",
+        "employment": "Vikariat / Deltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/56bb0581-8410-4eab-81b5-8b6897742b36",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "979692102",
+          "name": "ADECCO NORGE AS AVD DRAMMEN"
+        }
+      },
+      "evidence": [
+        {
+          "id": "1a1f0930ae888642a706dc6f",
+          "snapshot_id": "bb0f34b903afc935235f1fd6",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/56bb0581-8410-4eab-81b5-8b6897742b36",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:17.222360Z",
+          "content_sha256": "e77aec66cddcf669a67c67a12e3e262238bfe9689e6ad4e1eefff28003c1214e",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "979692102"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-13T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/56bb0581-8410-4eab-81b5-8b6897742b36",
+          "status": "ACTIVE",
+          "employer_org": "979692102",
+          "identity_proved": true,
+          "expires": "2026-11-13T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Adecco søker dyktige elektrikere til Haugalandet",
+        "job_title": "Elektriker",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-29T00:00:00+01:00",
+        "location": "HAUGESUND",
+        "employment": "Prosjekt / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/394472f7-7e6e-4351-b6ae-db82bc881bfb",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "973061992",
+          "name": "ADECCO NORGE AS AVD HAUGESUND"
+        }
+      },
+      "evidence": [
+        {
+          "id": "bbc50a092811cf050291fc4e",
+          "snapshot_id": "20bd657a58a8e56e03ab7113",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/394472f7-7e6e-4351-b6ae-db82bc881bfb",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:18.911580Z",
+          "content_sha256": "3537cd37e4a64646f13f194389ec13d4d23b12924e24e781aa99ae41323d2ba2",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "973061992"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-29T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/394472f7-7e6e-4351-b6ae-db82bc881bfb",
+          "status": "ACTIVE",
+          "employer_org": "973061992",
+          "identity_proved": true,
+          "expires": "2026-11-29T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Lagermedarbeider med truckførerbevis C1 søkes til produksjon",
+        "job_title": "Lagerarbeider",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-13T00:00:00+01:00",
+        "location": "HOLMESTRAND",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/e8f932ec-cb9b-41d2-a85a-78df8767a562",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "979692102",
+          "name": "ADECCO NORGE AS AVD DRAMMEN"
+        }
+      },
+      "evidence": [
+        {
+          "id": "c9fe27b0225cff0f0dbc92e4",
+          "snapshot_id": "1df2df3f56d6a6868896713a",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/e8f932ec-cb9b-41d2-a85a-78df8767a562",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:20.464615Z",
+          "content_sha256": "c0c3e84faf360c0847f36e9a8335fd28812e1bad23c8fe8278120770dac9eedd",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "979692102"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-13T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/e8f932ec-cb9b-41d2-a85a-78df8767a562",
+          "status": "ACTIVE",
+          "employer_org": "979692102",
+          "identity_proved": true,
+          "expires": "2026-11-13T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "935333156",
+      "name": "ADECCO NORGE AS",
+      "original300": false,
+      "value": {
+        "title": "Truckfører søkes til lagerjobb i Tromsø (oppstart snarest)",
+        "job_title": "Truckfører",
+        "date_posted": "2026-11-04T00:00:00+01:00",
+        "valid_through": "2026-11-11T00:00:00+01:00",
+        "location": "TROMSØ",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/c69c02fb-53d6-4b03-8f4c-ae36fc04ae86",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "973061925",
+          "name": "ADECCO NORGE AS AVD TROMSØ"
+        }
+      },
+      "evidence": [
+        {
+          "id": "4ce8200347e42531fb60e176",
+          "snapshot_id": "b582ae434eeadf7e6cd24382",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/c69c02fb-53d6-4b03-8f4c-ae36fc04ae86",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:22.015816Z",
+          "content_sha256": "0207c7d676ea0b3f8a511471be31461b60b3cf51dda985e45f75642d5962ca61",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "973061925"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T00:00:00+01:00",
+            "expires": "2026-11-11T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/c69c02fb-53d6-4b03-8f4c-ae36fc04ae86",
+          "status": "ACTIVE",
+          "employer_org": "973061925",
+          "identity_proved": true,
+          "expires": "2026-11-11T00:00:00+01:00",
+          "published": "2026-11-04T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "933090256",
+      "name": "FORTICA AS",
+      "original300": false,
+      "value": {
+        "title": "Site Supervisor – Data Centre Projects",
+        "job_title": "",
+        "date_posted": "2026-11-04T09:12:35+01:00",
+        "valid_through": "2026-12-04T10:02:15+01:00",
+        "location": "BJERKVIK, FYRESDAL, ØVREBØ",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/4c3ad1e5-b2cd-4525-a26d-4f94b7b858e6",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "935825962",
+          "name": "FORTICA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "c4af13a67c54bd3a5605b0ce",
+          "snapshot_id": "b467a521c016e83bac6218af",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/4c3ad1e5-b2cd-4525-a26d-4f94b7b858e6",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:04.973477Z",
+          "content_sha256": "b68368b2c6de11e5429e4119d76eb5f44d167a3fe17650a5ffa025589698e1f8",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "935825962"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T09:12:35+01:00",
+            "expires": "2026-12-04T10:02:15+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/4c3ad1e5-b2cd-4525-a26d-4f94b7b858e6",
+          "status": "ACTIVE",
+          "employer_org": "935825962",
+          "identity_proved": true,
+          "expires": "2026-12-04T10:02:15+01:00",
+          "published": "2026-11-04T09:12:35+01:00"
+        }
+      ]
+    },
+    {
+      "org": "933090256",
+      "name": "FORTICA AS",
+      "original300": false,
+      "value": {
+        "title": "Logistics Supervisor – Data Centre Projects",
+        "job_title": "",
+        "date_posted": "2026-11-04T09:13:56+01:00",
+        "valid_through": "2026-12-04T10:01:13+01:00",
+        "location": "FYRESDAL",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/48c4295f-0689-4e52-99a1-bb7f7cd31829",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "935825962",
+          "name": "FORTICA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "8360fa928308d2f8cf01abcb",
+          "snapshot_id": "5ab05ca4645ce0615f595b3e",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/48c4295f-0689-4e52-99a1-bb7f7cd31829",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:06.582586Z",
+          "content_sha256": "e3abfcb1d9533dbcf537cec31a0be938505e5fbaecd13173ca6267667f47aae6",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "935825962"
+          },
+          "reporting_period": {
+            "published": "2026-11-04T09:13:56+01:00",
+            "expires": "2026-12-04T10:01:13+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/48c4295f-0689-4e52-99a1-bb7f7cd31829",
+          "status": "ACTIVE",
+          "employer_org": "935825962",
+          "identity_proved": true,
+          "expires": "2026-12-04T10:01:13+01:00",
+          "published": "2026-11-04T09:13:56+01:00"
+        }
+      ]
+    },
+    {
+      "org": "933090256",
+      "name": "FORTICA AS",
+      "original300": false,
+      "value": {
+        "title": "Site Manager – Data Centre Projects",
+        "job_title": "",
+        "date_posted": "2026-10-30T10:28:39+01:00",
+        "valid_through": "2026-12-03T17:09:31+01:00",
+        "location": "BJERKVIK, FYRESDAL, ØVREBØ",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/9b94f3ce-cffb-4c51-9d1d-fc85bb9e40f0",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "935825962",
+          "name": "FORTICA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "ef2a102ac17d5690d8e2cdc2",
+          "snapshot_id": "4c774a25ab6110db1da4860d",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/9b94f3ce-cffb-4c51-9d1d-fc85bb9e40f0",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:08.167240Z",
+          "content_sha256": "40d6d19cc7c7afe3bb567c0ba1696984c20ee3fe35a9df7fb825fb8a7420c153",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "935825962"
+          },
+          "reporting_period": {
+            "published": "2026-10-30T10:28:39+01:00",
+            "expires": "2026-12-03T17:09:31+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/9b94f3ce-cffb-4c51-9d1d-fc85bb9e40f0",
+          "status": "ACTIVE",
+          "employer_org": "935825962",
+          "identity_proved": true,
+          "expires": "2026-12-03T17:09:31+01:00",
+          "published": "2026-10-30T10:28:39+01:00"
+        }
+      ]
+    },
+    {
+      "org": "933090256",
+      "name": "FORTICA AS",
+      "original300": false,
+      "value": {
+        "title": "Construction Worker – Data Centre Projects",
+        "job_title": "",
+        "date_posted": "2026-10-30T10:30:02+01:00",
+        "valid_through": "2026-12-03T17:08:54+01:00",
+        "location": "BJERKVIK, FYRESDAL, ØVREBØ",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/ef611b1f-84c2-4474-8156-dce1211ee284",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "935825962",
+          "name": "FORTICA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "5d3240625636e2357b0bb21b",
+          "snapshot_id": "b2b86df2fec207057666b2a7",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/ef611b1f-84c2-4474-8156-dce1211ee284",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:09.735040Z",
+          "content_sha256": "65f67d020423531daddd43cbf627d27484c8b43d1f01684e44fd26144a9f3411",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "935825962"
+          },
+          "reporting_period": {
+            "published": "2026-10-30T10:30:02+01:00",
+            "expires": "2026-12-03T17:08:54+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/ef611b1f-84c2-4474-8156-dce1211ee284",
+          "status": "ACTIVE",
+          "employer_org": "935825962",
+          "identity_proved": true,
+          "expires": "2026-12-03T17:08:54+01:00",
+          "published": "2026-10-30T10:30:02+01:00"
+        }
+      ]
+    },
+    {
+      "org": "983974694",
+      "name": "HELSE FONNA HF",
+      "original300": false,
+      "value": {
+        "title": "Bedriftslege/arbeidsmedisiner",
+        "job_title": "Bedriftslege/Arbeidsmedisiner",
+        "date_posted": "2026-10-22T00:00:00+02:00",
+        "valid_through": "2026-11-18T00:00:00+01:00",
+        "location": "HAUGESUND",
+        "employment": "Fast / Deltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/095094b6-4e98-42c6-a14d-65ea3932f915",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "974724774",
+          "name": "HELSE FONNA HF HAUGESUND SJUKEHUS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "e16e76f515c09c0939a68578",
+          "snapshot_id": "bb0fbde93fa6e7c7fb7300c3",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/095094b6-4e98-42c6-a14d-65ea3932f915",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:05.152660Z",
+          "content_sha256": "f7f3e5e373b0c4fd4577c2f95a697885562550e71fadb0fd54749054ecc64de8",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "974724774"
+          },
+          "reporting_period": {
+            "published": "2026-10-22T00:00:00+02:00",
+            "expires": "2026-11-18T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/095094b6-4e98-42c6-a14d-65ea3932f915",
+          "status": "ACTIVE",
+          "employer_org": "974724774",
+          "identity_proved": true,
+          "expires": "2026-11-18T00:00:00+01:00",
+          "published": "2026-10-22T00:00:00+02:00"
+        }
+      ]
+    },
+    {
+      "org": "983974694",
+      "name": "HELSE FONNA HF",
+      "original300": false,
+      "value": {
+        "title": "Ferdig med LIS1? Spesialiser deg hos oss!",
+        "job_title": "Lege i spesialisering (LIS3) ",
+        "date_posted": "2026-11-02T00:00:00+01:00",
+        "valid_through": "2026-11-29T00:00:00+01:00",
+        "location": "HAUGESUND",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/5fd6bc76-bdab-44c1-84c6-60140d202342",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "999219543",
+          "name": "HELSE FONNA HF HAUGESUND BUP POLIKLINIKK"
+        }
+      },
+      "evidence": [
+        {
+          "id": "f002df796e78ffa6fac4e02f",
+          "snapshot_id": "872e11d0ecad62e67d7c5fd1",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/5fd6bc76-bdab-44c1-84c6-60140d202342",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:06.733272Z",
+          "content_sha256": "fca2a09401d28fa97aa5396b7b999a5a771aea5135505831afc23e172d20a027",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "999219543"
+          },
+          "reporting_period": {
+            "published": "2026-11-02T00:00:00+01:00",
+            "expires": "2026-11-29T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/5fd6bc76-bdab-44c1-84c6-60140d202342",
+          "status": "ACTIVE",
+          "employer_org": "999219543",
+          "identity_proved": true,
+          "expires": "2026-11-29T00:00:00+01:00",
+          "published": "2026-11-02T00:00:00+01:00"
+        }
+      ]
+    },
+    {
+      "org": "983974694",
+      "name": "HELSE FONNA HF",
+      "original300": false,
+      "value": {
+        "title": "Skal du bli bioingeniør og ønskjer jobb og stipend?",
+        "job_title": "Bioingeniørstudent",
+        "date_posted": "2026-06-01T00:00:00+02:00",
+        "valid_through": "2026-12-31T00:00:00+01:00",
+        "location": "HAUGESUND",
+        "employment": "Vikariat / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/8228712a-e94f-4abe-85a8-8041d47ce027",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "974724774",
+          "name": "HELSE FONNA HF HAUGESUND SJUKEHUS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "862318fd9aea2fadb8ff886e",
+          "snapshot_id": "02accd0e4aba20cde9277909",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/8228712a-e94f-4abe-85a8-8041d47ce027",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:08.296863Z",
+          "content_sha256": "eb02015852ac5114ffd67cc488cbcf050f65bef08487a069fe6163bc0c844289",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "974724774"
+          },
+          "reporting_period": {
+            "published": "2026-06-01T00:00:00+02:00",
+            "expires": "2026-12-31T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/8228712a-e94f-4abe-85a8-8041d47ce027",
+          "status": "ACTIVE",
+          "employer_org": "974724774",
+          "identity_proved": true,
+          "expires": "2026-12-31T00:00:00+01:00",
+          "published": "2026-06-01T00:00:00+02:00"
+        }
+      ]
+    },
+    {
+      "org": "930202959",
+      "name": "NORLANDIA EVENTYRSTUA BARNEHAGE AS",
+      "original300": false,
+      "value": {
+        "title": "Pedagogisk leder som vil utgjøre en forskjell?",
+        "job_title": "",
+        "date_posted": "2026-10-26T12:35:27+01:00",
+        "valid_through": "2026-11-06T00:00:00+01:00",
+        "location": "OSLO",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/98c7281b-3016-497d-8c8b-53b45dd817d0",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "991743944",
+          "name": "NORLANDIA EVENTYRSTUA BARNEHAGE"
+        }
+      },
+      "evidence": [
+        {
+          "id": "488335d5303c9a6361731ee9",
+          "snapshot_id": "813cd1f182ba357ef466dd10",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/98c7281b-3016-497d-8c8b-53b45dd817d0",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:04.831247Z",
+          "content_sha256": "5c1534c20be053f96ecc1764873e00858c4573eeaccd789175ffe54b8b0e9ee3",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "991743944"
+          },
+          "reporting_period": {
+            "published": "2026-10-26T12:35:27+01:00",
+            "expires": "2026-11-06T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/98c7281b-3016-497d-8c8b-53b45dd817d0",
+          "status": "ACTIVE",
+          "employer_org": "991743944",
+          "identity_proved": true,
+          "expires": "2026-11-06T00:00:00+01:00",
+          "published": "2026-10-26T12:35:27+01:00"
+        }
+      ]
+    },
+    {
+      "org": "917363749",
+      "name": "ZOUQ SANDVIKA AS",
+      "original300": false,
+      "value": {
+        "title": "Vi søker kokk til Zouq Restaurant Sandvika",
+        "job_title": "Kokk",
+        "date_posted": "2026-09-16T13:53:32+02:00",
+        "valid_through": "2026-11-30T00:00:00+01:00",
+        "location": "SANDVIKA",
+        "employment": "Fast / Heltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/0e2821f9-3588-444a-9296-087718c54094",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "817422462",
+          "name": "ZOUQ SANDVIKA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "e1eef7147af899777d51cd77",
+          "snapshot_id": "ed8251b6de0967cbd00ad2b4",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/0e2821f9-3588-444a-9296-087718c54094",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:05.196622Z",
+          "content_sha256": "560c78110b3566287e9d1206286a632e8b5347e9c89db72eb7541d8c323d76c3",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "817422462"
+          },
+          "reporting_period": {
+            "published": "2026-09-16T13:53:32+02:00",
+            "expires": "2026-11-30T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/0e2821f9-3588-444a-9296-087718c54094",
+          "status": "ACTIVE",
+          "employer_org": "817422462",
+          "identity_proved": true,
+          "expires": "2026-11-30T00:00:00+01:00",
+          "published": "2026-09-16T13:53:32+02:00"
+        }
+      ]
+    },
+    {
+      "org": "917363749",
+      "name": "ZOUQ SANDVIKA AS",
+      "original300": false,
+      "value": {
+        "title": "servitør søkes til Zouq Sandvika",
+        "job_title": "Servitør",
+        "date_posted": "2026-09-06T15:26:38+02:00",
+        "valid_through": "2026-11-30T00:00:00+01:00",
+        "location": "SANDVIKA",
+        "employment": "Fast / Deltid",
+        "url": "https://arbeidsplassen.nav.no/stillinger/stilling/00192017-ffa7-4937-9e88-65931ee2b80a",
+        "source": "NAV arbeidsplassen",
+        "employer_unit": {
+          "organisation_number": "817422462",
+          "name": "ZOUQ SANDVIKA AS"
+        }
+      },
+      "evidence": [
+        {
+          "id": "aa9175953585818ccb5d931d",
+          "snapshot_id": "30f5273c4cb8db03d742bc4a",
+          "source_url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/00192017-ffa7-4937-9e88-65931ee2b80a",
+          "source_class": "official_public_api",
+          "retrieved_at": "2026-11-05T15:18:05.722381Z",
+          "content_sha256": "1a84a927642033ca83c5bd6429ef5224241912c2e6f142ccab365b1fc8abe9b2",
+          "locator": {
+            "json_pointer": "/ad_content/employer/orgnr",
+            "matched_orgnr": "817422462"
+          },
+          "reporting_period": {
+            "published": "2026-09-06T15:26:38+02:00",
+            "expires": "2026-11-30T00:00:00+01:00"
+          },
+          "extraction_method": "deterministic_v1",
+          "identity_method": "nav_ad_employer_registered_subunit"
+        }
+      ],
+      "source_checks": [
+        {
+          "url": "https://pam-stilling-feed.nav.no/api/v1/feedentry/00192017-ffa7-4937-9e88-65931ee2b80a",
+          "status": "ACTIVE",
+          "employer_org": "817422462",
+          "identity_proved": true,
+          "expires": "2026-11-30T00:00:00+01:00",
+          "published": "2026-09-06T15:26:38+02:00"
+        }
+      ]
+    }
+  ]
+}

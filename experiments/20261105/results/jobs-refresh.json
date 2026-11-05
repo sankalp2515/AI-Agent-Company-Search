@@ -1,0 +1,41 @@
+{
+  "mode": "saved-source component refresh, no HTTP; not a live refresh",
+  "checks": [
+    {
+      "organisation_number": "935333156",
+      "job_claims": 8,
+      "material_changes": 0,
+      "failed_source_retained_job_claims": 8,
+      "duplicate_claims": 0
+    },
+    {
+      "organisation_number": "933090256",
+      "job_claims": 4,
+      "material_changes": 0,
+      "failed_source_retained_job_claims": 4,
+      "duplicate_claims": 0
+    },
+    {
+      "organisation_number": "983974694",
+      "job_claims": 3,
+      "material_changes": 0,
+      "failed_source_retained_job_claims": 3,
+      "duplicate_claims": 0
+    },
+    {
+      "organisation_number": "930202959",
+      "job_claims": 1,
+      "material_changes": 0,
+      "failed_source_retained_job_claims": 1,
+      "duplicate_claims": 0
+    },
+    {
+      "organisation_number": "917363749",
+      "job_claims": 2,
+      "material_changes": 0,
+      "failed_source_retained_job_claims": 2,
+      "duplicate_claims": 0
+    }
+  ],
+  "passed": true
+}

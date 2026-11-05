@@ -1,0 +1,93 @@
+{
+  "run_id": "deep-news",
+  "completed_at": "2026-11-05T15:18:49.788820Z",
+  "companies": 3,
+  "envelopes": 3,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 3
+  },
+  "requests": 62,
+  "bytes": 5428155,
+  "runtime_seconds": 37.677,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 100,
+    "seconds": 300
+  },
+  "p50_company_ms": 26582,
+  "p95_company_ms": 35756,
+  "coverage": {
+    "legal_identity": 3,
+    "financials": 0,
+    "leadership": 3,
+    "locations": 0,
+    "official_website": 3,
+    "description": 3,
+    "jobs": 0,
+    "activity": 3,
+    "owned_profiles": 3,
+    "contact": 3
+  },
+  "states": {
+    "not_applicable": 0,
+    "ambiguous": 0,
+    "available": 21,
+    "not_available": 0,
+    "blocked": 0,
+    "failed": 9
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 3,
+    "social_links": 3,
+    "news": 2,
+    "job_postings": 0,
+    "careers_page": 1,
+    "description": 3
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 0,
+    "unique_urls": 35,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 3,
+      "seconds": 1.2,
+      "request_ceiling": 100,
+      "time_ceiling_seconds": 240.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 3,
+      "seconds": 0.9,
+      "request_ceiling": 97,
+      "time_ceiling_seconds": 240.0
+    },
+    {
+      "stage": "website",
+      "requests": 56,
+      "seconds": 33.8,
+      "request_ceiling": 62,
+      "time_ceiling_seconds": 109.155
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": null,
+  "website_methods": {
+    "labelled_organisation_number": 1,
+    "legal_name_and_registered_address": 1,
+    "legal_name_and_registered_phone": 1
+  },
+  "discovery": null
+}

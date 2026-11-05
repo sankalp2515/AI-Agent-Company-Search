@@ -638,6 +638,29 @@ def operating_leader_on_pages(row, pages, legal):
     return None
 
 
+def registered_officers_on_pages(row, pages):
+    """Two different registered officers named on a site whose domain spells the company name.
+
+    One shared person can be a coincidence or a sister company. Both people, on a domain equal
+    to this exact name, is specific. Firms holding a role, such as auditors, do not count."""
+    officers = {}
+    for c in row["claims"]:
+        value = c["value"] if c["field"] == "leadership" and isinstance(c["value"], dict) else {}
+        role = str(value.get("role") or "").lower()
+        parts = str(value.get("name") or "").split()
+        if len(parts) >= 2 and len(parts[-1]) >= 3 and any(r in role for r in ("daglig leder", "innehaver", "styrets leder", "styremedlem", "nestleder"))                 and not re.search(r"\b(?:AS|ASA|ANS|DA|SA)\b", " ".join(parts)):
+            officers[(parts[0].casefold(), parts[-1].casefold())] = parts
+    for snapshot, soup, text in pages:
+        found = []
+        for parts in officers.values():
+            match = re.search(r"\b" + re.escape(parts[0]) + r"\b(?:\s+\w+\.?){0,2}\s+" + re.escape(parts[-1]) + r"\b", text, re.I)
+            if match:
+                found.append(match.group(0))
+        if len(found) >= 2:
+            return snapshot, {"text_quote": "; ".join(found[:3]), "corroboration": "two registered officers named on a domain spelling the company name"}, "name_domain_and_two_registered_officers"
+    return None
+
+
 def corroborated(body, pages, row=None, domain_named=False):
     from .names import matched_name_span, text_contains_name
     legal = body.get("navn", "")
@@ -759,9 +782,61 @@ def declared_domain_legal_statement(org, legal_name, pages):
     return None
 
 
+SITEMAP_ARTICLE = re.compile(r"/(?:news|nyheter|nyhet|nytt|aktuelt|presse|press|blogg?|blogs|artikler?|articles?|innlegg)/.+|/20\d\d/\d{1,2}/.+", re.I)
+SITEMAP_CAREERS = re.compile(r"^/(?:[a-z]{2}/)?(?:karriere|careers?|jobb-hos-oss|jobbe-hos-oss|ledige-stillinger|ledig-stilling|stillinger|jobs?)/?$", re.I)
+SITEMAP_IDENTITY = re.compile(r"kontakt|contact|om-oss|omoss|about|personvern|privacy|vilkar|impressum|salgsbetingelser", re.I)
+SITEMAP_PEOPLE = re.compile(r"team|ansatte|people|medarbeidere|hvem-er-vi|bedriften|selskapet|firmaet|historie|ledelse", re.I)
+
+
+def parse_sitemap(text):
+    """(page entries, child sitemap URLs). A sitemap only points to pages; it proves nothing itself."""
+    import xml.etree.ElementTree as ET
+    if re.search(r"<!DOCTYPE|<!ENTITY", text[:4000], re.I):
+        return [], []
+    try:
+        root = ET.fromstring(text)
+    except (ET.ParseError, ValueError):
+        return [], []
+    pages, children = [], []
+    for node in root:
+        kind = node.tag.rsplit("}", 1)[-1]
+        fields = {child.tag.rsplit("}", 1)[-1]: (child.text or "").strip() for child in node}
+        if kind == "sitemap" and fields.get("loc"):
+            children.append(fields["loc"])
+        elif kind == "url" and fields.get("loc"):
+            pages.append((fields["loc"], fields.get("lastmod", "")))
+    return pages, children
+
+
+def site_sitemap(row, base, robot, transport, site_host, max_files=4):
+    """Bounded read of a site's own sitemap: declared files first, then the usual addresses."""
+    from .names import registrable
+    declared = list(robot.site_maps() or []) if robot else []
+    queue = declared[:3] or [urllib.parse.urljoin(base, "sitemap.xml"), urllib.parse.urljoin(base, "wp-sitemap.xml")]
+    pages, seen, fetched = {}, set(), 0
+    while queue and fetched < max_files:
+        target = queue.pop(0)
+        if target in seen or target.endswith(".gz") or registrable(urllib.parse.urlsplit(target).hostname) != registrable(site_host):
+            continue
+        seen.add(target)
+        fetched += 1
+        snap = transport.get(target, "company_owned")
+        attach(row, snap)
+        if availability(snap) != "available":
+            continue
+        found, children = parse_sitemap(snap["text"])
+        for page_url, lastmod in found[:5000]:
+            if registrable(urllib.parse.urlsplit(page_url).hostname) == registrable(site_host):
+                pages.setdefault(page_url.split("#")[0], lastmod)
+        queue.extend(sorted(children, key=lambda u: 0 if re.search(r"post|news|nyhet|artik|blog|page", u, re.I) else 1))
+        if pages and not declared:
+            queue = [u for u in queue if not u.endswith("wp-sitemap.xml")]
+    return pages
+
+
 def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, _address_fallback=False):
     """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
-    from .names import is_aggregator, registrable, domain_matches_name, text_contains_name, domain_is_full_name, NO_GUESS_FORMS, national_mismatch
+    from .names import is_aggregator, registrable, domain_matches_name, text_contains_name, domain_is_full_name, domain_spells_name, NO_GUESS_FORMS, national_mismatch
     raw_url = url or body.get("hjemmeside")
     for field in SITE_FIELDS:
         row["availability"].setdefault(field, "not_available")
@@ -889,6 +964,41 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             proof = corroborated(body, pages, row, domain_is_full_name(home['source_url'], legal))
     if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
         proof = declared_domain_legal_statement(org, legal, pages)
+    sitemap_pages = None
+    named_domain = domain_is_full_name(home["source_url"], legal)
+    spelled_domain = named_domain or domain_spells_name(home["source_url"], legal)
+    if not proof and not conflict and not managed and spelled_domain:
+        proof = registered_officers_on_pages(row, pages)
+    if (not proof and not conflict and page_limit >= 5 and (spelled_domain or domain_matches_name(home["source_url"], legal)
+                                                            or any(text_contains_name(t, legal) for _, _, t in pages))):
+        # The linked pages did not settle identity. The site's own map often lists its legal and
+        # about pages, and a site named after the company may name its head on a page of its menu.
+        sitemap_pages = site_sitemap(row, base, robot, transport, final_host)
+        opened = {s["source_url"].rstrip("/") for s, _, _ in pages}
+        listed = sorted(sitemap_pages, key=lambda u: (0 if SITEMAP_IDENTITY.search(urllib.parse.urlsplit(u).path) else 1, len(u)))
+        further = [u for u in listed if SITEMAP_IDENTITY.search(urllib.parse.urlsplit(u).path)
+                   or SITEMAP_PEOPLE.search(urllib.parse.urlsplit(u).path)]
+        if spelled_domain:
+            menu = [urllib.parse.urljoin(home["source_url"], a["href"]).split("#")[0] for nav in soup.select("nav, header") for a in nav.find_all("a", href=True)]
+            further += [u for u in dict.fromkeys(menu) if registrable(urllib.parse.urlsplit(u).hostname) == registrable(final_host)
+                        and u.rstrip("/") != home["source_url"].rstrip("/") and not re.search(r"\.(?:pdf|png|jpe?g|svg|zip)$|/(?:cart|checkout|login|logg-inn|handlekurv|account|konto|min-side)/?$", u, re.I)]
+        tried = 0
+        for target in dict.fromkeys(further):
+            if tried >= 3 or proof or conflict:
+                break
+            if target.rstrip("/") in opened:
+                continue
+            opened.add(target.rstrip("/"))
+            tried += 1
+            fetch(target)
+            proof = proof_on_pages(org, legal, pages)
+            conflict = conflicting_number(org, pages)
+            if not proof and not conflict and not managed:
+                proof = corroborated(body, pages, row, named_domain)
+            if not proof and not conflict and not managed and spelled_domain:
+                proof = registered_officers_on_pages(row, pages)
+            if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
+                proof = declared_domain_legal_statement(org, legal, pages)
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
@@ -941,6 +1051,28 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
                          for u, label in additions if u.rstrip('/') not in visited][:article_slots]
             article_slots -= len(additions)
             queue[0:0] = additions
+    if sitemap_pages is None:
+        sitemap_pages = site_sitemap(row, base, robot, transport, final_host) if page_limit >= 5 else {}
+    articles = sorted(((u, m) for u, m in sitemap_pages.items() if SITEMAP_ARTICLE.search(urllib.parse.urlsplit(u).path)
+                       and not urllib.parse.urlsplit(u).query and not re.search(r"\.(?:pdf|png|jpe?g|svg|zip)$", u, re.I)),
+                      key=lambda entry: entry[1] or "", reverse=True)
+    opened = {s["source_url"].rstrip("/") for s, _, _ in pages}
+    taken = 0
+    for article_url, _ in articles:
+        if taken >= 6:
+            break
+        if article_url.rstrip("/") in opened or not robot.can_fetch(UA, article_url):
+            continue
+        taken += 1
+        fetched = fetch(article_url)
+        if fetched:
+            context = {"index_url": "sitemap", "link_label": "listed in the site's sitemap", "via": "sitemap"}
+            fetched[0]["news_context"] = context
+            for stored in row["source_snapshots"]:
+                if stored["id"] == fetched[0]["id"]:
+                    stored["news_context"] = context
+    sitemap_careers = next((u for u in sitemap_pages if SITEMAP_CAREERS.search(urllib.parse.urlsplit(u).path)), None)
+    careers_page = fetch(sitemap_careers) if sitemap_careers and sitemap_careers.rstrip("/") not in opened else None
     if feed is not None and robot.can_fetch(UA, urllib.parse.urljoin(home["source_url"], feed["href"])):
         feed_url = urllib.parse.urljoin(home["source_url"], feed["href"])
         if registrable(urllib.parse.urlsplit(feed_url).hostname) == registrable(final_host) and "comments" not in feed_url:
@@ -957,6 +1089,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             if availability(feed_snap) == "available" and "<rss" in feed_snap["text"][:2000].lower():
                 extract_feed(row, feed_snap, body, site_url=home["source_url"])
     extract_site_facts(row, body, pages, method, getattr(transport, "quote_selector", None), transport)
+    if careers_page and not any(c["field"] == "careers_page" for c in row["claims"]):
+        claim(row, "careers_page", careers_page[0]["source_url"], careers_page[0], {"sitemap_loc": sitemap_careers}, identity_method="sitemap_of_verified_company_site")
     return True
 
 
@@ -993,7 +1127,7 @@ def news_url_ok(url, site_url):
         return False
     if re.fullmatch(r"(?:contact|kontakt|privacy(?:-policy)?|personvern(?:erklaering)?|terms(?:-and-conditions)?|om-oss|about|shop|products?)", path.rsplit("/", 1)[-1]):
         return False
-    if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg)/[^/]+|/20\d\d/\d{1,2}/[^/]+", path):
+    if re.search(r"/(?:news|nyheter|nyhet|nytt|aktuelt|presse|press|blogg?|artikler?|articles?|innlegg)/[^/]+|/20\d\d/\d{1,2}/[^/]+", path):
         return True  # inside a news section or a dated permalink
     if re.search(r"/(?:news|nyheter|nyhet|aktuelt|presse|press|blogg?|artikler?|innlegg|arkiv|archive)$", path):
         return False  # the section index lists posts; it is not one
@@ -1079,40 +1213,68 @@ def linked_news_subject(body, headline, summary=''):
     return bool(event and (text_contains_name(summary, legal) or re.match(r'^(?:we|our|vi|vår)\b', title, re.I)))
 
 
+def explicit_publish_date(parsed, heading):
+    """A publication date the page itself states in markup, never a sitemap lastmod."""
+    for meta in parsed.select('meta[property="article:published_time"], meta[name="article:published_time"], meta[itemprop="datePublished"]'):
+        raw = str(meta.get("content") or "")
+        if news_date(raw):
+            return news_date(raw), raw, "meta_published_time"
+    node = heading.find_next("time", attrs={"datetime": True})
+    if node is not None and not node.find_parent(["nav", "footer", "aside"]) and news_date(node["datetime"]):
+        return news_date(node["datetime"]), node["datetime"], "time_after_headline"
+    return None
+
+
 def extract_linked_article(row, snap, parsed, body, site_url):
-    """A verified-site news-card hop plus literal headline and publication dateline."""
+    """A verified-site article reached from a news card or the site's sitemap, with a stated date."""
     from .names import text_contains_name
     context = snap.get('news_context')
-    if not context or not NEWS_INDEX.search(urllib.parse.urlsplit(context.get('index_url', '')).path):
+    if not context:
+        return
+    via_sitemap = context.get('via') == 'sitemap'
+    if not via_sitemap and not NEWS_INDEX.search(urllib.parse.urlsplit(context.get('index_url', '')).path):
         return
     if urllib.parse.urlsplit(snap['source_url']).hostname != urllib.parse.urlsplit(site_url).hostname:
+        return
+    if any(c['field'] == 'activity' and isinstance(c['value'], dict) and c['value'].get('url') == snap['source_url'] for c in row['claims']):
         return
     headings = [h for h in parsed.find_all('h1') if not h.find_parent(['nav', 'header', 'footer', 'aside'])]
     if len(headings) != 1:
         return
     heading = headings[0]
     title = heading.get_text(' ', strip=True)
-    if not 20 <= len(title) <= 500 or len(title.split()) < 4 or STATIC_PAGE.search(urllib.parse.urlsplit(snap['source_url']).path):
+    if STATIC_PAGE.search(urllib.parse.urlsplit(snap['source_url']).path):
         return
-    # Require the article itself to name this company near the headline/lead.
     following = [n for n in heading.find_all_next(['h2', 'h3', 'p', 'time'], limit=10)
                  if not n.find_parent(['nav', 'header', 'footer', 'aside'])]
     lead = ' '.join(n.get_text(' ', strip=True) for n in following[:4])
-    if (not text_contains_name(title + ' ' + lead, body.get('navn', ''))
+    if via_sitemap:
+        # The site's own article section and a stated date are the evidence. Media companies
+        # publish about others, so news_about_company still applies, as do instructional titles.
+        if (not 8 <= len(title) <= 500 or len(title.split()) < 2 or not news_url_ok(snap['source_url'], site_url)
+                or not news_about_company(body, title, lead)):
+            return
+    elif (not 20 <= len(title) <= 500 or len(title.split()) < 4 or not text_contains_name(title + ' ' + lead, body.get('navn', ''))
             or not news_about_company(body, title, lead) or not linked_news_subject(body, title, lead)):
+        # Without a sitemap listing, the article itself must name this company near the headline.
         return
+    found = None
     for node in following[:4]:
-        text = node.get_text(' ', strip=True)
-        date = literal_dateline(text)
-        if not date:
-            continue
-        iso, quote = date
-        claim(row, 'activity', {'headline': title[:300], 'published_at': iso, 'published_raw': quote,
-              'url': snap['source_url'], 'kind': 'company_owned_linked_article'}, snap,
-              {'news_index_url': context['index_url'], 'link_label': context['link_label'],
-               'headline_quote': title, 'date_quote': quote}, period={'published_at': iso}, identity_method='verified_site_news_link_and_literal_dateline')
-        row['availability']['activity'] = 'available'
-        break
+        date = literal_dateline(node.get_text(' ', strip=True))
+        if date:
+            found = (date[0], date[1], 'dateline')
+            break
+    found = found or explicit_publish_date(parsed, heading)
+    if not found:
+        return
+    iso, quote, source = found
+    kind = 'company_owned_sitemap_article' if via_sitemap else 'company_owned_linked_article'
+    claim(row, 'activity', {'headline': title[:300], 'published_at': iso, 'published_raw': quote,
+          'url': snap['source_url'], 'kind': kind}, snap,
+          {'news_index_url': context['index_url'], 'link_label': context['link_label'],
+           'headline_quote': title, 'date_quote': quote, 'date_source': source}, period={'published_at': iso},
+          identity_method='verified_site_sitemap_and_stated_date' if via_sitemap else 'verified_site_news_link_and_literal_dateline')
+    row['availability']['activity'] = 'available'
 
 
 def extract_feed(row, snap, body=None, site_url=None):
@@ -1616,6 +1778,22 @@ def synthesize(row):
         label = "Latest filed accounts" if not registry_year or registry_year <= year else "Most recent accounts figures available"
         account_kind = {"SELSKAP": "company", "KONSERN": "group"}.get(str(sample["value"].get("account_type") or "").upper(), "company")
         say(f"{label} ({period.get('fraDato')} to {period.get('tilDato')}, {account_kind} accounts): " + ", ".join(bits) + "." + verdict, list(latest.values()), "financials")
+        previous_year = str(int(year) - 1) if year.isdigit() else ""
+        earlier = {c["field"].split(".", 1)[1]: c for c in fin if str(c["reporting_period"].get("tilDato") or "").startswith(previous_year + "-12")
+                   and c["value"].get("account_type") == kind} if previous_year else {}
+        moves, moved = [], []
+        for key, label in (("revenue", "revenue"), ("annual_result", "net result"), ("equity", "equity")):
+            now_value = (latest.get(key) or {}).get("value", {}).get("amount")
+            old_value = (earlier.get(key) or {}).get("value", {}).get("amount")
+            if not isinstance(now_value, (int, float)) or not isinstance(old_value, (int, float)):
+                continue
+            text = f"{label} went from {fmt_amount(earlier[key]['value'])} to {fmt_amount(latest[key]['value'])}"
+            if old_value > 0 and now_value > 0:
+                text += f" ({(now_value - old_value) / old_value:+.0%})"
+            moves.append(text)
+            moved += [latest[key], earlier[key]]
+        if moves:
+            say(f"Change from {previous_year} to {year}: " + "; ".join(moves) + ".", moved, "financial_change")
         if registry_year and year and registry_year > year:
             first_claim = next((c for c in row["claims"] if c["field"] == "latest_accounts_year"), None)
             say(f"The register records a {registry_year} annual-accounts filing, but Regnskapsregisteret did not return its figures at retrieval time; {year} figures are shown and are not the latest filing.",

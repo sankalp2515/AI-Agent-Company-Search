@@ -1,8 +1,8 @@
 """Network fallback, legal-statement proof, domain hypotheses and summary wording."""
 from bs4 import BeautifulSoup
 
-from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_unused_snapshots, english_legal_form, validate
-from orglens.names import guess_domains
+from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_unused_snapshots, english_legal_form, explicit_publish_date, parse_sitemap, registered_officers_on_pages, validate, SITEMAP_ARTICLE, SITEMAP_CAREERS
+from orglens.names import domain_spells_name, guess_domains
 
 
 def page(url, text):
@@ -98,3 +98,49 @@ def test_altered_page_behind_a_published_fact_still_fails(tmp_path):
     (tmp_path / (cited + ".bin")).write_bytes(b"changed")
     assert drop_lost_unused_snapshots(rows, tmp_path) == 0
     assert not validate(rows, ["123456789"], tmp_path)["passed"]
+
+
+def test_sitemap_parsing_and_hostile_xml():
+    xml = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://x.no/nyheter/a</loc><lastmod>2026-01-02</lastmod></url></urlset>'
+    assert parse_sitemap(xml) == ([("https://x.no/nyheter/a", "2026-01-02")], [])
+    index = '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://x.no/post.xml</loc></sitemap></sitemapindex>'
+    assert parse_sitemap(index) == ([], ["https://x.no/post.xml"])
+    assert parse_sitemap('<!DOCTYPE x [<!ENTITY a "b">]><urlset/>') == ([], [])
+    assert parse_sitemap("not xml") == ([], [])
+
+
+def test_sitemap_patterns_skip_section_pages_and_rental_listings():
+    assert SITEMAP_ARTICLE.search("/artikler/ceramic-loop")
+    assert not SITEMAP_ARTICLE.search("/nyheter/")
+    assert SITEMAP_CAREERS.search("/ledig-stilling/")
+    assert not SITEMAP_CAREERS.search("/ledige-lokaler/")
+
+
+def test_publish_date_comes_from_the_page_not_a_guess():
+    soup = BeautifulSoup('<meta property="article:published_time" content="2026-02-03T10:00:00Z"><h1>Ny avtale</h1>', "html.parser")
+    assert explicit_publish_date(soup, soup.h1)[0] == "2026-02-03"
+    soup = BeautifulSoup('<h1>Ny avtale</h1><footer><time datetime="2026-02-03">x</time></footer>', "html.parser")
+    assert explicit_publish_date(soup, soup.h1) is None
+    soup = BeautifulSoup('<h1>Ny avtale</h1><p>Avtalen gjelder fra 3. februar 2026.</p>', "html.parser")
+    assert explicit_publish_date(soup, soup.h1) is None
+
+
+def officers_row():
+    people = [("Linn Maria Runeson", "Daglig leder"), ("Eric Thomas Reid", "Styrets leder"), ("ECIT SERVICES AS", "Regnskapsfører")]
+    return {"claims": [{"field": "leadership", "value": {"name": n, "role": r}} for n, r in people]}
+
+
+def test_short_name_domain_needs_two_people_on_one_page():
+    assert domain_spells_name("https://www.edit.land/", "EDIT AS")
+    assert not domain_spells_name("https://www.editing.no/", "EDIT AS")
+    both = [page("https://www.edit.land/atelier", "Established by Linn Runeson and Eric Reid")]
+    assert registered_officers_on_pages(officers_row(), both)[2] == "name_domain_and_two_registered_officers"
+    one = [page("https://www.edit.land/atelier", "Established by Linn Runeson")]
+    assert registered_officers_on_pages(officers_row(), one) is None
+    split = [page("https://www.edit.land/a", "Linn Runeson"), page("https://www.edit.land/b", "Eric Reid")]
+    assert registered_officers_on_pages(officers_row(), split) is None
+
+
+def test_a_firm_role_holder_never_counts_as_an_officer():
+    pages = [page("https://www.edit.land/", "Linn Runeson with ECIT SERVICES AS")]
+    assert registered_officers_on_pages(officers_row(), pages) is None

@@ -102,6 +102,13 @@ def domain_is_full_name(url, legal_name):
     return len(joined) >= 5 and label in variants
 
 
+def domain_spells_name(url, legal_name):
+    """Domain label equals the core legal name, however short. A candidate signal, never proof alone."""
+    label = translit(registrable(urllib.parse.urlsplit(url).hostname).split(".")[0]).replace("-", "")
+    words = [w for w in re.findall(r"[a-z0-9]+", translit(legal_name)) if w not in LEGAL_FORMS]
+    return len("".join(words)) >= 3 and label == "".join(words)
+
+
 def text_contains_name(text, legal_name):
     """Full core legal name (all tokens, in order) appears in visible text."""
     return matched_name_span(text, legal_name) is not None

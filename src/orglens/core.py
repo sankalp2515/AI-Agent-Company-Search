@@ -805,6 +805,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
         if availability(snap) == "available" and registrable(urllib.parse.urlsplit(snap["source_url"]).hostname) == registrable(final_host) and "html" in snap.get("content_type", "html"):
             parsed, visible = soup_text(snap["text"])
             pages.append((snap, parsed, visible))
+            return pages[-1]
 
     budget = max(1, page_limit - 1)
     initial_contacts = links[:min(2, budget)]
@@ -861,9 +862,35 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None):
     row["availability"]["official_website"] = "available"
     row.setdefault("website_research", {})["verification"] = {"url": home["source_url"], "method": method, "origin": origin}
     remaining_links = ([discovered_page] if discovered_page and discovered_page != home["source_url"] else []) + links[used_contacts:] + extra
-    remaining_links.sort(key=lambda u: 0 if u == discovered_page else 1 if any(t in u.lower() for t in ('news','nyhet','aktuelt','presse','blog')) else 2 if any(t in u.lower() for t in MORE_TERMS) else 3)
-    for target in remaining_links[: max(0, budget - used_contacts)]:
-        fetch(target)
+    remaining_links.sort(key=lambda u: 0 if u == discovered_page else 1 if any(t in u.lower() for t in ('news','nyhet','aktuelt','presse','blog','/articles','/artikler')) else 2 if any(t in u.lower() for t in MORE_TERMS) else 3)
+    # Follow a bounded second hop from an explicit news index. A larger first-hop
+    # crawl otherwise fills its budget with static pages while missing every post.
+    queue = [(u, None) for u in remaining_links]
+    visited = {s['source_url'].rstrip('/') for s, _, _ in pages}
+    article_slots = 2
+    for _ in range(max(0, budget - used_contacts)):
+        while queue and queue[0][0].rstrip('/') in visited:
+            queue.pop(0)
+        if not queue:
+            break
+        target, context = queue.pop(0)
+        visited.add(target.rstrip('/'))
+        fetched = fetch(target)
+        if not fetched:
+            continue
+        if context:
+            fetched[0]['news_context'] = context
+            # attach() has already retained this same observation; preserve the
+            # link provenance without changing its bytes or retrieval timestamp.
+            for stored in row['source_snapshots']:
+                if stored['id'] == fetched[0]['id']:
+                    stored['news_context'] = context
+        if article_slots:
+            additions = news_index_links(fetched[0], fetched[1], home['source_url'])
+            additions = [(u, {'index_url': fetched[0]['source_url'], 'link_label': label})
+                         for u, label in additions if u.rstrip('/') not in visited][:article_slots]
+            article_slots -= len(additions)
+            queue[0:0] = additions
     if feed is not None and robot.can_fetch(UA, urllib.parse.urljoin(home["source_url"], feed["href"])):
         feed_url = urllib.parse.urljoin(home["source_url"], feed["href"])
         if registrable(urllib.parse.urlsplit(feed_url).hostname) == registrable(final_host) and "comments" not in feed_url:
@@ -932,6 +959,90 @@ def news_about_company(body, title, summary=""):
     words = distinctive(name_tokens((body or {}).get("navn", ""))) or name_tokens((body or {}).get("navn", ""))
     text = translit_text(title + " " + summary)
     return bool(words) and all(w in text for w in words)
+
+
+NEWS_INDEX = re.compile(r'/(?:news|nyheter|nytt|aktuelt|blogg?|presse|press|articles?|artikler?)/?$', re.I)
+
+
+def news_index_links(snap, parsed, site_url):
+    """Literal article-card URLs on an explicit news index; never external publishers."""
+    if not NEWS_INDEX.search(urllib.parse.urlsplit(snap['source_url']).path):
+        return []
+    found = {}
+    for link in parsed.find_all('a', href=True):
+        if link.find_parent(['nav', 'header', 'footer', 'aside']):
+            continue
+        label = link.get_text(' ', strip=True)
+        url = urllib.parse.urljoin(snap['source_url'], link['href']).split('#')[0]
+        parts = urllib.parse.urlsplit(url)
+        if (parts.scheme not in {'https', 'http'} or parts.query
+                or parts.hostname != urllib.parse.urlsplit(site_url).hostname
+                or not parts.path.rstrip('/') or NEWS_INDEX.search(parts.path)
+                or STATIC_PAGE.search(parts.path) or re.search(r'\.(?:pdf|png|jpe?g|svg|zip)$', parts.path, re.I)
+                or not 20 <= len(label) <= 300 or len(label.split()) < 3):
+            continue
+        found.setdefault(url, label)
+    return sorted(found.items(), key=lambda pair: 0 if re.search(r'press release|pressemelding', pair[1], re.I) else 1)
+
+
+def literal_dateline(text):
+    """Only a leading dateline, not an event date buried in prose."""
+    months = {w: i for i, words in enumerate([
+        'januar january jan', 'februar february feb', 'mars march mar', 'april apr', 'mai may',
+        'juni june jun', 'juli july jul', 'august aug', 'september sept sep', 'oktober october okt oct',
+        'november nov', 'desember december des dec'], 1) for w in words.split()}
+    raw = re.sub(r'^(?:published|publisert)\s*:?\s*', '', text.strip(), flags=re.I)
+    match = re.fullmatch(r'(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4}|\d{1,2}(?:st|nd|rd|th)?\.?\s+(?:of\s+)?(?:'
+                         + '|'.join(sorted(months, key=len, reverse=True)) + r')\.?\s+\d{4})(?:\s*,\s*[^\d]{1,80})?', raw, re.I)
+    if not match:
+        return None
+    quote = match[1]
+    try:
+        cleaned = re.sub(r'(?<=\d)(?:st|nd|rd|th)\b|\bof\s+', '', quote, flags=re.I).replace('.', '')
+        if re.search(r'[a-z]', cleaned, re.I):
+            day, month, year = cleaned.lower().split()
+            parsed = datetime(int(year), months[month], int(day)).date()
+        else:
+            parsed = datetime.strptime(quote, '%Y-%m-%d' if '-' in quote else '%d.%m.%Y').date()
+    except (ValueError, KeyError):
+        return None
+    iso = news_date(parsed.isoformat())
+    return (iso, quote) if iso else None
+
+
+def extract_linked_article(row, snap, parsed, body, site_url):
+    """A verified-site news-card hop plus literal headline and publication dateline."""
+    from .names import text_contains_name
+    context = snap.get('news_context')
+    if not context or not NEWS_INDEX.search(urllib.parse.urlsplit(context.get('index_url', '')).path):
+        return
+    if urllib.parse.urlsplit(snap['source_url']).hostname != urllib.parse.urlsplit(site_url).hostname:
+        return
+    headings = [h for h in parsed.find_all('h1') if not h.find_parent(['nav', 'header', 'footer', 'aside'])]
+    if len(headings) != 1:
+        return
+    heading = headings[0]
+    title = heading.get_text(' ', strip=True)
+    if not 20 <= len(title) <= 500 or len(title.split()) < 4 or STATIC_PAGE.search(urllib.parse.urlsplit(snap['source_url']).path):
+        return
+    # Require the article itself to name this company near the headline/lead.
+    following = [n for n in heading.find_all_next(['h2', 'h3', 'p', 'time'], limit=10)
+                 if not n.find_parent(['nav', 'header', 'footer', 'aside'])]
+    lead = ' '.join(n.get_text(' ', strip=True) for n in following[:4])
+    if not text_contains_name(title + ' ' + lead, body.get('navn', '')) or not news_about_company(body, title, lead):
+        return
+    for node in following[:4]:
+        text = node.get_text(' ', strip=True)
+        date = literal_dateline(text)
+        if not date:
+            continue
+        iso, quote = date
+        claim(row, 'activity', {'headline': title[:300], 'published_at': iso, 'published_raw': quote,
+              'url': snap['source_url'], 'kind': 'company_owned_linked_article'}, snap,
+              {'news_index_url': context['index_url'], 'link_label': context['link_label'],
+               'headline_quote': title, 'date_quote': quote}, period={'published_at': iso}, identity_method='verified_site_news_link_and_literal_dateline')
+        row['availability']['activity'] = 'available'
+        break
 
 
 def extract_feed(row, snap, body=None, site_url=None):
@@ -1151,6 +1262,8 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 if seen >= 6:
                     break
         extract_dated_news_cards(row,snap,parsed,body,home["source_url"])
+        if snap is not home:
+            extract_linked_article(row, snap, parsed, body, home['source_url'])
     from .names import name_tokens, translit, registrable
     site_label = translit(registrable(urllib.parse.urlsplit(home["source_url"]).hostname).split(".")[0]).replace("-", "")
     brand = next((c["value"] for c in row["claims"] if c["field"] == "public_brand" and isinstance(c["value"], str)), "")
@@ -1214,6 +1327,17 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
             for paragraph in parsed.select(selector):
                 quote = description_quote(paragraph)
                 if quote and quote not in options:options.append(quote)
+            if not options and snap is home:
+                # Older/Squarespace themes often omit semantic main/article tags.
+                # Admit a literal company-introduction paragraph, never arbitrary
+                # navigation, a vendor credit or a news article's opening sentence.
+                from .names import text_contains_name
+                for paragraph in parsed.find_all('p'):
+                    quote = description_quote(paragraph)
+                    if (quote and text_contains_name(quote, body.get('navn', ''))
+                            and re.search(r'\b(?:er|is|tilbyr|leverer|provides|offers|develops|founded)\b', quote, re.I)):
+                        options.append(quote)
+                        break
             if quote_selector and transport:
                 # More sites use nested divs instead of semantic main/paragraph tags.
                 # The model may select an existing source span, never author one.

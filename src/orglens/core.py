@@ -2018,27 +2018,42 @@ def validate(rows, orgs, snapshots=None):
     return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
 
 
-def drop_lost_unused_snapshots(rows, snapshots):
-    """Security software can remove a page from a rejected domain after it was fetched.
+def drop_lost_snapshots(rows, snapshots):
+    """Security software can remove or alter a page from a compromised site after it was fetched.
 
-    A page behind published evidence must stay and fail validation if it changed. A page that backs
-    nothing leaves the envelope with a recorded note, so one junk domain cannot invalidate a whole run."""
+    Facts must not outlive their evidence, and one such site must not invalidate a whole run. A page
+    that cannot be read back leaves the envelope, along with any claim that has no other evidence, and
+    the field says so. Validation stays strict, so later tampering with a finished run still fails."""
     dropped = 0
     for row in rows:
-        cited = {e.get("snapshot_id") for e in row["evidence"]}
-        kept = []
+        lost = []
         for snap in row["source_snapshots"]:
             path = Path(snapshots) / (snap["content_sha256"] + ".bin")
             try:
                 intact = path.exists() and digest(path.read_bytes()) == snap["content_sha256"]
             except OSError:
                 intact = False
-            if intact or snap["id"] in cited:
-                kept.append(snap)
-                continue
-            dropped += 1
-            row["errors"].append({"module": "evidence", "message": f"Retrieved page unavailable after fetch and unused as evidence: {snap.get('source_url')}"})
-        row["source_snapshots"] = kept
+            if not intact:
+                lost.append(snap)
+        if not lost:
+            continue
+        dropped += len(lost)
+        lost_ids = {snap["id"] for snap in lost}
+        row["source_snapshots"] = [snap for snap in row["source_snapshots"] if snap["id"] not in lost_ids]
+        gone = {e["id"] for e in row["evidence"] if e.get("snapshot_id") in lost_ids}
+        row["evidence"] = [e for e in row["evidence"] if e["id"] not in gone]
+        kept = []
+        for item in row["claims"]:
+            item["evidence_ids"] = [e for e in item["evidence_ids"] if e not in gone]
+            if item["evidence_ids"]:
+                kept.append(item)
+            else:
+                family = family_of(item["field"])
+                if not any(other is not item and family_of(other["field"]) == family and set(other["evidence_ids"]) - gone for other in row["claims"]):
+                    row["availability"][family] = "failed"
+        row["claims"] = kept
+        for snap in lost:
+            row["errors"].append({"module": "evidence", "message": f"Retrieved page unavailable after fetch; nothing is published from it: {snap.get('source_url')}"})
     return dropped
 
 
@@ -2295,18 +2310,18 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                                   "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
         transport.limit = requests
         transport.deadline = network_deadline
+    dropped_snapshots = drop_lost_snapshots(rows, output / "snapshots")
     for row in rows:
         finish(row, prior.get(row["organisation_number"]))
         if row.get("agent", {}).get("selected_claim_ids"):
             # Model choices highlight verified claims; the cited narrative stays deterministic.
             row["summary"]["model_selected_claim_ids"] = [c["id"] for c in row["claims"] if c["id"] in set(row["agent"]["selected_claim_ids"])]
         # Count all observations including redirects. Fetch failures have run-level accounting.
-    dropped_snapshots = drop_lost_unused_snapshots(rows, output / "snapshots")
     write_rows(output / "envelopes.jsonl", rows)
     validation = validate(rows, orgs, output / "snapshots")
     durations = sorted(r["operations"]["runtime_ms"] for r in rows)
     report = {"run_id": run_id, "completed_at": now(), "companies": len(orgs), "envelopes": len(rows),
-              "validation": validation, "dropped_unused_snapshots": dropped_snapshots, "requests": transport.requests, "bytes": transport.bytes,
+              "validation": validation, "dropped_snapshots": dropped_snapshots, "requests": transport.requests, "bytes": transport.bytes,
               "runtime_seconds": round(time.monotonic() - started, 3), "third_party_cost_usd": float(discovery.spent) if discovery else 0,
               "limits": {"requests": requests, "seconds": seconds}, "p50_company_ms": durations[len(durations)//2],
               "p95_company_ms": durations[min(len(durations)-1, int(len(durations)*.95))],

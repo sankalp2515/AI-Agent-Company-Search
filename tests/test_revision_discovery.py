@@ -1,7 +1,7 @@
 """Network fallback, legal-statement proof, domain hypotheses and summary wording."""
 from bs4 import BeautifulSoup
 
-from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_unused_snapshots, english_legal_form, explicit_publish_date, parse_sitemap, registered_officers_on_pages, validate, SITEMAP_ARTICLE, SITEMAP_CAREERS
+from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_snapshots, english_legal_form, explicit_publish_date, parse_sitemap, registered_officers_on_pages, validate, SITEMAP_ARTICLE, SITEMAP_CAREERS
 from orglens.core import news_about_company, note_timed_out_candidate
 from orglens.names import domain_spells_name, guess_domains
 
@@ -88,16 +88,24 @@ def batch_with_snapshots(tmp_path):
 def test_lost_unused_page_is_recorded_and_the_run_stays_valid(tmp_path):
     rows, _, unused = batch_with_snapshots(tmp_path)
     (tmp_path / (unused + ".bin")).write_bytes(b"cleaned by antivirus")
-    assert drop_lost_unused_snapshots(rows, tmp_path) == 1
+    assert drop_lost_snapshots(rows, tmp_path) == 1
     assert [s["id"] for s in rows[0]["source_snapshots"]] == ["s1"]
     assert "https://junk.no/" in rows[0]["errors"][0]["message"]
     assert validate(rows, ["123456789"], tmp_path)["passed"]
 
 
-def test_altered_page_behind_a_published_fact_still_fails(tmp_path):
+def test_fact_does_not_outlive_its_lost_evidence(tmp_path):
     rows, cited, _ = batch_with_snapshots(tmp_path)
     (tmp_path / (cited + ".bin")).write_bytes(b"changed")
-    assert drop_lost_unused_snapshots(rows, tmp_path) == 0
+    assert drop_lost_snapshots(rows, tmp_path) == 1
+    assert rows[0]["claims"] == [] and rows[0]["evidence"] == []
+    assert rows[0]["availability"]["legal_identity"] == "failed"
+    assert validate(rows, ["123456789"], tmp_path)["passed"]
+
+
+def test_validator_alone_still_catches_later_tampering(tmp_path):
+    rows, cited, _ = batch_with_snapshots(tmp_path)
+    (tmp_path / (cited + ".bin")).write_bytes(b"changed")
     assert not validate(rows, ["123456789"], tmp_path)["passed"]
 
 

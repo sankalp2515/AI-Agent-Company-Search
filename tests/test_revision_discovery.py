@@ -2,7 +2,7 @@
 from bs4 import BeautifulSoup
 
 from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_snapshots, english_legal_form, explicit_publish_date, parse_sitemap, registered_officers_on_pages, validate, SITEMAP_ARTICLE, SITEMAP_CAREERS
-from orglens.core import news_about_company, note_timed_out_candidate
+from orglens.core import international_office_listing, news_about_company, note_timed_out_candidate
 from orglens.names import domain_spells_name, guess_domains
 
 
@@ -207,3 +207,10 @@ def test_rules_and_plans_are_not_news():
     assert not news_about_company(body, "Vedtekter – Husordensregler")
     assert not news_about_company(body, "Årsplan 2026-2027")
     assert news_about_company(body, "Nytt tak på bygget")
+
+
+def test_foreign_group_office_list_cannot_prove_a_national_subsidiary():
+    assert international_office_listing("https://sportradar.com/about/locations/", "Trondheim office", "https://sportradar.com/")
+    assert international_office_listing("https://group.com/kontakt", "Offices in Sweden, Germany and Japan", "https://group.com/")
+    assert not international_office_listing("https://foss.com/kontakt", "Vi holder til i Oslo", "https://foss.com/")
+    assert not international_office_listing("https://reflexetikett.no/lokasjoner/", "Sweden, Germany, Japan", "https://reflexetikett.no/")

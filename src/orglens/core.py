@@ -767,6 +767,19 @@ def alternate_addresses(url, origin=None):
     return addresses
 
 
+OFFICE_LIST_PATH = re.compile(r"locations?|offices?|kontorer|lokasjoner|avdelinger|where-we-are|find-us|worldwide|global", re.I)
+COUNTRY_NAMES = re.compile(r"\b(?:Sweden|Denmark|Finland|Germany|France|Spain|Italy|Netherlands|Poland|United Kingdom|USA|United States|Canada|Australia|Singapore|India|China|Japan|"
+                           r"Sverige|Danmark|Tyskland|Frankrike|Spania)\b", re.I)
+
+
+def international_office_listing(page_url, text, site_url):
+    """A foreign-domain page listing offices shows a group's reach, not this entity's own website."""
+    host = (urllib.parse.urlsplit(site_url).hostname or "").lower()
+    if host.endswith(".no"):
+        return False
+    return bool(OFFICE_LIST_PATH.search(urllib.parse.urlsplit(page_url).path)) or len({m.lower() for m in COUNTRY_NAMES.findall(text)}) >= 3
+
+
 def note_timed_out_candidate(row, url, origin, errors_before):
     """Remember a candidate lost to a timeout. A slow moment says nothing about the company."""
     if not any("timed out" in str(e.get("message")) for e in row["errors"][errors_before:]):
@@ -1036,6 +1049,11 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
     proof_snap, proof_locator, method = proof
+    if method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
+        proof_text = next((t for snapshot, _, t in pages if snapshot is proof_snap), "")
+        if international_office_listing(proof_snap["source_url"], proof_text, home["source_url"]):
+            site_fail(row, "ambiguous", f"{final_host}: registered details appear only on an international office listing (possible group site)")
+            return False
     weak = method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"} or (
         isinstance(proof_locator, dict) and proof_locator.get("page_role") == "contact_or_about")
     if weak and not domain_matches_name(home["source_url"], legal):

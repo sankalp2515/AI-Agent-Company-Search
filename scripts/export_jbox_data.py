@@ -51,13 +51,27 @@ FLAGS = {"bankrupt": "Bankruptcy", "liquidating": "Liquidation", "in_group": "Pa
 FACT_COLUMNS = ["id", "org_number", "section", "label", "value_text", "value_number", "unit", "period", "link_url",
                 "source_url", "source_name", "source_class", "retrieved_at", "where_in_source", "identity_check", "content_sha256"]
 AVAILABILITY = ["official_website", "owned_profiles", "activity", "description", "jobs", "financials", "leadership", "locations", "contact"]
+LEGAL_FORMS = {"Aksjeselskap": "Limited company", "Eierseksjonssameie": "Condominium association", "Borettslag": "Housing cooperative",
+               "Forening/lag/innretning": "Association", "Stiftelse": "Foundation", "Enkeltpersonforetak": "Sole proprietorship"}
+ROLES = {"Daglig leder": "Managing director", "Styrets leder": "Chair of the board", "Nestleder": "Deputy chair", "Styremedlem": "Board member",
+         "Varamedlem": "Deputy board member", "Regnskapsfører": "Accountant", "Revisor": "Auditor", "Forretningsfører": "Business manager",
+         "Innehaver": "Owner", "Kontaktperson": "Contact person"}
+PLATFORMS = {"linkedin": "LinkedIn", "youtube": "YouTube", "tiktok": "TikTok"}
 
 
 def clean(text):
     """Role holders that are firms reach the summary as a printed list, such as ['BDO AS']."""
     text = re.sub(r"\[((?:'[^']*'(?:, )?)+)\]", lambda match: ", ".join(re.findall(r"'([^']*)'", match[1])), str(text))
-    text = re.sub(r"\bis a (?=[aeiouyæøå])", "is an ", text)
+    for norwegian, english in LEGAL_FORMS.items():
+        text = re.sub(rf"\bis an? {re.escape(norwegian.lower())} in\b", f"is a {english.lower()} ({norwegian.lower()}) in", text)
+    for norwegian, english in ROLES.items():
+        text = text.replace(f"({norwegian})", f"({english})")
+    text = text.replace("SELSKAP accounts", "company accounts").replace("KONSERN accounts", "group accounts")
     return text.replace("plus 1 further roles", "plus 1 further role")
+
+
+def english_form(norwegian):
+    return f"{LEGAL_FORMS[norwegian]} ({norwegian})" if norwegian in LEGAL_FORMS else norwegian
 
 
 def address(value):
@@ -117,8 +131,9 @@ def describe(claim, identity):
             return section, label, "", value, "people", ""
         return section, label, str(value)[:280], None, "", ""
     if field in {"legal_form", "industry"}:
-        label = "Legal form" if field == "legal_form" else "Industry"
-        return "identity", label, value.get("beskrivelse", ""), None, "", ""
+        if field == "legal_form":
+            return "identity", "Legal form", english_form(value.get("beskrivelse", "")), None, "", ""
+        return "identity", "Industry", value.get("beskrivelse", ""), None, "", ""
     if field == "secondary_industries":
         return "identity", "Other industries", "; ".join(item["beskrivelse"] for item in value), None, "", ""
     if field == "business_address":
@@ -130,11 +145,11 @@ def describe(claim, identity):
             return None
         return "identity", f'Contact {value["type"]}', value["value"], None, "", ""
     if field == "leadership":
-        return "people", value["role"], clean(value["name"]), None, "", ""
+        return "people", ROLES.get(value["role"], value["role"]), clean(value["name"]), None, "", ""
     if field == "locations":
         return "workplaces", value["name"], address(value.get("address")), None, "", ""
     if field == "owned_profiles":
-        return "web", value["platform"].capitalize(), value["url"], None, "", value["url"]
+        return "web", PLATFORMS.get(value["platform"], value["platform"].capitalize()), value["url"], None, "", value["url"]
     if field == "activity":
         if value.get("kind") == "official_registry_event":
             return "registry_events", value.get("published_at", ""), value["headline"], None, "", ""
@@ -168,7 +183,7 @@ def company_tables(row, sample, rechecked):
     footprint = row["external_footprint"]
     state = row["availability"]
     company = {
-        "org_number": org, "name": identity["legal_name"], "legal_form": (identity.get("legal_form") or {}).get("beskrivelse", ""),
+        "org_number": org, "name": identity["legal_name"], "legal_form": english_form((identity.get("legal_form") or {}).get("beskrivelse", "")),
         "industry_code": (identity.get("industry") or {}).get("kode", ""), "industry": (identity.get("industry") or {}).get("beskrivelse", ""),
         "municipality": identity.get("municipality", ""), "address": address(identity.get("business_address")),
         "founded_on": identity.get("founded_on", ""), "employees": identity.get("employees", ""),

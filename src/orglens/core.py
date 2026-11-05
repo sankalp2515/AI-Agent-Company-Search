@@ -1761,8 +1761,7 @@ def finish(row, previous=None):
 
 def validate(rows, orgs, snapshots=None):
     errors = []
-    warnings = []
-    snapshot_hashes = {}
+    snapshot_hashes = []
     if [r["organisation_number"] for r in rows] != orgs:
         errors.append("Output membership/order differs from input")
     for row in rows:
@@ -1783,10 +1782,8 @@ def validate(rows, orgs, snapshots=None):
             if not all(e.get(k) for k in ("source_url", "retrieved_at", "content_sha256", "locator")):
                 errors.append("Incomplete evidence")
         if snapshots:
-            cited = {e.get("snapshot_id") for e in ev.values()}
             for s in row["source_snapshots"]:
-                sha = s["content_sha256"]
-                snapshot_hashes[sha] = snapshot_hashes.get(sha, False) or s["id"] in cited
+                snapshot_hashes.append(s["content_sha256"])
     if snapshot_hashes:
         def intact(sha):
             path = Path(snapshots) / (sha + ".bin")
@@ -1796,19 +1793,37 @@ def validate(rows, orgs, snapshots=None):
                 return False
         # Shared evidence is immutable within this check. Rehash it on every
         # validation invocation, with bounded I/O rather than serial file reads.
-        unique = list(snapshot_hashes)
+        unique = list(dict.fromkeys(snapshot_hashes))
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             checked = dict(zip(unique, pool.map(intact, unique)))
-        for sha in unique:
-            if checked[sha]:
-                continue
-            # Evidence behind a published fact must be intact. A page that backs nothing, such as a
-            # rejected guessed domain removed by antivirus, is reported but cannot sink the whole run.
-            if snapshot_hashes[sha]:
+        for sha in snapshot_hashes:
+            if not checked[sha]:
                 errors.append("Snapshot missing or corrupted")
-            else:
-                warnings.append(f"Unused snapshot unavailable: {sha}")
-    return {"passed": not errors, "errors": errors, "warnings": warnings, "envelopes": len(rows)}
+    return {"passed": not errors, "errors": errors, "envelopes": len(rows)}
+
+
+def drop_lost_unused_snapshots(rows, snapshots):
+    """Security software can remove a page from a rejected domain after it was fetched.
+
+    A page behind published evidence must stay and fail validation if it changed. A page that backs
+    nothing leaves the envelope with a recorded note, so one junk domain cannot invalidate a whole run."""
+    dropped = 0
+    for row in rows:
+        cited = {e.get("snapshot_id") for e in row["evidence"]}
+        kept = []
+        for snap in row["source_snapshots"]:
+            path = Path(snapshots) / (snap["content_sha256"] + ".bin")
+            try:
+                intact = path.exists() and digest(path.read_bytes()) == snap["content_sha256"]
+            except OSError:
+                intact = False
+            if intact or snap["id"] in cited:
+                kept.append(snap)
+                continue
+            dropped += 1
+            row["errors"].append({"module": "evidence", "message": f"Retrieved page unavailable after fetch and unused as evidence: {snap.get('source_url')}"})
+        row["source_snapshots"] = kept
+    return dropped
 
 
 def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
@@ -2052,11 +2067,12 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             # Model choices highlight verified claims; the cited narrative stays deterministic.
             row["summary"]["model_selected_claim_ids"] = [c["id"] for c in row["claims"] if c["id"] in set(row["agent"]["selected_claim_ids"])]
         # Count all observations including redirects. Fetch failures have run-level accounting.
+    dropped_snapshots = drop_lost_unused_snapshots(rows, output / "snapshots")
     write_rows(output / "envelopes.jsonl", rows)
     validation = validate(rows, orgs, output / "snapshots")
     durations = sorted(r["operations"]["runtime_ms"] for r in rows)
     report = {"run_id": run_id, "completed_at": now(), "companies": len(orgs), "envelopes": len(rows),
-              "validation": validation, "requests": transport.requests, "bytes": transport.bytes,
+              "validation": validation, "dropped_unused_snapshots": dropped_snapshots, "requests": transport.requests, "bytes": transport.bytes,
               "runtime_seconds": round(time.monotonic() - started, 3), "third_party_cost_usd": float(discovery.spent) if discovery else 0,
               "limits": {"requests": requests, "seconds": seconds}, "p50_company_ms": durations[len(durations)//2],
               "p95_company_ms": durations[min(len(durations)-1, int(len(durations)*.95))],

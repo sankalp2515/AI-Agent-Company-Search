@@ -1,7 +1,7 @@
 """Network fallback, legal-statement proof, domain hypotheses and summary wording."""
 from bs4 import BeautifulSoup
 
-from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, english_legal_form, validate
+from orglens.core import FIELDS, alternate_addresses, declared_domain_legal_statement, digest, drop_lost_unused_snapshots, english_legal_form, validate
 from orglens.names import guess_domains
 
 
@@ -77,22 +77,24 @@ def batch_with_snapshots(tmp_path):
     for raw in (cited, unused):
         (tmp_path / (digest(raw) + ".bin")).write_bytes(raw)
     row = {"organisation_number": "123456789", "run": {"terminal_status": "completed", "completed_at": "2026-11-06T00:00:00Z"},
-           "availability": {field: "not_available" for field in FIELDS},
+           "availability": {field: "not_available" for field in FIELDS}, "errors": [],
            "claims": [{"field": "legal_name", "evidence_ids": ["e1"]}],
            "evidence": [{"id": "e1", "snapshot_id": "s1", "source_url": "https://x.no/", "retrieved_at": "t", "content_sha256": digest(cited), "locator": {"q": 1}}],
-           "source_snapshots": [{"id": "s1", "content_sha256": digest(cited)}, {"id": "s2", "content_sha256": digest(unused)}]}
+           "source_snapshots": [{"id": "s1", "content_sha256": digest(cited)}, {"id": "s2", "source_url": "https://junk.no/", "content_sha256": digest(unused)}]}
     return [row], digest(cited), digest(unused)
 
 
-def test_lost_unused_snapshot_is_a_warning_not_a_failed_run(tmp_path):
+def test_lost_unused_page_is_recorded_and_the_run_stays_valid(tmp_path):
     rows, _, unused = batch_with_snapshots(tmp_path)
-    (tmp_path / (unused + ".bin")).unlink()
-    result = validate(rows, ["123456789"], tmp_path)
-    assert result["passed"] and len(result["warnings"]) == 1
+    (tmp_path / (unused + ".bin")).write_bytes(b"cleaned by antivirus")
+    assert drop_lost_unused_snapshots(rows, tmp_path) == 1
+    assert [s["id"] for s in rows[0]["source_snapshots"]] == ["s1"]
+    assert "https://junk.no/" in rows[0]["errors"][0]["message"]
+    assert validate(rows, ["123456789"], tmp_path)["passed"]
 
 
-def test_altered_snapshot_behind_a_published_fact_still_fails(tmp_path):
+def test_altered_page_behind_a_published_fact_still_fails(tmp_path):
     rows, cited, _ = batch_with_snapshots(tmp_path)
     (tmp_path / (cited + ".bin")).write_bytes(b"changed")
-    result = validate(rows, ["123456789"], tmp_path)
-    assert not result["passed"] and result["errors"] == ["Snapshot missing or corrupted"]
+    assert drop_lost_unused_snapshots(rows, tmp_path) == 0
+    assert not validate(rows, ["123456789"], tmp_path)["passed"]

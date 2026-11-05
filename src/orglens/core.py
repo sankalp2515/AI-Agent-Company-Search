@@ -1397,7 +1397,11 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
     if not guesses:
         return False
     fetched = 0
-    for url in guess_domains(body.get("navn", ""), (body.get("organisasjonsform") or {}).get("kode")):
+    form = (body.get("organisasjonsform") or {}).get("kode")
+    hypotheses = [(u, 'name_guess') for u in guess_domains(body.get('navn', ''), form)]
+    for old in body.get('historiskeNavn', [])[-2:]:
+        hypotheses.extend((u, 'historical_name_guess') for u in guess_domains(old.get('navn', ''), form))
+    for url, guess_origin in hypotheses:
         if time.monotonic() >= getattr(transport,'deadline',float('inf')) or getattr(transport,'requests',0) >= getattr(transport,'limit',float('inf')):
             break
         if fetched >= max_guess_fetches:
@@ -1407,9 +1411,9 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
             continue
         seen.add(key)
         fetched += 1
-        research["candidates"].append({"url": url, "origin": "name_guess"})
+        research["candidates"].append({"url": url, "origin": guess_origin})
         before = dict(row["availability"])
-        if crawl_site(row, body, transport, page_limit, origin="name_guess", url=url):
+        if crawl_site(row, body, transport, page_limit, origin=guess_origin, url=url):
             return True
         # An unverified guess is not evidence about the company; restore prior states.
         for field in SITE_FIELDS:

@@ -59,3 +59,26 @@ def test_navigation_or_footer_cannot_supply_fallback_description():
     row=core.envelope('123456789','t')
     core.extract_site_facts(row,{'navn':'EXAMPLE AS'},[(site('https://example.no/',html),*core.soup_text(html))],'labelled_organisation_number')
     assert not [c for c in row['claims'] if c['field']=='description']
+
+
+def test_historical_name_domain_is_a_candidate_but_current_entity_is_proved(monkeypatch):
+    import orglens.names as names
+    monkeypatch.setattr(names,'guess_domains',lambda legal_name,form=None:['https://oldbrand.no/'] if legal_name=='Oldbrand AS' else [])
+    monkeypatch.setattr(names,'resolves',lambda url:True)
+    t=Sites({'https://parent.no/':'<h1>Parent Group AS</h1><p>Org.nr 987654321</p>',
+             'https://oldbrand.no/':'<h1>Newbrand AS</h1><p>Org.nr 123456789</p>'})
+    row=core.envelope('123456789','t')
+    assert core.research_website(row,{'navn':'Newbrand AS','hjemmeside':'https://parent.no/',
+                                     'historiskeNavn':[{'navn':'Oldbrand AS'}]},t,3,max_guess_fetches=1)
+    assert row['website_research']['verification']['origin']=='historical_name_guess'
+    assert row['website_research']['verification']['method']=='labelled_organisation_number'
+
+
+def test_historical_name_does_not_authorize_a_different_entity(monkeypatch):
+    import orglens.names as names
+    monkeypatch.setattr(names,'guess_domains',lambda legal_name,form=None:['https://oldbrand.no/'])
+    monkeypatch.setattr(names,'resolves',lambda url:True)
+    t=Sites({'https://oldbrand.no/':'<h1>Oldbrand AS</h1><p>Org.nr 987654321</p>'})
+    row=core.envelope('123456789','t')
+    assert not core.research_website(row,{'navn':'Newbrand AS','historiskeNavn':[{'navn':'Oldbrand AS'}]},t,3,max_guess_fetches=1)
+    assert not [c for c in row['claims'] if c['field']=='official_website']

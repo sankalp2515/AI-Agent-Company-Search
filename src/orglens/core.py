@@ -768,16 +768,23 @@ def alternate_addresses(url, origin=None):
 
 
 OFFICE_LIST_PATH = re.compile(r"locations?|offices?|kontorer|lokasjoner|avdelinger|where-we-are|find-us|worldwide|global", re.I)
-COUNTRY_NAMES = re.compile(r"\b(?:Sweden|Denmark|Finland|Germany|France|Spain|Italy|Netherlands|Poland|United Kingdom|USA|United States|Canada|Australia|Singapore|India|China|Japan|"
-                           r"Sverige|Danmark|Tyskland|Frankrike|Spania)\b", re.I)
 
 
-def international_office_listing(page_url, text, site_url):
+def international_office_listing(page_url, site_url):
     """A foreign-domain page listing offices shows a group's reach, not this entity's own website."""
     host = (urllib.parse.urlsplit(site_url).hostname or "").lower()
     if host.endswith(".no"):
         return False
-    return bool(OFFICE_LIST_PATH.search(urllib.parse.urlsplit(page_url).path)) or len({m.lower() for m in COUNTRY_NAMES.findall(text)}) >= 3
+    return bool(OFFICE_LIST_PATH.search(urllib.parse.urlsplit(page_url).path))
+
+
+PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|domain (?:name )?(?:is )?(?:for sale|parked)|buy this domain|this domain (?:is|may be)|"
+                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|default web page", re.I)
+
+
+def parked_page(text):
+    """A short holding page says a domain exists, not that a company publishes anything there."""
+    return len(text) < 2000 and bool(PARKED_PAGE.search(text))
 
 
 def note_timed_out_candidate(row, url, origin, errors_before):
@@ -935,6 +942,9 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             return False
         origin = "redirect"
     soup, text = soup_text(home["text"])
+    if parked_page(text):
+        site_fail(row, "not_available", f"{final_host}: holding page, no company content")
+        return False
     legal_name = body.get('navn','')
     publisher_labels = [n.get_text(' ',strip=True) for n in soup.select('title,h1')]
     publisher_labels += [n.get('content','') for n in soup.select('meta[property="og:site_name"]')]
@@ -1050,8 +1060,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         return False
     proof_snap, proof_locator, method = proof
     if method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
-        proof_text = next((t for snapshot, _, t in pages if snapshot is proof_snap), "")
-        if international_office_listing(proof_snap["source_url"], proof_text, home["source_url"]):
+        if international_office_listing(proof_snap["source_url"], home["source_url"]):
             site_fail(row, "ambiguous", f"{final_host}: registered details appear only on an international office listing (possible group site)")
             return False
     weak = method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"} or (
@@ -1605,6 +1614,8 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
         # Literal company-authored prose is useful when metadata is absent. Restrict
         # this fallback to page main content; navigation/cookie/footer text is not a profile.
         for snap, parsed, visible in pages:
+            if re.search(r"personvern|privacy|cookie|vilkar|terms|gdpr", snap["source_url"], re.I):
+                continue
             if set(labelled_numbers(visible)) - {org}:
                 continue
             options=[]

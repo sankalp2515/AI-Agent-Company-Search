@@ -210,7 +210,14 @@ def test_rules_and_plans_are_not_news():
 
 
 def test_foreign_group_office_list_cannot_prove_a_national_subsidiary():
-    assert international_office_listing("https://sportradar.com/about/locations/", "Trondheim office", "https://sportradar.com/")
-    assert international_office_listing("https://group.com/kontakt", "Offices in Sweden, Germany and Japan", "https://group.com/")
-    assert not international_office_listing("https://foss.com/kontakt", "Vi holder til i Oslo", "https://foss.com/")
-    assert not international_office_listing("https://reflexetikett.no/lokasjoner/", "Sweden, Germany, Japan", "https://reflexetikett.no/")
+    assert international_office_listing("https://sportradar.com/about/locations/", "https://sportradar.com/")
+    assert not international_office_listing("https://wanderingowl.com/kontakt", "https://wanderingowl.com/")
+    assert not international_office_listing("https://reflexetikett.no/lokasjoner/", "https://reflexetikett.no/")
+
+
+def test_holding_pages_are_not_company_sites():
+    from orglens.core import parked_page
+    assert parked_page("energa.no is registered, but the owner currently does not have a website")
+    assert parked_page("Kommer snart")
+    assert not parked_page("Vi er et elektrofirma i Arendal. " * 100 + "Kommer snart: ny avdeling.")
+    assert not parked_page("Vi er et elektrofirma i Arendal med 20 ansatte.")

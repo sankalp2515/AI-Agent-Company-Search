@@ -33,3 +33,7 @@ Tavily basic results are transient URL candidates only. The agent independently 
 - **Social profiles** are outbound links on a verified company website. Profile pages on LinkedIn, Meta and similar platforms are never fetched.
 - **certifi** (MPL-2.0) supplies a pinned CA bundle, so TLS verification behaves the same on every operating system.
 - External API cost of the default command: **$0**. No LLM, search API or paid service is called. The optional `--ai` mode is unchanged and not part of the evaluator command.
+
+## Food Safety Authority inspections
+
+Food safety inspection results come from Mattilsynet's open Smilefjes dataset (`https://smilefjes.mattilsynet.no/api/tilsyn.csv`), licensed CC BY 4.0 per its [data.norge.no record](https://data.norge.no/nb/datasets/288aa74c-e3d3-492e-9ede-e71503b3bfd9/smilefjestilsyn-pa-serveringssteder). Attribution: "Contains data from Mattilsynet (the Norwegian Food Safety Authority)". Each run reads the file live, because the authority withdraws invalidated inspections and asks users to refresh daily. Identity comes only from the exact organisation number or a registered workplace.

@@ -65,8 +65,20 @@ def is_aggregator(url):
     return any(host == d or host.endswith("." + d) for d in AGGREGATORS)
 
 
+def spellings(legal_name):
+    """Tjæralin is written tjaralin or tjaeralin in a domain, and Høvik hovik or hoevik."""
+    lowered = str(legal_name or "").casefold()
+    plain = lowered.replace("æ", "a").replace("ø", "o").replace("å", "a")
+    doubled = lowered.replace("æ", "ae").replace("ø", "oe").replace("å", "aa")
+    return list(dict.fromkeys([legal_name, plain, doubled]))
+
+
 def domain_matches_name(url, legal_name):
-    """True when the domain label carries a distinctive part of the legal name."""
+    """True when the domain label carries a distinctive part of the legal name, in any Norwegian spelling."""
+    return any(_domain_matches_spelling(url, spelling) for spelling in spellings(legal_name))
+
+
+def _domain_matches_spelling(url, legal_name):
     label = translit(registrable(urllib.parse.urlsplit(url).hostname).split(".")[0]).replace("-", "")
     tokens = name_tokens(legal_name)
     joined = "".join(tokens)
@@ -82,7 +94,11 @@ def national_mismatch(url, legal_name):
 
 
 def domain_is_full_name(url, legal_name):
-    """Domain label spells the complete core legal name (hyphens ignored)."""
+    """Domain label spells the complete core legal name (hyphens ignored), in any Norwegian spelling."""
+    return any(_domain_is_full_spelling(url, spelling) for spelling in spellings(legal_name))
+
+
+def _domain_is_full_spelling(url, legal_name):
     domain = registrable(urllib.parse.urlsplit(url).hostname)
     label = translit(domain.split(".")[0]).replace("-", "")
     words = re.findall(r"[a-z0-9]+", translit(legal_name))
@@ -100,6 +116,22 @@ def domain_is_full_name(url, legal_name):
         # on an international parent domain is still rejected above.
         variants.add("".join(w for w in complete if w not in identity_connectors | {"norge", "norway", "norden", "scandinavia", "skandinavia"}))
     return len(joined) >= 5 and label in variants
+
+
+OWNERSHIP_WORDS = {"holding", "holdings", "invest", "investering", "investment", "eiendom", "eiendommer", "eigedom", "property", "capital", "kapital", "verdipapirfondet"}
+
+
+def domain_covers_name(url, legal_name):
+    """The domain carries at least two words of the name, or the whole name. A shared brand word is not enough,
+    and a holding or property company often lists the site of the business it owns."""
+    if OWNERSHIP_WORDS & set(re.findall(r"[a-z]+", translit(legal_name))):
+        return False
+    for spelling in spellings(legal_name):
+        label = translit(registrable(urllib.parse.urlsplit(url).hostname).split(".")[0]).replace("-", "")
+        tokens = name_tokens(spelling)
+        if sum(len(t) >= 2 and t in label for t in tokens) >= min(2, len(tokens)) and any(len(t) >= 4 for t in tokens if t in label):
+            return True
+    return False
 
 
 def domain_spells_name(url, legal_name):

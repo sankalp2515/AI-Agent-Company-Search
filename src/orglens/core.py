@@ -785,6 +785,9 @@ PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|dom
 AD_LANDER = re.compile(r"[?&](?:amp;)?dn=[a-z0-9.-]+\.[a-z]{2,}&(?:amp;)?pid=|has been informing visitors about topics|most relevant links on all topics related to", re.I)
 
 
+BOILERPLATE_DESCRIPTION = re.compile(r"create-react-app|created using|just another wordpress|powered by|default description", re.I)
+
+
 def parked_page(text, html=""):
     """A short holding page or a domain reseller's ad page says a domain exists, not that a company publishes anything there."""
     return (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
@@ -889,7 +892,7 @@ def site_sitemap(row, base, robot, transport, site_host, max_files=4):
 
 def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, _address_fallback=False):
     """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
-    from .names import is_aggregator, registrable, domain_matches_name, text_contains_name, domain_is_full_name, domain_spells_name, NO_GUESS_FORMS, national_mismatch
+    from .names import is_aggregator, registrable, domain_covers_name, domain_matches_name, text_contains_name, domain_is_full_name, domain_spells_name, NO_GUESS_FORMS, national_mismatch
     raw_url = url or body.get("hjemmeside")
     for field in SITE_FIELDS:
         row["availability"].setdefault(field, "not_available")
@@ -1058,6 +1061,11 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
                 proof = registered_officers_on_pages(row, pages)
             if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
                 proof = declared_domain_legal_statement(org, legal, pages)
+    declared = origin == "registry" and not managed
+    if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal):
+        # The company declared this address against its exact organisation number, and the domain carries its name.
+        proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
+                       "name_check": "at least two words of the legal name in the domain"}, "registry_declared_homepage"
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
@@ -1068,12 +1076,13 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             return False
     weak = method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"} or (
         isinstance(proof_locator, dict) and proof_locator.get("page_role") == "contact_or_about")
-    if weak and not domain_matches_name(home["source_url"], legal):
+    # A company's own declaration answers the parent-group question that these two guards ask of an undeclared domain.
+    if weak and not declared and not domain_matches_name(home["source_url"], legal):
         # Weaker proofs on a domain that does not carry the company's name usually mean a parent-group or
         # portfolio site listing this entity: publishing its social accounts, news or jobs would be wrong.
         site_fail(row, "ambiguous", f"{final_host}: identity shown only on a page of a differently named domain (possible parent/group site)")
         return False
-    if weak and not domain_is_full_name(home["source_url"], legal)             and not any(text_contains_name(label, legal) for label in publisher_labels):
+    if weak and not declared and not domain_is_full_name(home["source_url"], legal) and not any(text_contains_name(label, legal) for label in publisher_labels):
         # A shared brand word is not publisher scope: "Fjordbakst Group" listing "Fjordbakst Vest AS"
         # on its contact page is the group's site. The homepage itself must name this company.
         site_fail(row, "ambiguous", f"{final_host}: homepage names a different publisher than {legal} (possible parent/group site)")
@@ -1474,7 +1483,7 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
             description = None
             for selector, attr in (('meta[name="description"]', "content"), ('meta[property="og:description"]', "content")):
                 node = parsed.select_one(selector)
-                if node and len(node.get(attr, "").strip()) >= 20:
+                if node and len(node.get(attr, "").strip()) >= 20 and not BOILERPLATE_DESCRIPTION.search(node.get(attr)):
                     description = (node.get(attr).strip(), selector)
                     break
             if description:
@@ -2334,7 +2343,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                      and (r.get("website_research") or {}).get("timed_out")]
         if strategy == "balanced" and retryable and not replay and time.monotonic() < network_deadline - 120:
             stage_begin, stage_clock = transport.requests, time.monotonic()
-            transport.limit, transport.deadline = requests, network_deadline - 60
+            # Insurance against a network blip, capped because it has recovered little in calm runs.
+            transport.limit, transport.deadline = requests, min(network_deadline - 60, time.monotonic() + 90)
             list(pool.map(lambda r: task(r, "website_retry"), retryable))
             stage_metrics.append({"stage": "website_retry", "requests": transport.requests-stage_begin, "companies": len(retryable),
                                   "recovered": sum(bool(r["website_research"].get("retry_recovered")) for r in retryable),

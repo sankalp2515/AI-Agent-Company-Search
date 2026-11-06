@@ -71,3 +71,23 @@ V4 exited with a validation failure on this machine because antivirus altered a 
 - Using an inspection's trade name to prove a website: it would tie a franchise chain's site to one franchisee.
 
 Local counts, not official scores.
+
+## Third round
+
+The first rule change here came from opening the pages Windows Defender flagged on a remote service. 10 of 11 flagged domains were one domain reseller's ad pages on guessed names, so they are now rejected as holding pages. The eleventh, Vassbakk & Stol, is a real company, and its facts survive when antivirus is not interfering.
+
+### Declared homepages
+
+In the 1,000-company test, 101 companies declare a homepage in the register and 44 had one published. Guards written for guessed domains also blocked declared ones. A declared address now skips the parent-group guards when the page names the company and shows its registered details, or when the domain carries at least two words of its name. Housing associations, whose declared address is usually their manager's site, keep the strict rule, and so do holding and property companies. Accepting one shared brand word was tested and rejected: it published a trout producer's site for a property company.
+
+### Isolated runs
+
+Runs ran in a Docker container with no host folders, no credentials, all capabilities dropped and a non-root user. Fetched pages stayed as inert bytes inside the container. Only `envelopes.jsonl` and `run-report.json` were copied out.
+
+### Sources measured and not adopted
+
+| Source | Result on 1,000 companies | Decision |
+|---|---|---|
+| Peppol Directory | 601 registered, 76 list a website, but only 2 of the 43 unverified were new domains and both were housing managers. The cards largely repeat the register. | Rejected |
+| Sentral godkjenning (construction approvals) | 23 listed, 3 with a website, 1 new domain | Not adopted |
+| TED EU contract awards | 12 companies | Not adopted |

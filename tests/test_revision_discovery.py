@@ -230,3 +230,24 @@ def test_domain_reseller_ad_pages_are_not_company_sites():
     assert parked_page("mercator.no", '<a href="https://example.test/?dn=mercator.no&amp;pid=ABC">x</a>')
     assert not parked_page("Vi er et elektrofirma i Arendal med 20 ansatte.", "<html><a href='/?page=2&pid=7'>neste</a></html>")
     assert not parked_page("Lang artikkel. " * 500, '<a href="https://example.test/?dn=eline.no&pid=ABC">x</a>')
+
+
+def test_declared_homepage_needs_more_than_one_shared_brand_word():
+    from orglens.names import domain_covers_name
+    assert domain_covers_name("https://snohettaregnskap.no/", "SNØHETTA REGNSKAP ALVDAL FOLLDAL AS")
+    assert domain_covers_name("https://www.kingorides.com", "KINGO AS")
+    for url, name in [("https://www.firdasea.no", "FIRDA EIENDOM AS"), ("https://hobbyboat.no/", "HOBBY BOAT EIENDOM AS"),
+                      ("https://www.bring.no", "BRING WAREHOUSING AS"), ("https://www.crownrelo.com", "CROWN WORLDWIDE MOVERS AS"),
+                      ("https://www.lenovo.com/no/no/", "LENOVO TECHNOLOGY B.V. NUF"), ("https://acme.no/", "ACME INVEST AS"),
+                      ("https://www.storebrand.no/", "VERDIPAPIRFONDET STOREBRAND GLOBAL VALUE")]:
+        assert not domain_covers_name(url, name), name
+
+
+def test_norwegian_letters_match_every_domain_spelling():
+    from orglens.names import domain_is_full_name, domain_matches_name
+    assert domain_is_full_name("https://www.tjaralin.no", "TJÆRALIN AS")
+    assert domain_is_full_name("https://tjaeralin.no", "TJÆRALIN AS")
+    assert domain_is_full_name("https://hoevikbygg.no", "HØVIK BYGG AS")
+    assert domain_matches_name("https://www.snohettaregnskap.no", "SNØHETTA REGNSKAP ALVDAL FOLLDAL AS")
+    assert not domain_matches_name("https://www.usbl.no", "KROKEN BORETTSLAG")
+    assert not domain_is_full_name("https://annetfirma.no", "TJÆRALIN AS")

@@ -119,3 +119,5 @@ Local counts, not official scores.
 ### Audit on 1,000 unseen companies
 
 Asking a remote service who runs eight newly added sites found one wrong company: `MARTIN GRAN AS` had been matched to a California arbitrator at `martingran.com`, because the registered head's name repeated the company name and the domain. One other, `dataconsultants.no`, was an expired page. Both patterns are now rejected.
+
+A second pass opened the 12 weakest-proof sites with no description. Ten were genuine. `ivre.no` and `enerviva.no` were a registrar's and a host's default pages, accepted because the declared domain spelled the name. A homepage accepted on its domain alone must now also name the company on the page.

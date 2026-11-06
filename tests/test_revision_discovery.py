@@ -280,3 +280,14 @@ def test_a_company_named_after_its_head_gets_no_proof_from_that_name():
 def test_expired_domain_is_a_holding_page():
     from orglens.core import parked_page
     assert parked_page("www.dataconsultants.no has expired")
+
+
+def test_declared_domain_needs_the_company_named_on_the_page():
+    from orglens.core import page_names_company, parked_page
+    assert page_names_company("HÅNDVERKER1 AS", [(None, None, "")], ["Håndverker 1"])
+    assert page_names_company("SNØHETTA REGNSKAP AS", [(None, None, "Velkommen til Snøhetta")], [])
+    assert not page_names_company("ENERVIVA AS", [(None, None, "Website Builder and domain registration")], ["Hosted by one.com"])
+    assert not page_names_company("IVRE AS", [(None, None, "Prøv igjen senere")], ["Ingen nettside"])
+    assert not page_names_company("IVRE AS", [(None, None, "Arkivrelatert innhold")], [])
+    assert parked_page("Ingen nettside")
+    assert parked_page("Hosted by one.com")

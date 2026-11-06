@@ -787,13 +787,21 @@ def international_office_listing(page_url, site_url):
 
 
 PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|domain (?:name )?(?:is )?(?:for sale|parked)|buy this domain|this domain (?:is|may be)|"
-                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|available soon|has expired|default web page", re.I)
+                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|available soon|has expired|ingen nettside|hosted by one\.com|default web page", re.I)
 
 
 AD_LANDER = re.compile(r"[?&](?:amp;)?dn=[a-z0-9.-]+\.[a-z]{2,}&(?:amp;)?pid=|has been informing visitors about topics|most relevant links on all topics related to", re.I)
 
 
 BOILERPLATE_DESCRIPTION = re.compile(r"create-react-app|created using|just another wordpress|powered by|default description", re.I)
+
+
+def page_names_company(legal_name, pages, labels):
+    """A declared domain with a hosting provider's default page on it has no company content."""
+    from .names import name_tokens
+    flat = translit_text(" ".join([*labels, *(visible for _, _, visible in pages)]))
+    # "Håndverker 1" on the page names HÅNDVERKER1 AS.
+    return any(len(token) >= 3 and re.search(r"(?<![a-z0-9])" + re.sub(r"(?<=[a-z])(?=\d)", " ?", re.escape(token)), flat) for token in name_tokens(legal_name))
 
 
 def parked_page(text, html=""):
@@ -1028,8 +1036,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         # The company's own Enhetsregisteret homepage declaration, with the complete core name on the domain or page.
         # The domain itself must carry the name: a declared parent/group domain (e.g. a brand page on the
         # international parent's site) is not the Norwegian entity's own website.
-        if domain_is_full_name(home["source_url"], legal) or (domain_matches_name(home["source_url"], legal)
-                                                              and any(text_contains_name(t, legal) for _, _, t in pages)):
+        if (domain_is_full_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels)) or (
+                domain_matches_name(home["source_url"], legal) and any(text_contains_name(t, legal) for _, _, t in pages)):
             proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
                            "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
     # Some companies put their legal identifier only in a privacy/legal page.
@@ -1079,7 +1087,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
                 proof = declared_domain_legal_statement(org, legal, pages)
     declared = origin == "registry" and not managed
-    if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal):
+    if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels):
         # The company declared this address against its exact organisation number, and the domain carries its name.
         proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
                        "name_check": "at least two words of the legal name in the domain"}, "registry_declared_homepage"

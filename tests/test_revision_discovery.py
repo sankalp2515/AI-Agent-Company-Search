@@ -251,3 +251,18 @@ def test_norwegian_letters_match_every_domain_spelling():
     assert domain_matches_name("https://www.snohettaregnskap.no", "SNØHETTA REGNSKAP ALVDAL FOLLDAL AS")
     assert not domain_matches_name("https://www.usbl.no", "KROKEN BORETTSLAG")
     assert not domain_is_full_name("https://annetfirma.no", "TJÆRALIN AS")
+
+
+def test_available_soon_is_a_holding_page():
+    from orglens.core import parked_page
+    assert parked_page("Site will be available soon. Thank you for your patience!")
+
+
+def test_only_companies_cut_short_get_the_resume_pass():
+    from orglens.core import website_cut_short
+    base = {"errors": [], "website_research": {"candidates": [{"url": "https://a.no"}]}}
+    assert website_cut_short({**base, "availability": {"official_website": "failed"}, "errors": [{"module": "website", "message": "Website research budget exhausted"}]})
+    assert website_cut_short({"errors": [], "availability": {"official_website": "failed"}})
+    assert not website_cut_short({**base, "availability": {"official_website": "available"}})
+    assert not website_cut_short({**base, "availability": {"official_website": "failed"}})
+    assert not website_cut_short({**base, "availability": {"official_website": "ambiguous"}, "errors": [{"module": "website", "message": "no proof"}]})

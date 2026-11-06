@@ -779,7 +779,7 @@ def international_office_listing(page_url, site_url):
 
 
 PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|domain (?:name )?(?:is )?(?:for sale|parked)|buy this domain|this domain (?:is|may be)|"
-                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|default web page", re.I)
+                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|available soon|default web page", re.I)
 
 
 AD_LANDER = re.compile(r"[?&](?:amp;)?dn=[a-z0-9.-]+\.[a-z]{2,}&(?:amp;)?pid=|has been informing visitors about topics|most relevant links on all topics related to", re.I)
@@ -791,6 +791,15 @@ BOILERPLATE_DESCRIPTION = re.compile(r"create-react-app|created using|just anoth
 def parked_page(text, html=""):
     """A short holding page or a domain reseller's ad page says a domain exists, not that a company publishes anything there."""
     return (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
+
+
+def website_cut_short(row):
+    """The website stage's time share ran out before this company's research could finish."""
+    if row["availability"].get("official_website") == "available":
+        return False
+    errors = [e for e in row["errors"] if e.get("module") == "website"]
+    return any("budget" in e.get("message", "").lower() for e in errors) or (
+        row["availability"].get("official_website") == "failed" and not (row.get("website_research") or {}).get("candidates"))
 
 
 def note_timed_out_candidate(row, url, origin, errors_before):
@@ -2098,7 +2107,7 @@ def drop_lost_snapshots(rows, snapshots):
     return dropped
 
 
-def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
+def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=24, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
     if strategy not in {"baseline", "balanced"}:
         raise ValueError("Unknown research strategy")
     if agent and replay:
@@ -2331,6 +2340,17 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             stage_metrics.append({"stage":"jobs_depth", "companies":len(deeper), "requests":transport.requests-stage_begin,
                                   "seconds":round(time.monotonic()-stage_clock,1), "request_ceiling":transport.limit,
                                   "time_ceiling_seconds":round(max(0,transport.deadline-started),3)})
+        unfinished = [r for r in rows if r["organisation_number"] in bodies and website_cut_short(r)]
+        if strategy == "balanced" and "website" in modules and unfinished and not replay and time.monotonic() < network_deadline - 120:
+            # A slow network must not cost companies their only website pass while run time remains.
+            stage_begin, stage_clock = transport.requests, time.monotonic()
+            transport.limit, transport.deadline = requests, network_deadline - 60
+            for row in unfinished:
+                row["errors"] = [e for e in row["errors"] if not (e.get("module") == "website" and "budget" in e.get("message", "").lower())]
+            list(pool.map(lambda r: task(r, "website"), unfinished))
+            stage_metrics.append({"stage": "website_resume", "requests": transport.requests-stage_begin, "companies": len(unfinished),
+                                  "seconds": round(time.monotonic()-stage_clock, 1), "request_ceiling": transport.limit,
+                                  "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
         hinted = [r for r in rows if r["organisation_number"] in bodies and nav_homepages.get(r["organisation_number"])
                   and r["availability"].get("official_website") != "available"]
         if strategy == "balanced" and hinted and not replay and time.monotonic() < network_deadline - 30:

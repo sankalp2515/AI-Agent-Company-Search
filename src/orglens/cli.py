@@ -26,7 +26,7 @@ def main():
     run.add_argument("--previous", help="Previous envelope JSONL; retain its snapshot directory")
     run.add_argument("--max-requests", type=int, default=1800)
     run.add_argument("--max-seconds", type=int, default=2400)
-    run.add_argument("--workers", type=int, default=12)
+    run.add_argument("--workers", type=int, default=24)
     run.add_argument("--pages", type=int, default=5)
     run.add_argument("--strategy", choices=("baseline", "balanced"), default="baseline", help="Experimental bounded external-first allocation; baseline preserves original phase order")
     run.add_argument("--modules", default="financials,leadership,locations,jobs,website")

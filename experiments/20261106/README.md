@@ -96,4 +96,22 @@ Runs ran in a Docker container with no host folders, no credentials, all capabil
 
 Three later 1,000-company runs published 71, 63 and 73 sites. These measure this machine's connection, not the code: afterwards 22 of 60 sites verified earlier the same day refused connections from both the host and a container, across about 20 unrelated server addresses, while a remote fetch of one such site succeeded. A rise to 24 workers was tested only during that fault, showed no gain and was reverted.
 
-The same 60 sites all responded after a quiet period, and 22 timed out again straight after the third run, so heavy crawling from this connection may itself trigger the fault. The cause is not established. The last clean full run is commit `453c474`, with 118 sites. The declared-homepage rule has only been measured on targeted runs, not a clean full run.
+The same 60 sites all responded after a quiet period, and 22 timed out again straight after the third run. The overnight run below crawled just as heavily with all 60 responding before and after, so the fault is not explained by crawling alone. Its cause is not established.
+
+### Clean overnight run
+
+Commit `12787c5`, 1,000 companies, one isolated container, 02:00 IST on 7 November. All 60 test sites responded before and after. V4 and the earlier commit come from separate runs on the same input.
+
+| Companies with | V4 | `453c474` | `12787c5` |
+|---|---:|---:|---:|
+| Verified website | 104 | 118 | 128 |
+| Description | 81 | 88 | 98 |
+| Social links | 67 | 74 | 81 |
+| Dated news or official activity | 22 | 42 | 45 |
+| Active jobs | 6 | 6 | 7 |
+| Careers page | 17 | 16 | 21 |
+| Any external fact | 108 | 132 | 142 |
+
+The final run was valid with 0 pages dropped, using 11,294 of 20,000 requests and 1,919 of 2,700 seconds. It lost no site against `453c474` and gained 10. Eight follow from the declared-homepage rule, and two were sites that failed on the network in the earlier run.
+
+Local counts, not official scores.

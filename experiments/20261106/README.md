@@ -91,3 +91,7 @@ Runs ran in a Docker container with no host folders, no credentials, all capabil
 | Peppol Directory | 601 registered, 76 list a website, but only 2 of the 43 unverified were new domains and both were housing managers. The cards largely repeat the register. | Rejected |
 | Sentral godkjenning (construction approvals) | 23 listed, 3 with a website, 1 new domain | Not adopted |
 | TED EU contract awards | 12 companies | Not adopted |
+
+### Results that are not comparable
+
+Two later 1,000-company runs published 71 and 63 sites. These measure this machine's connection, not the code: afterwards 22 of 60 sites verified earlier the same day refused connections from both the host and a container, across about 20 unrelated server addresses, while a remote fetch of one such site succeeded. A rise to 24 workers was tested only during that fault, showed no gain and was reverted.

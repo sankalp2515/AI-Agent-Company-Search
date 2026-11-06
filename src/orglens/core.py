@@ -2107,7 +2107,7 @@ def drop_lost_snapshots(rows, snapshots):
     return dropped
 
 
-def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=24, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
+def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, previous=None, pages=4, modules=("financials", "leadership", "locations", "jobs", "website"), registry=None, registry_retrieved_at=None, replay=None, discovery=None, agent=None, jobs_source=None, guesses=True, strategy="baseline", quote_selector=None):
     if strategy not in {"baseline", "balanced"}:
         raise ValueError("Unknown research strategy")
     if agent and replay:

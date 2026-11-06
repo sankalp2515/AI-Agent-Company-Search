@@ -94,4 +94,6 @@ Runs ran in a Docker container with no host folders, no credentials, all capabil
 
 ### Results that are not comparable
 
-Two later 1,000-company runs published 71 and 63 sites. These measure this machine's connection, not the code: afterwards 22 of 60 sites verified earlier the same day refused connections from both the host and a container, across about 20 unrelated server addresses, while a remote fetch of one such site succeeded. A rise to 24 workers was tested only during that fault, showed no gain and was reverted.
+Three later 1,000-company runs published 71, 63 and 73 sites. These measure this machine's connection, not the code: afterwards 22 of 60 sites verified earlier the same day refused connections from both the host and a container, across about 20 unrelated server addresses, while a remote fetch of one such site succeeded. A rise to 24 workers was tested only during that fault, showed no gain and was reverted.
+
+The same 60 sites all responded after a quiet period, and 22 timed out again straight after the third run, so heavy crawling from this connection may itself trigger the fault. The cause is not established. The last clean full run is commit `453c474`, with 118 sites. The declared-homepage rule has only been measured on targeted runs, not a clean full run.

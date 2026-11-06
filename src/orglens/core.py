@@ -782,9 +782,12 @@ PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|dom
                          r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|default web page", re.I)
 
 
-def parked_page(text):
-    """A short holding page says a domain exists, not that a company publishes anything there."""
-    return len(text) < 2000 and bool(PARKED_PAGE.search(text))
+AD_LANDER = re.compile(r"[?&](?:amp;)?dn=[a-z0-9.-]+\.[a-z]{2,}&(?:amp;)?pid=|has been informing visitors about topics|most relevant links on all topics related to", re.I)
+
+
+def parked_page(text, html=""):
+    """A short holding page or a domain reseller's ad page says a domain exists, not that a company publishes anything there."""
+    return (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
 
 
 def note_timed_out_candidate(row, url, origin, errors_before):
@@ -942,7 +945,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             return False
         origin = "redirect"
     soup, text = soup_text(home["text"])
-    if parked_page(text):
+    if parked_page(text, home["text"]):
         site_fail(row, "not_available", f"{final_host}: holding page, no company content")
         return False
     legal_name = body.get('navn','')
@@ -2348,6 +2351,22 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         # Count all observations including redirects. Fetch failures have run-level accounting.
     write_rows(output / "envelopes.jsonl", rows)
     validation = validate(rows, orgs, output / "snapshots")
+    # Security software scans asynchronously, so a page can vanish after the first pass above.
+    for _ in range(3):
+        if validation["passed"]:
+            break
+        held = {row["organisation_number"]: len(row["source_snapshots"]) for row in rows}
+        lost_late = drop_lost_snapshots(rows, output / "snapshots")
+        if not lost_late:
+            break
+        dropped_snapshots += lost_late
+        for row in rows:
+            if len(row["source_snapshots"]) != held[row["organisation_number"]]:
+                row["changes"] = []
+                finish(row, prior.get(row["organisation_number"]))
+                row["errors"] = list({(e.get("module"), e.get("message")): e for e in row["errors"]}.values())
+        write_rows(output / "envelopes.jsonl", rows)
+        validation = validate(rows, orgs, output / "snapshots")
     durations = sorted(r["operations"]["runtime_ms"] for r in rows)
     report = {"run_id": run_id, "completed_at": now(), "companies": len(orgs), "envelopes": len(rows),
               "validation": validation, "dropped_snapshots": dropped_snapshots, "requests": transport.requests, "bytes": transport.bytes,

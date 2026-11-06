@@ -11,7 +11,7 @@ Prepared 4 November 2026. It builds on version 3 (`e5d5a01`, Builderr's audit of
 | One command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700` |
 | Frozen registry | Append `--bulk <registry file>`. `--registry` is the same option. `--registry-retrieved-at <timestamp>` is optional; without it, the file's own time is recorded and labelled as such. |
 | Models / search | None. The command is keyless. Optional `--discover` / `--extract-ai` modes exist but are not used. |
-| APIs | Brønnøysundregistrene (Enhetsregisteret entities, roles, subunits; Regnskapsregisteret accounts), NAV Job Vacancy Feed (published public token), and verified company websites under robots.txt |
+| APIs | Brønnøysundregistrene (Enhetsregisteret entities, roles, subunits; Regnskapsregisteret accounts), NAV Job Vacancy Feed (published public token), Mattilsynet Smilefjes inspections (CC BY 4.0), and verified company websites under robots.txt |
 | Licences | MIT application; beautifulsoup4/soupsieve MIT; certifi MPL-2.0; data-source terms in [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) |
 | Cost | $0 external API cost |
 | Contact | Sankalp Wanjari — wanjarisankalp@gmail.com |

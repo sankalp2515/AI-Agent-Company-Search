@@ -221,3 +221,12 @@ def test_holding_pages_are_not_company_sites():
     assert parked_page("Kommer snart")
     assert not parked_page("Vi er et elektrofirma i Arendal. " * 100 + "Kommer snart: ny avdeling.")
     assert not parked_page("Vi er et elektrofirma i Arendal med 20 ansatte.")
+
+
+def test_domain_reseller_ad_pages_are_not_company_sites():
+    from orglens.core import parked_page
+    lander = '<meta name="description" content="eline.no has been informing visitors about topics such as CRM."><a href="https://example.test/?dn=eline.no&pid=ABC">x</a>'
+    assert parked_page("eline.no Kontakt oss", lander)
+    assert parked_page("mercator.no", '<a href="https://example.test/?dn=mercator.no&amp;pid=ABC">x</a>')
+    assert not parked_page("Vi er et elektrofirma i Arendal med 20 ansatte.", "<html><a href='/?page=2&pid=7'>neste</a></html>")
+    assert not parked_page("Lang artikkel. " * 500, '<a href="https://example.test/?dn=eline.no&pid=ABC">x</a>')

@@ -29,7 +29,7 @@ Evidence-first research agent for Norwegian companies. Give it a batch of organi
 
 Every claim carries a source URL, retrieval time, SHA-256 of the exact response bytes, an evidence locator and an identity method. Unknowns are explicit states (`available`, `not_available`, `blocked`, `not_applicable`, `ambiguous`, `failed`) and are never turned into zero.
 
-The recommended hybrid command requires organizer-approved search/model credentials. A separate keyless fallback has **$0 external API cost**; see [both commands and the cost declaration](SUBMISSION.md).
+The evaluator command needs no credentials and has **$0 external API cost**. See the [cost declaration](SUBMISSION.md).
 
 ## Install (clean machine)
 
@@ -43,12 +43,12 @@ uv sync --frozen
 ## One evaluator command
 
 ```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --max-requests 20000 --max-seconds 1800 --discover --max-search-queries 1200 --extract-ai --providers groq --max-model-calls 400
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700 --no-discover
 ```
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
-- Credentials: organizer-approved `GROQ_API_KEY` plus SerpAPI and/or Tavily search credentials. Keep keys in the evaluator's secret environment. [SUBMISSION.md](SUBMISSION.md) declares provider costs and the keyless fallback.
-- Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are local release-test settings, **not confirmed official limits**. Builderr supplies the official budget. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
+- Credentials: none. This command makes no paid API calls. [SUBMISSION.md](SUBMISSION.md) declares costs and the optional hybrid command for organizer-approved credentials.
+- Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are Builderr's published budget of 20 requests per company and 45 minutes. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
 - Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
 

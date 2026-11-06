@@ -115,3 +115,7 @@ Commit `12787c5`, 1,000 companies, one isolated container, 02:00 IST on 7 Novemb
 The final run was valid with 0 pages dropped, using 11,294 of 20,000 requests and 1,919 of 2,700 seconds. It lost no site against `453c474` and gained 10. Eight follow from the declared-homepage rule, and two were sites that failed on the network in the earlier run.
 
 Local counts, not official scores.
+
+### Audit on 1,000 unseen companies
+
+Asking a remote service who runs eight newly added sites found one wrong company: `MARTIN GRAN AS` had been matched to a California arbitrator at `martingran.com`, because the registered head's name repeated the company name and the domain. One other, `dataconsultants.no`, was an expired page. Both patterns are now rejected.

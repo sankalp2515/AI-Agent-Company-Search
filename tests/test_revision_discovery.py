@@ -266,3 +266,17 @@ def test_only_companies_cut_short_get_the_resume_pass():
     assert not website_cut_short({**base, "availability": {"official_website": "available"}})
     assert not website_cut_short({**base, "availability": {"official_website": "failed"}})
     assert not website_cut_short({**base, "availability": {"official_website": "ambiguous"}, "errors": [{"module": "website", "message": "no proof"}]})
+
+
+def test_a_company_named_after_its_head_gets_no_proof_from_that_name():
+    from orglens.core import named_after_person
+    assert named_after_person("MARTIN GRAN AS", "Martin Gran")
+    assert named_after_person("ØYVIND RUUD AS", "Øyvind Ruud Ruud")
+    assert not named_after_person("TANNLEGE LILLY DAHLSTRÖM AS", "Lilly Dahlström")
+    assert not named_after_person("RUUD TREVARE AS", "Øyvind Ruud Ruud")
+    assert not named_after_person("NUMBERS AS", "Ingve Sørheim")
+
+
+def test_expired_domain_is_a_holding_page():
+    from orglens.core import parked_page
+    assert parked_page("www.dataconsultants.no has expired")

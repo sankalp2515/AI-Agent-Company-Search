@@ -665,6 +665,14 @@ def registered_officers_on_pages(row, pages):
     return None
 
 
+def named_after_person(legal_name, person):
+    """MARTIN GRAN AS with a head called Martin Gran: the name on the page repeats the domain, so it proves nothing.
+    Anyone with that name would pass, such as an arbitrator in California at martingran.com."""
+    from .names import name_tokens
+    company = set(name_tokens(legal_name))
+    return bool(company) and company <= set(name_tokens(person))
+
+
 def corroborated(body, pages, row=None, domain_named=False):
     from .names import matched_name_span, text_contains_name
     legal = body.get("navn", "")
@@ -679,7 +687,7 @@ def corroborated(body, pages, row=None, domain_named=False):
     if row is not None and domain_named is True:
         # domain_named=True only when the domain spells the complete legal name (see crawl_site).
         found = operating_leader_on_pages(row, pages, legal)
-        if found:
+        if found and not named_after_person(legal, found[1].get("text_quote", "")):
             return found[0], found[1], "full_name_domain_and_registered_operating_head"
     # A shared director, partial-name domain or registry URL alone is a candidate, not proof.
     legal_flat = translit_text(legal)
@@ -779,7 +787,7 @@ def international_office_listing(page_url, site_url):
 
 
 PARKED_PAGE = re.compile(r"is registered,? but|owner currently does not have|domain (?:name )?(?:is )?(?:for sale|parked)|buy this domain|this domain (?:is|may be)|"
-                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|available soon|default web page", re.I)
+                         r"domenet (?:er )?(?:registrert|parkert|til salgs)|account (?:has been )?suspended|under construction|kommer snart|coming soon|available soon|has expired|default web page", re.I)
 
 
 AD_LANDER = re.compile(r"[?&](?:amp;)?dn=[a-z0-9.-]+\.[a-z]{2,}&(?:amp;)?pid=|has been informing visitors about topics|most relevant links on all topics related to", re.I)

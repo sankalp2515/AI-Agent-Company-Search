@@ -51,12 +51,26 @@ def test_external_footprint_names_families_plainly_and_excludes_registry_events(
     claim(row, "official_website", "https://acme.no/", snapshot("{}"), {"text_quote": "Org.nr 123456789"}, identity_method="labelled_organisation_number")
     claim(row, "owned_profiles", {"platform": "facebook", "url": "https://facebook.com/acme"}, snapshot("{}"), {"link_href": "x"})
     claim(row, "activity", {"headline": "Registered for VAT", "published_at": "2020-01-01", "kind": "official_registry_event"}, snapshot("{}"), {"json_pointer": "/x"})
+    claim(row, "activity", {"headline": "Food safety inspection", "published_at": "2026-09-01", "kind": "official_food_inspection"}, snapshot("{}"), {"csv_value": "5"})
     claim(row, "activity", {"headline": "Vi åpner ny butikk i Bergen", "published_at": "2026-09-01", "kind": "company_owned_feed_item", "url": "https://acme.no/nyheter/1"}, snapshot("{}"), {"feed_item": 0})
     footprint = external_footprint(row)
     assert footprint["website"]["url"] == "https://acme.no/"
     assert footprint["social_links"][0]["platform"] == "facebook"
     assert [n["headline"] for n in footprint["news"]] == ["Vi åpner ny butikk i Bergen"]
     assert footprint["news"][0]["evidence_ids"]
+    assert [item["headline"] for item in footprint["public_inspections"]] == ["Food safety inspection"]
+
+
+def test_radio_publisher_in_article_template_does_not_make_it_the_subject():
+    from orglens.core import news_about_company
+    company = {"navn": "RADIO GRENLAND AS", "naeringskode1": {"kode": "60.100"}}
+    assert not news_about_company(company, "Borgestad kirke lyses opp | Radio Grenland", "Saken ble sendt på Radio Grenland")
+    assert news_about_company(company, "Radio Grenland lanserer ny lokal kanal")
+
+
+def test_directory_index_is_not_a_company_website():
+    from orglens.core import parked_page
+    assert parked_page("Index of / Index of / Name Last Modified Size Proudly Served by LiteSpeed")
 
 
 def test_registry_file_without_timestamp_is_accepted_and_labelled(tmp_path):

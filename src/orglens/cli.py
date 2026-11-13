@@ -32,7 +32,7 @@ def main():
     run.add_argument("--workers", type=int, default=12)
     run.add_argument("--pages", type=int, default=5)
     run.add_argument("--strategy", choices=("baseline", "balanced"), default="baseline", help="Experimental bounded external-first allocation; baseline preserves original phase order")
-    run.add_argument("--modules", default="financials,leadership,locations,jobs,website")
+    run.add_argument("--modules", default="financials,leadership,locations,jobs,website,awards")
     run.add_argument("--nav-days", type=int, default=186, help="NAV change-feed bootstrap horizon (186 days covers six calendar months)")
     run.add_argument("--no-guess", action="store_true", help="Disable keyless name-derived website candidates")
     run.add_argument("--registry", "--bulk", dest="registry", help="Evaluator frozen BRREG registry file (original-object JSONL or semicolon CSV); --bulk is an alias")
@@ -104,7 +104,7 @@ def main():
                 parser.error("--requests-per-company must be positive")
             args.max_requests = args.requests_per_company * len(read_inputs(args.input))
         modules = tuple(m for m in args.modules.split(",") if m)
-        if set(modules) - {"financials", "leadership", "locations", "jobs", "website"}:
+        if set(modules) - {"financials", "leadership", "locations", "jobs", "website", "awards"}:
             parser.error("Unknown module")
         previous = [json.loads(line) for line in Path(args.previous).read_text(encoding="utf-8").splitlines() if line.strip()] if args.previous else None
         discovery = None

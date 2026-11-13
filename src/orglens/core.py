@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import ipaddress
 import json
+import math
 import re
 import socket
 import ssl
@@ -28,7 +29,7 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 STATES = {"available", "not_available", "blocked", "not_applicable", "ambiguous", "failed"}
 ENTITY = "https://data.brreg.no/enhetsregisteret/api/enheter/"
-FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles", "contact")
+FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles", "contact", "public_awards")
 SITE_FIELDS = ("official_website", "description", "activity", "owned_profiles", "contact")
 ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organi[sz]ation(?:al)?\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
 UA = "OrgLens/0.1 (Norwegian company research; public sources only)"
@@ -39,7 +40,7 @@ MAX_READ_SECONDS = 25
 # Named official bulk files only. Everything else keeps the general limit.
 LARGE_RESPONSE_LIMITS = {FOOD_INSPECTIONS_URL: FOOD_INSPECTIONS_MAX_BYTES}
 TLS = ssl.create_default_context(cafile=certifi.where())  # pinned CA bundle, identical on every OS
-FAST_HOSTS = {"data.brreg.no", "pam-stilling-feed.nav.no"}
+FAST_HOSTS = {"data.brreg.no", "pam-stilling-feed.nav.no", "stottetiltak-registerinfo-api.app.brreg.no"}
 
 
 def now():
@@ -48,6 +49,10 @@ def now():
 
 def digest(value):
     return hashlib.sha256(value if isinstance(value, bytes) else json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+
+def json_request_bytes(payload):
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
 
 
 def write_json(path, value):
@@ -158,11 +163,17 @@ class Transport:
                     self.site_cache[url] = dict(snapshot)
             return snapshot
 
-    def _get(self, url, source_class="official_registry", headers=None):
+    def post(self, url, payload, source_class="official_public_api"):
+        return self._get(url, source_class, {"Content-Type": "application/json", "Accept": "application/json"},
+                         data=json_request_bytes(payload), method="POST")
+
+    def _get(self, url, source_class="official_registry", headers=None, *, data=None, method="GET"):
         started = time.monotonic()
         requested = url
         origin_host = urllib.parse.urlsplit(url).hostname
         chain = []
+        request_identity = {"request_method": method, "request_body_sha256": digest(data),
+                            "request_body": data.decode("utf-8")} if data is not None else {}
         try:
             for _ in range(6):
                 if self.requests >= self.limit or time.monotonic() >= self.deadline:
@@ -177,7 +188,7 @@ class Transport:
                 opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=TLS))
                 extra = headers if headers and urllib.parse.urlsplit(url).hostname == origin_host else {}
                 # Credentials never follow a redirect to another host.
-                req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json,text/html,text/plain;q=0.8", **extra})
+                req = urllib.request.Request(url, data=data, method=method, headers={"User-Agent": UA, "Accept": "application/json,text/html,text/plain;q=0.8", **extra})
                 try:
                     response = opener.open(req, timeout=min(self.timeout, max(0.1, self.deadline - time.monotonic())))
                 except urllib.error.HTTPError as exc:
@@ -185,6 +196,8 @@ class Transport:
                 with response:
                     status = response.code
                     if status in {301, 302, 303, 307, 308}:
+                        if method != "GET":
+                            raise ValueError("Redirect refused for a JSON POST; request body never follows redirects")
                         chain.append({"url": url, "status": status})
                         url = urllib.parse.urljoin(url, response.headers["Location"])
                         continue
@@ -210,7 +223,7 @@ class Transport:
                     dest.write_bytes(raw)
                 with self.lock:
                     self.bytes += len(raw)
-                return {"id": digest({"url": url, "hash": sha})[:24], "requested_url": requested,
+                return {"id": digest({"url": url, "hash": sha, **request_identity})[:24], "requested_url": requested, **request_identity,
                         "source_url": url, "redirect_chain": chain, "status": status,
                         "retrieved_at": now(), "content_sha256": sha, "snapshot_path": f"snapshots/{sha}.bin",
                         "source_class": source_class, "content_type": content_type, "charset": charset,
@@ -218,7 +231,7 @@ class Transport:
                         "text": raw.decode(charset, errors="replace"), "elapsed_ms": int((time.monotonic() - started) * 1000)}
             raise ValueError("Redirect limit exceeded")
         except (BudgetExceeded, ValueError, OSError, urllib.error.URLError) as exc:
-            return {"source_url": requested, "retrieved_at": now(), "status": 0,
+            return {"source_url": requested, **request_identity, "retrieved_at": now(), "status": 0,
                     "availability": "blocked" if isinstance(exc, ValueError) else "failed",
                     "error": str(exc), "budget_exhausted": isinstance(exc, BudgetExceeded)}
 
@@ -396,7 +409,9 @@ def official(row, transport, module):
         paths = {"revenue": ["resultatregnskapResultat", "driftsresultat", "driftsinntekter", "sumDriftsinntekter"],
                  "operating_result": ["resultatregnskapResultat", "driftsresultat", "driftsresultat"],
                  "annual_result": ["resultatregnskapResultat", "aarsresultat"], "assets": ["eiendeler", "sumEiendeler"],
-                 "equity": ["egenkapitalGjeld", "egenkapital", "sumEgenkapital"]}
+                 "equity": ["egenkapitalGjeld", "egenkapital", "sumEgenkapital"],
+                 "debt": ["egenkapitalGjeld", "gjeldOversikt", "sumGjeld"],
+                 "profit_before_tax": ["resultatregnskapResultat", "ordinaertResultatFoerSkattekostnad"]}
         for i, record in enumerate(body):
             reported_org = str((record.get("virksomhet") or {}).get("organisasjonsnummer", ""))
             if reported_org != org:
@@ -405,11 +420,17 @@ def official(row, transport, module):
                 continue
             # Group and company accounts are kept distinct with original type, currency and period.
             period = record.get("regnskapsperiode")
-            if not period:
+            if not isinstance(period, dict) or not all(isinstance(period.get(key), str) for key in ("fraDato", "tilDato")):
+                continue
+            try:
+                start, end = (datetime.strptime(period[key], "%Y-%m-%d").date() for key in ("fraDato", "tilDato"))
+            except ValueError:
+                continue
+            if start > end:
                 continue
             for field, path in paths.items():
                 value = nested(record, path)
-                if isinstance(value, (int, float)) and not isinstance(value, bool):
+                if type(value) in (int, float) and (not isinstance(value, float) or math.isfinite(value)):
                     claim(row, "financials." + field, {"amount": value, "currency": record.get("valuta"),
                           "account_type": record.get("regnskapstype")}, snap,
                           {"json_pointer": f"/{i}/" + "/".join(path)}, period)
@@ -696,7 +717,10 @@ def corroborated(body, pages, row=None, domain_named=False):
     if row is not None and domain_named is True:
         # domain_named=True only when the domain spells the complete legal name (see crawl_site).
         found = operating_leader_on_pages(row, pages, legal)
-        if found and not named_after_person(legal, found[1].get("text_quote", "")):
+        from .names import name_tokens
+        company_words = set(name_tokens(legal))
+        quote = found[1].get("text_quote", "") if found else ""
+        if found and not named_after_person(legal, quote) and company_words and not company_words <= set(name_tokens(quote)):
             return found[0], found[1], "full_name_domain_and_registered_operating_head"
     # A shared director, partial-name domain or registry URL alone is a candidate, not proof.
     legal_flat = translit_text(legal)
@@ -815,7 +839,8 @@ def page_names_company(legal_name, pages, labels):
 
 def parked_page(text, html=""):
     """A short holding page or a domain reseller's ad page says a domain exists, not that a company publishes anything there."""
-    return (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
+    directory_index = bool(re.match(r"\s*Index of\s*/", text, re.I)) and bool(re.search(r"Name\s+Last Modified\s+Size", text, re.I))
+    return directory_index or (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
 
 
 def website_cut_short(row):
@@ -908,6 +933,8 @@ def site_sitemap(row, base, robot, transport, site_host, max_files=4):
         target = queue.pop(0)
         if target in seen or target.endswith(".gz") or registrable(urllib.parse.urlsplit(target).hostname) != registrable(site_host):
             continue
+        if robot and not robot.can_fetch(UA, target):
+            continue
         seen.add(target)
         fetched += 1
         snap = transport.get(target, "company_owned")
@@ -931,6 +958,7 @@ DECLARED_BY = {"registry": "Enhetsregisteret hjemmeside", "registry_branch": "En
 def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, _address_fallback=False):
     """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
     from .names import is_aggregator, registrable, domain_covers_name, domain_matches_name, text_contains_name, domain_is_full_name, domain_spells_name, NO_GUESS_FORMS, national_mismatch
+    legal_suffix_guess = origin == "legal_suffix_guess"
     raw_url = url or body.get("hjemmeside")
     for field in SITE_FIELDS:
         row["availability"].setdefault(field, "not_available")
@@ -992,6 +1020,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
     legal_name = body.get('navn','')
     publisher_labels = [n.get_text(' ',strip=True) for n in soup.select('title,h1')]
     publisher_labels += [n.get('content','') for n in soup.select('meta[property="og:site_name"]')]
+    publisher_named = any(text_contains_name(label, legal_name) for label in publisher_labels)
     if (origin in REGISTRY_DECLARED and page_limit >= 3 and not domain_is_full_name(home['source_url'],legal_name)
             and not any(text_contains_name(label,legal_name) for label in publisher_labels)):
         # A registered URL can become a group portal. Follow an explicitly linked
@@ -1049,8 +1078,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         # The company's own Enhetsregisteret homepage declaration, with the complete core name on the domain or page.
         # The domain itself must carry the name: a declared parent/group domain (e.g. a brand page on the
         # international parent's site) is not the Norwegian entity's own website.
-        if (domain_is_full_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels)) or (
-                domain_matches_name(home["source_url"], legal) and any(text_contains_name(t, legal) for _, _, t in pages)):
+        if domain_matches_name(home["source_url"], legal) and (publisher_named or (
+                domain_is_full_name(home["source_url"], legal) and text_contains_name(text, legal))):
             proof = home, {"declared_by": DECLARED_BY[origin], "declared_value": raw_url,
                            "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
     # Some companies put their legal identifier only in a privacy/legal page.
@@ -1100,7 +1129,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             if not proof and not conflict and not managed and origin in {*REGISTRY_DECLARED, "registry_email"}:
                 proof = declared_domain_legal_statement(org, legal, pages)
     declared = origin in REGISTRY_DECLARED and not managed
-    if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels):
+    if not proof and not conflict and declared and publisher_named and domain_covers_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels):
         # The company declared this address against its exact organisation number, and the domain carries its name.
         proof = home, {"declared_by": DECLARED_BY[origin], "declared_value": raw_url,
                        "name_check": "at least two words of the legal name in the domain"}, "registry_declared_homepage"
@@ -1108,6 +1137,29 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
     proof_snap, proof_locator, method = proof
+    if method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
+        # A shared site can have an exact subsidiary contact page while its
+        # title and company-wide profiles still belong to a different entity.
+        proof_soup = next((parsed for snap, parsed, _ in pages if snap is proof_snap), None)
+        title = proof_soup.title.get_text(" ", strip=True) if proof_soup and proof_soup.title else ""
+        lead = re.split(r"\s+[|–—-]\s+", title, maxsplit=1)[0]
+        company_label = re.fullmatch(r"([\w& .'-]+?\s+(?:AS|ASA|ANS|DA|SA|NUF))", lead, re.I)
+        if company_label and not text_contains_name(company_label[1], legal):
+            site_fail(row, "ambiguous", f"{final_host}: contact evidence is hosted by a different legal publisher")
+            return False
+    if legal_suffix_guess and method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
+        # A suffix in the domain is only a hint. Require the full legal label,
+        # including AS, in the actual source for either corroborated proof.
+        proof_text = next((visible for snap, _, visible in pages if snap is proof_snap), "")
+        tokens = list(re.finditer(r"[^\W_]+", proof_text))
+        expected = translit_text(legal).split()
+        visible = [translit_text(token[0]) for token in tokens]
+        start = next((i for i in range(len(tokens) - len(expected) + 1)
+                      if visible[i:i + len(expected)] == expected), None)
+        if start is None:
+            site_fail(row, "ambiguous", f"{final_host}: legal suffix guess lacks the full publisher name")
+            return False
+        proof_locator = {**proof_locator, "text_quote": proof_text[tokens[start].start():tokens[start + len(expected) - 1].end()]}
     if method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
         if international_office_listing(proof_snap["source_url"], home["source_url"]):
             site_fail(row, "ambiguous", f"{final_host}: registered details appear only on an international office listing (possible group site)")
@@ -1225,7 +1277,12 @@ def news_date(raw):
 STATIC_PAGE = re.compile(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r|terms|salgsbetingelser|kj[oø]psbetingelser|career|karriere|"
                          r"ledige[- /]stillinger|kontakt|contact|forside|home|kategori|category|/tag/|/shop|/produkt|/product")
 # Broadcasting, newspaper/periodical publishing and news agencies: their articles are editorial output, not news about the company.
-MEDIA_INDUSTRY = re.compile(r"^(?:58\.1[34]|60\.|63\.9)")
+MEDIA_INDUSTRY = re.compile(r"^(?:58\.1[234]|60\.|63\.9)")
+MEDIA_PUBLISHER_NAME = re.compile(r"\b(?:radio(?:en)?|nettavis\w*|dagsavis\w*|lokalavis\w*|nyhetsbyr[aå]\w*)\b", re.I)
+EDITORIAL_GUIDE = re.compile(
+    r"^(?:how\b|what\s+(?:is|are|if|does|do)\b|why\s+(?:choose|should)\b|tips\b|slik\b|guide\b|diy\b|"
+    r"hva\s+(?:er|om|koster|bør)\b|hvordan\b|hvor\s+(?:kan|finner|bør)\b|"
+    r"når\s+bør\b|hvorfor\s+velge\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)", re.I)
 
 
 def news_url_ok(url, site_url):
@@ -1248,17 +1305,18 @@ def news_url_ok(url, site_url):
 
 def news_about_company(body, title, summary=""):
     """Media companies publish stories about others; keep only their items that name the company itself."""
-    from .names import name_tokens, distinctive
-    if re.search(r'^(?:how\s+to\b|how\s+can\b|tips\b|slik\b|guide\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)', title.strip(), re.I):
+    from .names import text_contains_name
+    if EDITORIAL_GUIDE.search(title.strip()):
         return False
     if re.search(r'\b(?:vedtekter|husordens?regler|årsplan|åpningstider|prisliste)\b', title, re.I):
         return False
     code = str(((body or {}).get("naeringskode1") or {}).get("kode") or "")
-    if not MEDIA_INDUSTRY.match(code):
+    legal = str((body or {}).get("navn") or "")
+    if not MEDIA_INDUSTRY.match(code) and not MEDIA_PUBLISHER_NAME.search(legal):
         return True
-    words = distinctive(name_tokens((body or {}).get("navn", ""))) or name_tokens((body or {}).get("navn", ""))
-    text = translit_text(title + " " + summary)
-    return bool(words) and all(w in text for w in words)
+    # A publisher's name in an article's template or title suffix is not its subject.
+    subject = re.split(r"\s(?:\||[-–—])\s", title, maxsplit=1)[0]
+    return text_contains_name(subject, legal)
 
 
 NEWS_INDEX = re.compile(r'/(?:news|nyheter|nytt|aktuelt|blogg?|presse|press|articles?|artikler?)/?$', re.I)
@@ -1470,7 +1528,8 @@ def extract_dated_news_cards(row, snap, parsed, body=None, site_url=None):
             links=[]
             for link in parent.find_all('a',href=True):
                 url=urllib.parse.urljoin(snap['source_url'],link['href'])
-                label=link.get_text(' ',strip=True)
+                heading = link.find(['h2', 'h3', 'h4']) or link.find_parent(['h2', 'h3', 'h4'])
+                label=(heading or link).get_text(' ',strip=True)
                 if not 12 <= len(label) <= 300 or not news_path.search(urllib.parse.urlsplit(url).path):
                     continue
                 if registrable(urllib.parse.urlsplit(url).hostname) != registrable(urllib.parse.urlsplit(snap['source_url']).hostname):
@@ -1746,7 +1805,7 @@ def wikidata_websites(org):
 
 def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False, branch=()):
     """Candidate ladder: registry homepage, workplace homepages, NAV employer homepage, previous verified site, name guesses."""
-    from .names import guess_domains, resolves, registrable
+    from .names import guess_domains, legal_suffix_domains, resolves, registrable
     candidates, seen = [], set()
 
     def add(url, origin):
@@ -1816,6 +1875,20 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
         for field in SITE_FIELDS:
             row["availability"][field] = before.get(field, "not_available")
         row["errors"] = [e for e in row["errors"] if not (e.get("module") == "website" and key in e.get("message", ""))]
+    if max_guess_fetches >= 2:
+        for url in legal_suffix_domains(body.get("navn") or "", form):
+            if time.monotonic() >= getattr(transport, "deadline", float("inf")) or getattr(transport, "requests", 0) >= getattr(transport, "limit", float("inf")):
+                break
+            key = registrable(urllib.parse.urlsplit(url).hostname)
+            if key in seen or not resolves(url):
+                continue
+            seen.add(key)
+            research["candidates"].append({"url": url, "origin": "legal_suffix_guess"})
+            before = dict(row["availability"])
+            if crawl_site(row, body, transport, min(page_limit, 6), origin="legal_suffix_guess", url=url):
+                return True
+            for field in SITE_FIELDS:
+                row["availability"][field] = before.get(field, "not_available")
     return False
 
 
@@ -1946,7 +2019,10 @@ def synthesize(row):
     if latest:
         sample = next(iter(latest.values()))
         period = sample["reporting_period"]
-        bits = [f"{label} {fmt_amount(latest[key]['value'])}" for key, label in (("revenue", "revenue"), ("operating_result", "operating result"), ("annual_result", "net result"), ("assets", "total assets"), ("equity", "equity")) if key in latest]
+        bits = [f"{label} {fmt_amount(latest[key]['value'])}" for key, label in (
+            ("revenue", "revenue"), ("operating_result", "operating result"), ("annual_result", "net result"),
+            ("assets", "total assets"), ("equity", "equity"), ("debt", "total debt"),
+            ("profit_before_tax", "profit before tax")) if key in latest]
         verdict = ""
         result = latest.get("annual_result", {}).get("value", {}).get("amount") if "annual_result" in latest else None
         if isinstance(result, (int, float)):
@@ -1967,6 +2043,8 @@ def synthesize(row):
             now_value = (latest.get(key) or {}).get("value", {}).get("amount")
             old_value = (earlier.get(key) or {}).get("value", {}).get("amount")
             if not isinstance(now_value, (int, float)) or not isinstance(old_value, (int, float)):
+                continue
+            if latest[key]["value"].get("currency") != earlier[key]["value"].get("currency"):
                 continue
             text = f"{label} went from {fmt_amount(earlier[key]['value'])} to {fmt_amount(latest[key]['value'])}"
             if old_value > 0 and now_value > 0:
@@ -2004,6 +2082,15 @@ def synthesize(row):
         titles = "; ".join(str(c["value"].get("title"))[:90] for c in jobs[:3])
         say(f"Appears to be hiring: {len(jobs)} active job ad{'s' if len(jobs) != 1 else ''} with an exact employer match ({titles}).", jobs[:3], "hiring")
     activity = by.get("activity", [])
+    awards = sorted(by.get('public_awards', []), key=lambda c: c['value']['award_date'], reverse=True)
+    if awards:
+        award = awards[0]['value']
+        instrument = {'tilskudd': 'grant', 'skatteEllerAvgiftsFritak': 'tax relief'}.get(
+            str(award.get('instrument') or '').rsplit('.', 1)[-1], 'state aid')
+        amount = award.get('amount')
+        amount_text = f" of {amount['currency']} {amount['amount']}" if amount else ' (exact amount not published)'
+        say(f"Registered {instrument} award{amount_text}, awarded {award['award_date']}. "
+            'This is not evidence of cash receipt or revenue.', awards[:1], 'public_awards')
     news = sorted([c for c in activity if c["value"].get("kind") not in {"official_registry_event", "official_food_inspection"}], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
     inspections = sorted([c for c in activity if c["value"].get("kind") == "official_food_inspection"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
     events = sorted([c for c in activity if c["value"].get("kind") == "official_registry_event"], key=lambda c: parsed_date(c["value"].get("published_at")), reverse=True)
@@ -2018,7 +2105,7 @@ def synthesize(row):
         statements.append({"text": f"Since the previous run, {len(row['changes'])} material change(s) were detected in: {', '.join(changed[:8])}.", "kind": "changes",
                            "evidence_ids": sorted({e for ch in row["changes"] for c in ch.get("current_claims", []) for e in c["evidence_ids"]}), "claim_ids": []})
     labels = {"official_website": "verified website", "description": "website description", "jobs": "active job ads", "activity": "dated public activity",
-              "owned_profiles": "company-owned social profiles", "contact": "contact details", "financials": "filed accounts", "leadership": "registered roles", "locations": "registered workplaces"}
+              "owned_profiles": "company-owned social profiles", "contact": "contact details", "financials": "filed accounts", "leadership": "registered roles", "locations": "registered workplaces", "public_awards": "registered public awards or tax relief"}
     unknown = [(f, s) for f, s in row["availability"].items() if s != "available" and f in labels]
     if unknown:
         statements.append({"text": "Not established from checked sources: " + "; ".join(f"{labels[f]} ({s.replace('_', ' ')})" for f, s in unknown) + ". Missing information is not treated as zero.",
@@ -2041,7 +2128,9 @@ def external_footprint(row):
     for c in row["claims"]:
         by.setdefault(c["field"], []).append(c)
     site = (by.get("official_website") or [None])[0]
-    news = [c for c in by.get("activity", []) if isinstance(c["value"], dict) and c["value"].get("kind") != "official_registry_event"]
+    activity = [c for c in by.get("activity", []) if isinstance(c["value"], dict)]
+    news = [c for c in activity if str(c["value"].get("kind") or "").startswith("company_")]
+    inspections = [c for c in activity if c["value"].get("kind") == "official_food_inspection"]
     return {
         "website": item(site, url=site["value"]) if site else None,
         "social_links": [item(c, platform=c["value"].get("platform"), url=c["value"].get("url")) for c in by.get("owned_profiles", [])],
@@ -2051,8 +2140,10 @@ def external_footprint(row):
                               valid_through=c["value"].get("valid_through"), url=c["value"].get("url"), source=c["value"].get("source"))
                          for c in by.get("jobs", [])],
         "careers_page": item(by["careers_page"][0], url=by["careers_page"][0]["value"]) if by.get("careers_page") else None,
+        "public_awards": [item(c, **c['value']) for c in by.get('public_awards', [])],
+        "public_inspections": [item(c, **c["value"]) for c in inspections],
         "description": item(by["description"][0], text=by["description"][0]["value"]) if by.get("description") else None,
-        "availability": {k: row["availability"].get(k) for k in ("official_website", "owned_profiles", "activity", "jobs", "description")},
+        "availability": {k: row["availability"].get(k) for k in ("official_website", "owned_profiles", "activity", "jobs", "description", "public_awards")},
     }
 
 
@@ -2084,9 +2175,12 @@ def finish(row, previous=None):
             evidence = [prior_evidence[e] for e in c["evidence_ids"] if e in prior_evidence]
             for ev in evidence:
                 if ev.get("source_class") in {"company_owned", "official_public_api"} and c["id"] not in current_ids:
-                    observed = [s for s in row["source_snapshots"] if ev["source_url"] in {s.get("source_url"), s.get("requested_url")}]
+                    old_snap = prior_snapshots.get(ev['snapshot_id'], {})
+                    observed = [s for s in row["source_snapshots"] if ev["source_url"] in {s.get("source_url"), s.get("requested_url")}
+                                and s.get('request_body_sha256') == old_snap.get('request_body_sha256')]
                     # A successful registry response says nothing about a failed news feed.
-                    source_state = (row.get("research_sources", {}).get("nav_jobs") or {}).get("state") if ev.get("source_class") == "official_public_api" else None
+                    source_name = 'public_awards' if family == 'public_awards' else 'nav_jobs'
+                    source_state = (row.get("research_sources", {}).get(source_name) or {}).get("state") if ev.get("source_class") == "official_public_api" else None
                     failed = failed or not observed or any(s.get("status") != 200 for s in observed) or source_state in {"partial", "failed"}
             if failed and c["id"] not in current_ids:
                 retained.append({**c, "stale": True})
@@ -2134,7 +2228,9 @@ def validate(rows, orgs, snapshots=None):
         source_ids = {s["id"] for s in row["source_snapshots"]}
         if row["run"].get("terminal_status") != "completed" or not row["run"].get("completed_at"):
             errors.append("Missing terminal run metadata")
-        if set(row["availability"]) != set(FIELDS) or any(v not in STATES for v in row["availability"].values()):
+        expected = set(FIELDS)
+        # Older schema 1.0 envelopes predate the optional awards connector.
+        if set(row["availability"]) not in (expected, expected - {"public_awards"}) or any(v not in STATES for v in row["availability"].values()):
             errors.append(f"Invalid availability: {row['organisation_number']}")
         for c in row["claims"]:
             if not c["evidence_ids"] or any(e not in ev for e in c["evidence_ids"]):
@@ -2223,6 +2319,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
     network_deadline = transport.deadline
     transport.quote_selector = quote_selector
     rows = [envelope(org, run_id) for org in orgs]
+    if 'awards' not in modules:
+        for row in rows:
+            row['availability']['public_awards'] = 'not_applicable'
     bodies = {}
     prior = {r["organisation_number"]: r for r in previous or []}
     replay_seeds = {}
@@ -2312,6 +2411,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 retry_timed_out_candidates(row, bodies[row["organisation_number"]], transport, pages)
             elif module == "food_inspections":
                 food_inspections.research(row, claim, news_date)
+            elif module == "awards":
+                from .awards import research
+                research(row, transport, claim)
             elif module == "website_hints":
                 # Second, bounded pass: NAV employer homepages exist only after the jobs phase.
                 body = bodies[row["organisation_number"]]
@@ -2352,7 +2454,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 if module == "locations" and found:
                     branch_homepages[row["organisation_number"]] = found
         except Exception as exc:
-            field = "legal_identity" if module == "identity" else "official_website" if module in {"website", "discovery"} else module
+            field = "legal_identity" if module == "identity" else "public_awards" if module == 'awards' else "official_website" if module in {"website", "discovery"} else module
             if field in FIELDS:
                 row["availability"][field] = "failed"
             row["errors"].append({"module": module, "message": f"{type(exc).__name__}: {exc}"})
@@ -2386,8 +2488,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 if module in {'website','discovery','agent'}:
                     time_fraction={'website':.45,'discovery':.35,'agent':.25}[module]
                     transport.deadline=min(network_deadline,time.monotonic()+remaining_seconds*time_fraction)
-                elif module in {'financials','leadership','locations'}:
-                    records_left=sum(m in {'financials','leadership','locations'} for m in phase_order[stage_index:])
+                elif module in {'financials','leadership','locations','awards'}:
+                    records_left=sum(m in {'financials','leadership','locations','awards'} for m in phase_order[stage_index:])
                     jobs_reserve=min(120,max(30,seconds*.1)) if 'jobs' in phase_order[stage_index+1:] else 0
                     allowance=max(1,(remaining_seconds-jobs_reserve)/max(1,records_left))
                     transport.deadline=min(network_deadline,time.monotonic()+allowance)
@@ -2513,7 +2615,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
               "score": None, "score_note": "Operational smoke test; no hidden labels or official competition score"}
     report["registry_snapshot"] = {"path": str(registry), "retrieved_at": registry_retrieved_at, "retrieved_at_source": registry_time_source, "sha256": snapshot_hash} if registry else None
     report["external_footprint_coverage"] = {k: sum(bool((r.get("external_footprint") or {}).get(k)) for r in rows)
-                                             for k in ("website", "social_links", "news", "job_postings", "careers_page", "description")}
+                                             for k in ("website", "social_links", "news", "job_postings", "careers_page", "description", "public_awards", "public_inspections")}
     report["strategy"] = strategy
     report["company_source_cache"] = {"scope": "this run only", "hits": transport.site_cache_hits,
                                       "unique_urls": len(transport.site_cache),

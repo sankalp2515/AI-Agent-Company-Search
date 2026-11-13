@@ -204,3 +204,14 @@ def resolves(url):
         return bool(socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
     except OSError:
         return False
+
+
+def legal_suffix_domains(legal_name, legal_form_code):
+    """Some Norwegian companies include their legal suffix in the domain."""
+    if legal_form_code != "AS" or not re.search(r"\sAS\s*$", legal_name, re.I):
+        return []
+    words = name_tokens(legal_name)
+    label = "".join(words)
+    if not 1 <= len(words) <= 3 or not 4 <= len(label) <= 40 or not distinctive(words):
+        return []
+    return [f"https://{label}as.no/", f"https://{label}-as.no/"]

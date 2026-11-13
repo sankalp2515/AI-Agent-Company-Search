@@ -700,7 +700,9 @@ def corroborated(body, pages, row=None, domain_named=False):
     if row is not None and domain_named is True:
         # domain_named=True only when the domain spells the complete legal name (see crawl_site).
         found = operating_leader_on_pages(row, pages, legal)
-        if found:
+        from .names import name_tokens
+        company_words = set(name_tokens(legal))
+        if found and company_words and not company_words <= set(name_tokens(found[1].get("text_quote", ""))):
             return found[0], found[1], "full_name_domain_and_registered_operating_head"
     # A shared director, partial-name domain or registry URL alone is a candidate, not proof.
     legal_flat = translit_text(legal)
@@ -811,7 +813,8 @@ BOILERPLATE_DESCRIPTION = re.compile(r"create-react-app|created using|just anoth
 
 def parked_page(text, html=""):
     """A short holding page or a domain reseller's ad page says a domain exists, not that a company publishes anything there."""
-    return (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
+    directory_index = bool(re.match(r"\s*Index of\s*/", text, re.I)) and bool(re.search(r"Name\s+Last Modified\s+Size", text, re.I))
+    return directory_index or (len(text) < 2000 and bool(PARKED_PAGE.search(text))) or (len(text) < 5000 and bool(AD_LANDER.search(html)))
 
 
 def website_cut_short(row):
@@ -987,6 +990,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
     legal_name = body.get('navn','')
     publisher_labels = [n.get_text(' ',strip=True) for n in soup.select('title,h1')]
     publisher_labels += [n.get('content','') for n in soup.select('meta[property="og:site_name"]')]
+    publisher_named = any(text_contains_name(label, legal_name) for label in publisher_labels)
     if (origin == 'registry' and page_limit >= 3 and not domain_is_full_name(home['source_url'],legal_name)
             and not any(text_contains_name(label,legal_name) for label in publisher_labels)):
         # A registered URL can become a group portal. Follow an explicitly linked
@@ -1044,8 +1048,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         # The company's own Enhetsregisteret homepage declaration, with the complete core name on the domain or page.
         # The domain itself must carry the name: a declared parent/group domain (e.g. a brand page on the
         # international parent's site) is not the Norwegian entity's own website.
-        if domain_is_full_name(home["source_url"], legal) or (domain_matches_name(home["source_url"], legal)
-                                                              and any(text_contains_name(t, legal) for _, _, t in pages)):
+        if domain_matches_name(home["source_url"], legal) and (publisher_named or (
+                domain_is_full_name(home["source_url"], legal) and text_contains_name(text, legal))):
             proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
                            "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
     # Some companies put their legal identifier only in a privacy/legal page.
@@ -1095,7 +1099,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
             if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
                 proof = declared_domain_legal_statement(org, legal, pages)
     declared = origin == "registry" and not managed
-    if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal):
+    if not proof and not conflict and declared and publisher_named and domain_covers_name(home["source_url"], legal):
         # The company declared this address against its exact organisation number, and the domain carries its name.
         proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
                        "name_check": "at least two words of the legal name in the domain"}, "registry_declared_homepage"

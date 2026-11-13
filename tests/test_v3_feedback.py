@@ -68,6 +68,11 @@ def test_radio_publisher_in_article_template_does_not_make_it_the_subject():
     assert news_about_company(company, "Radio Grenland lanserer ny lokal kanal")
 
 
+def test_directory_index_is_not_a_company_website():
+    from orglens.core import parked_page
+    assert parked_page("Index of / Index of / Name Last Modified Size Proudly Served by LiteSpeed")
+
+
 def test_registry_file_without_timestamp_is_accepted_and_labelled(tmp_path):
     path = tmp_path / "registry.csv"
     path.write_text('organisasjonsnummer;navn;organisasjonsform.kode\n123456789;Example AS;AS\n', encoding="utf-8")

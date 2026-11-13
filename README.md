@@ -24,7 +24,7 @@ Evidence-first research agent for Norwegian companies. Give it a batch of organi
 - filed accounts
 - leadership and workplaces
 - a verified website, company-linked social profiles and contact details
-- active job ads and dated activity
+- active job ads, dated company news, public inspections and registered public awards
 - refresh changes
 
 Every claim carries a source URL, retrieval time, SHA-256 of the exact response bytes, an evidence locator and an identity method. Unknowns are explicit states (`available`, `not_available`, `blocked`, `not_applicable`, `ambiguous`, `failed`) and are never turned into zero.
@@ -48,6 +48,7 @@ uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
 - Credentials: none. This command makes no paid API calls. [SUBMISSION.md](SUBMISSION.md) declares costs and the optional hybrid command for organizer-approved credentials.
+- Public awards: the State Aid Register is queried by the exact recipient organisation number. Each lookup counts against the run budget. Use `--modules financials,leadership,locations,jobs,website` to omit awards.
 - Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are Builderr's published budget of 20 requests per company and 45 minutes. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
 - Refresh: append `--previous out/evaluation/envelopes.jsonl`. Changes are computed on field/value sets, so an unchanged source never produces a false change. If a refresh fails, the previous claims are kept and marked stale.
@@ -77,6 +78,8 @@ The agent runs in phases. Each phase covers every company before the next phase 
    3. the website verified in the previous run
    4. a non-personal registered email domain, independently verified
    5. name-derived domain hypotheses, checked by DNS first
+
+   A final Norwegian domain check tries the legal suffix for AS companies when the website budget has room. The same publisher proof applies.
 
    Optional search follows unresolved websites. Another provider is queried after rejected candidates, stopping once publisher identity is proven. Registry-listed group portals can lead to an explicitly linked, independently verified company site.
 

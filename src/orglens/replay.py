@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from .core import Transport, digest
+from .core import Transport, digest, json_request_bytes
 
 
 class ReplayTransport(Transport):
@@ -13,13 +13,21 @@ class ReplayTransport(Transport):
         for line in (self.source / "envelopes.jsonl").read_text(encoding="utf-8").splitlines():
             row = json.loads(line)
             for snap in row["source_snapshots"]:
+                if snap.get("request_method") == "POST":
+                    self.index.setdefault((snap.get("requested_url", snap["source_url"]), snap.get("request_body_sha256")), snap)
+                    continue
                 self.index.setdefault(snap.get("requested_url", snap["source_url"]), snap)
                 # A verified website seed can be the final redirect destination.
                 # Those exact bytes were observed there, with the same timestamp.
                 self.index.setdefault(snap["source_url"], snap)
 
     def get(self, url, source_class="official_registry"):
-        snap = self.index.get(url)
+        return self._saved(url, self.index.get(url))
+
+    def post(self, url, payload, source_class="official_public_api"):
+        return self._saved(url, self.index.get((url, digest(json_request_bytes(payload)))))
+
+    def _saved(self, url, snap):
         if not snap:
             return {"status": 0, "source_url": url, "retrieved_at": "not_retrieved", "error": "No saved observation for this URL; replay never uses the network"}
         raw = (self.source / "snapshots" / (snap["content_sha256"] + ".bin")).read_bytes()

@@ -47,6 +47,7 @@ def execute(tmp_path, rows, assertions):
     path = tmp_path / "index.html"
     render(rows, path)
     script = re.findall(r"<script>(.*?)</script>", path.read_text(encoding="utf-8"), re.S)[0]
+    # The page ships its data compressed. The DOM double has no packed element, so the script reads `data`.
     result = subprocess.run([node, "-"], input="const INPUT=" + json.dumps(rows) + ";\n" + DOM + script + "\n" + assertions,
                             text=True, capture_output=True, timeout=30)
     assert result.returncode == 0, result.stderr

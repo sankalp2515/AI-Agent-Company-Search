@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import csv
+import gzip
 import hashlib
 import ipaddress
 import json
@@ -1192,6 +1193,8 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
 
 
 NEWS_MAX_AGE_DAYS = 3 * 366
+# Each dated item is a separately scored fact, and a feed or news page is already fetched, so more items cost no requests.
+NEWS_ITEMS_PER_SOURCE = 20
 # A complete 45-day NAV index took 81 pages on 4 November 2026; leave headroom for busy weeks.
 NAV_FEED_PAGE_CAP = 600
 
@@ -1415,7 +1418,7 @@ def extract_feed(row, snap, body=None, site_url=None):
               period={"published_at": date}, identity_method="verified_company_site_feed")
         row["availability"]["activity"] = "available"
         count += 1
-        if count >= 8:
+        if count >= NEWS_ITEMS_PER_SOURCE:
             break
 
 
@@ -1475,7 +1478,7 @@ def extract_dated_news_cards(row, snap, parsed, body=None, site_url=None):
                 row['availability']['activity']='available'
                 known.add(key);count+=1
             break
-        if count>=8:
+        if count>=NEWS_ITEMS_PER_SOURCE:
             break
 
 
@@ -1687,6 +1690,31 @@ def extract_site_facts(row, body, pages, method, quote_selector=None, transport=
                 return
 
 
+_OSM_HINTS = None
+
+
+def osm_websites(legal_name, legal_form_code=None):
+    """Websites OpenStreetMap mappers recorded for a business with exactly this core name.
+
+    A hint only, tried like a name guess and published only after the normal identity proof. Chains,
+    brands and housing associations are excluded. Data (c) OpenStreetMap contributors, ODbL."""
+    global _OSM_HINTS
+    from .names import NO_GUESS_FORMS, name_tokens
+    if (legal_form_code or "").upper() in NO_GUESS_FORMS:
+        return []
+    if _OSM_HINTS is None:
+        path = Path(__file__).with_name("data") / "osm_websites.json.gz"
+        try:
+            _OSM_HINTS = json.loads(gzip.decompress(path.read_bytes()))["hints"]
+        except (OSError, ValueError, KeyError):
+            _OSM_HINTS = {}
+    found = []
+    for website, _postcode in _OSM_HINTS.get("".join(name_tokens(legal_name)), []):
+        if website not in found:
+            found.append(website)
+    return found[:2]
+
+
 def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False):
     """Candidate ladder: registry homepage, NAV-verified employer homepage, previous verified site, name guesses."""
     from .names import guess_domains, resolves, registrable
@@ -1732,7 +1760,8 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
         return False
     fetched = 0
     form = (body.get("organisasjonsform") or {}).get("kode")
-    hypotheses = [(u, 'name_guess') for u in guess_domains(body.get('navn', ''), form)]
+    hypotheses = [(u, 'osm_name') for u in osm_websites(body.get('navn', ''), form)]
+    hypotheses += [(u, 'name_guess') for u in guess_domains(body.get('navn', ''), form)]
     for old in (body.get('historiskeNavn') or [])[-2:]:
         hypotheses.extend((u, 'historical_name_guess') for u in guess_domains(old.get('navn', ''), form))
     for url, guess_origin in hypotheses:

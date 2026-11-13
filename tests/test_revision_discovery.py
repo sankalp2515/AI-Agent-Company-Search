@@ -301,3 +301,10 @@ def test_financial_health_uses_only_filed_figures_of_one_period():
     assert len(used) == 4
     assert financial_health({"revenue": c(0), "operating_result": c(10)}) == ([], [])
     assert financial_health({"equity": c(10)}) == ([], [])
+
+
+def test_osm_hint_is_a_candidate_only_and_skips_housing():
+    from orglens.core import osm_websites
+    assert isinstance(osm_websites("BAKERIET I LOM AS", "AS"), list)
+    assert osm_websites("BAKERIET I LOM AS", "BRL") == []
+    assert osm_websites("", "AS") == []

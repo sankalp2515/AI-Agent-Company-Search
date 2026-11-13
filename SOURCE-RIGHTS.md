@@ -37,3 +37,8 @@ Tavily basic results are transient URL candidates only. The agent independently 
 ## Food Safety Authority inspections
 
 Food safety inspection results come from Mattilsynet's open Smilefjes dataset (`https://smilefjes.mattilsynet.no/api/tilsyn.csv`), licensed CC BY 4.0 per its [data.norge.no record](https://data.norge.no/nb/datasets/288aa74c-e3d3-492e-9ede-e71503b3bfd9/smilefjestilsyn-pa-serveringssteder). Attribution: "Contains data from Mattilsynet (the Norwegian Food Safety Authority)". Each run reads the file live, because the authority withdraws invalidated inspections and asks users to refresh daily. Identity comes only from the exact organisation number or a registered workplace.
+
+## OpenStreetMap website hints
+
+`src/orglens/data/osm_websites.json.gz` holds names and websites of Norwegian businesses from OpenStreetMap, retrieved through the Overpass API on 13 November 2026 and rebuilt with `scripts/build_osm_hints.py`. Data (c) OpenStreetMap contributors, available under the Open Database Licence (ODbL 1.0). It is only a discovery hint: a matched website is published only after the normal identity proof, and chains, brands and housing associations are excluded. The file is a declared external cache.
+

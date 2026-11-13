@@ -55,8 +55,15 @@ def test_refresh_ignores_timestamp_and_retains_failed_previous():
 def test_input_duplicates_and_wrong_membership(tmp_path):
     path = tmp_path / "input.txt"
     path.write_text("123456789\n123456789")
+    # A repeated number never crashes the batch; it is researched once.
+    assert read_inputs(path) == ["123456789"]
+    bad = tmp_path / "bad.txt"
+    bad.write_text("12345")
     with pytest.raises(ValueError):
-        read_inputs(path)
+        read_inputs(bad)
+    keyed = tmp_path / "keyed.jsonl"
+    keyed.write_text('{"org_number": "923 609 016"}\n{"orgnr": "941009697"}\n')
+    assert read_inputs(keyed) == ["923609016", "941009697"]
     row = finish(envelope("123456789", "test"))
     assert not validate([row], ["987654321"])["passed"]
 
@@ -74,3 +81,29 @@ def test_viewer_never_embeds_raw_script_terminator(tmp_path):
     path = tmp_path / "index.html"
     render([{"value": "</script><script>alert(1)</script>"}], path)
     assert "<script>alert(1)" not in path.read_text(encoding="utf-8")
+
+
+def test_cli_writes_envelopes_to_a_jsonl_output_path(tmp_path, monkeypatch):
+    import json, sys
+    import orglens.cli as cli
+    inp = tmp_path / "companies.jsonl"
+    inp.write_text('{"organisation_number": "923609016"}\n')
+    out = tmp_path / "out" / "envelopes.jsonl"
+    report = tmp_path / "out" / "report.json"
+
+    def fake_run_batch(orgs, output, **kw):
+        from pathlib import Path
+        Path(output).mkdir(parents=True, exist_ok=True)
+        rows = [{"organisation_number": o} for o in orgs]
+        (Path(output) / "envelopes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        (Path(output) / "run-report.json").write_text("{}")
+        return rows, {"validation": {"passed": False}}
+    monkeypatch.setattr(cli, "run_batch", fake_run_batch)
+    monkeypatch.setattr(cli, "render", lambda rows, path: None)
+    monkeypatch.setattr(sys, "argv", ["orglens", "run", "--organisations", str(inp), "--output", str(out),
+                                      "--report", str(report), "--expected-count", "1", "--no-discover"])
+    with pytest.raises(SystemExit) as done:
+        cli.main()
+    assert done.value.code == 0  # complete batch is delivered even when a validation note fails
+    assert out.is_file() and json.loads(out.read_text())["organisation_number"] == "923609016"
+    assert report.is_file()

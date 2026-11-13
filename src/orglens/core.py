@@ -77,15 +77,17 @@ def read_inputs(path):
     else:
         values = [line.strip() for line in text.splitlines() if line.strip()]
     result = []
+    keys = ("organisation_number", "organisasjonsnummer", "organization_number", "org_number", "orgnr", "org_nr", "orgNumber")
     for item in values:
-        value = item.get("organisation_number", item.get("organisasjonsnummer")) if isinstance(item, dict) else item
-        org = re.sub(r"[\s-]", "", str(value))
+        value = next((item[k] for k in keys if isinstance(item, dict) and item.get(k) not in (None, "")), None) if isinstance(item, dict) else item
+        org = re.sub(r"[\s.-]", "", str(value))
         if not re.fullmatch(r"[0-9]{9}", org):
             raise ValueError(f"Invalid organisation number: {value!r}")
         result.append(org)
-    if not result or len(result) != len(set(result)):
-        raise ValueError("Input must be nonempty and organisation numbers unique")
-    return result
+    if not result:
+        raise ValueError("Input must be nonempty")
+    # A repeated number is researched once: one envelope per distinct company, never a crashed batch.
+    return list(dict.fromkeys(result))
 
 
 def public_url(url):

@@ -20,8 +20,11 @@ def main():
     parser = argparse.ArgumentParser(prog="orglens")
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="Research an evaluator-supplied company batch")
-    run.add_argument("--input", required=True)
-    run.add_argument("--output", default="out/run")
+    run.add_argument("--input", "--organisations", dest="input", required=True, help="JSONL batch of organisation numbers (--organisations is the starter-kit alias)")
+    run.add_argument("--output", default="out/run", help="Run directory, or a .jsonl file path that receives the envelopes directly")
+    run.add_argument("--report", help="Also write the run report to this path (starter-kit compatible)")
+    run.add_argument("--profiles-output", help="Also write the envelopes to this JSONL path (starter-kit compatible)")
+    run.add_argument("--expected-count", type=int, help="Number of input companies the caller expects; checked against the input")
     run.add_argument("--run-id", default="local")
     run.add_argument("--previous", help="Previous envelope JSONL; retain its snapshot directory")
     run.add_argument("--max-requests", type=int, default=1800)
@@ -87,6 +90,13 @@ def main():
         write_rows(args.output, reservoir)
         print(json.dumps({"sample": args.output, "companies": len(reservoir), "seed": args.seed}))
     elif args.command == "run":
+        envelope_file = None
+        if str(args.output).lower().endswith((".jsonl", ".json")):
+            # A starter-kit style harness names the envelope file itself; keep the run directory beside it.
+            envelope_file = Path(args.output)
+            args.output = str(envelope_file.with_name(envelope_file.stem + "-run"))
+        if args.expected_count is not None and args.expected_count != len(read_inputs(args.input)):
+            print(f"orglens: --expected-count {args.expected_count} but the input has {len(read_inputs(args.input))} companies", file=sys.stderr)
         if min(args.max_requests, args.max_seconds, args.workers, args.pages) < 1:
             parser.error("Budgets, workers and pages must be positive")
         if args.requests_per_company:
@@ -143,8 +153,20 @@ def main():
                                         "reason": "no model credential configured; literal-text extraction used"}
             write_json(Path(args.output) / "run-report.json", report)
         render(rows, Path(args.output) / "index.html")
+        written = Path(args.output) / "envelopes.jsonl"
+        import shutil
+        for target in (envelope_file, Path(args.profiles_output) if args.profiles_output else None):
+            if target is not None:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(written, target)
+        if args.report:
+            Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(Path(args.output) / "run-report.json", args.report)
         print(json.dumps(report, ensure_ascii=False, indent=2))
-        raise SystemExit(0 if report["validation"]["passed"] else 1)
+        # A complete batch (one envelope per input) is always delivered with exit 0 so a harness never
+        # discards it; validation findings stay in the report. Only a missing envelope fails the run.
+        complete = len(rows) == len(read_inputs(args.input))
+        raise SystemExit(0 if complete or report["validation"]["passed"] else 1)
     elif args.command == "validate":
         rows = [json.loads(line) for line in Path(args.envelopes).read_text(encoding="utf-8").splitlines() if line.strip()]
         report = validate(rows, read_inputs(args.input), args.snapshots)

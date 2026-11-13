@@ -1247,6 +1247,10 @@ STATIC_PAGE = re.compile(r"om[- ]?oss|about|privacy|personvern|cookie|vilk[aå]r
 # Broadcasting, newspaper/periodical publishing and news agencies: their articles are editorial output, not news about the company.
 MEDIA_INDUSTRY = re.compile(r"^(?:58\.1[234]|60\.|63\.9)")
 MEDIA_PUBLISHER_NAME = re.compile(r"\b(?:radio(?:en)?|nettavis\w*|dagsavis\w*|lokalavis\w*|nyhetsbyr[aå]\w*)\b", re.I)
+EDITORIAL_GUIDE = re.compile(
+    r"^(?:how\b|what\s+(?:is|are|if|does|do)\b|why\s+(?:choose|should)\b|tips\b|slik\b|guide\b|diy\b|"
+    r"hva\s+(?:er|om|koster|bør)\b|hvordan\b|hvor\s+(?:kan|finner|bør)\b|"
+    r"når\s+bør\b|hvorfor\s+velge\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)", re.I)
 
 
 def news_url_ok(url, site_url):
@@ -1270,7 +1274,7 @@ def news_url_ok(url, site_url):
 def news_about_company(body, title, summary=""):
     """Media companies publish stories about others; keep only their items that name the company itself."""
     from .names import text_contains_name
-    if re.search(r'^(?:how\s+to\b|how\s+can\b|tips\b|slik\b|guide\b|\d+\s+.*\b(?:tips|traits|ways|steps)\b)', title.strip(), re.I):
+    if EDITORIAL_GUIDE.search(title.strip()):
         return False
     if re.search(r'\b(?:vedtekter|husordens?regler|årsplan|åpningstider|prisliste)\b', title, re.I):
         return False
@@ -1492,7 +1496,8 @@ def extract_dated_news_cards(row, snap, parsed, body=None, site_url=None):
             links=[]
             for link in parent.find_all('a',href=True):
                 url=urllib.parse.urljoin(snap['source_url'],link['href'])
-                label=link.get_text(' ',strip=True)
+                heading = link.find(['h2', 'h3', 'h4']) or link.find_parent(['h2', 'h3', 'h4'])
+                label=(heading or link).get_text(' ',strip=True)
                 if not 12 <= len(label) <= 300 or not news_path.search(urllib.parse.urlsplit(url).path):
                     continue
                 if registrable(urllib.parse.urlsplit(url).hostname) != registrable(urllib.parse.urlsplit(snap['source_url']).hostname):

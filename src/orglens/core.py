@@ -30,7 +30,7 @@ STATES = {"available", "not_available", "blocked", "not_applicable", "ambiguous"
 ENTITY = "https://data.brreg.no/enhetsregisteret/api/enheter/"
 FIELDS = ("legal_identity", "financials", "leadership", "locations", "official_website", "description", "jobs", "activity", "owned_profiles", "contact")
 SITE_FIELDS = ("official_website", "description", "activity", "owned_profiles", "contact")
-ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organisation\s+number|organization\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
+ORG_LABEL = r"(?:organisasjons(?:nummer|nr)|organi[sz]ation(?:al)?\s+number|org(?:anisasjons)?[.\s]*(?:nr|nummer|number))"
 UA = "OrgLens/0.1 (Norwegian company research; public sources only)"
 from .openrecords import FOOD_INSPECTIONS_MAX_BYTES, FOOD_INSPECTIONS_URL, FoodInspections
 
@@ -446,7 +446,7 @@ def soup_text(html):
 
 def identity_proof(org, text):
     # A number is identity evidence only beside a legal organisation label; arbitrary digits never match.
-    pattern = ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)"
+    pattern = ORG_LABEL + r"\s*[:.#-]{0,3}\s*((?:\d[\s.]*){9})(?!\d)"
     found = [re.sub(r"\D", "", match.group(1)) for match in re.finditer(pattern, text, re.I)]
     return org in found and len(set(found)) == 1
 
@@ -460,7 +460,7 @@ def site_identity_proof(org, pages):
             candidates.append((visible, {"css_selector": 'footer, [role="contentinfo"]', "text_quote": visible}))
         for visible, locator in candidates:
             if identity_proof(org, visible):
-                match = re.search(ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)", visible, re.I)
+                match = re.search(ORG_LABEL + r"\s*[:.#-]{0,3}\s*((?:\d[\s.]*){9})(?!\d)", visible, re.I)
                 if match:
                     locator["text_quote"] = match.group(0)
                 return snapshot, locator
@@ -493,7 +493,7 @@ TRUSTED_ORIGINS = {"registry", "nav_employer"}
 
 
 def labelled_numbers(text):
-    found = [re.sub(r"\D", "", m.group(1)) for m in re.finditer(ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)", text, re.I)]
+    found = [re.sub(r"\D", "", m.group(1)) for m in re.finditer(ORG_LABEL + r"\s*[:.#-]{0,3}\s*((?:\d[\s.]*){9})(?!\d)", text, re.I)]
     found += [re.sub(r"\D", "", m.group(1)) for m in re.finditer(MVA, text, re.I)]
     return [f for f in found if len(f) == 9]
 
@@ -572,7 +572,7 @@ def proof_on_pages(org, legal_name, pages):
             # Subpages count only when they are the company's own contact/about/terms page about itself.
             names_here = text_contains_name(text, legal_name) or any(t in translit_text(text) for t in distinctive(name_tokens(legal_name)))
             if i == 0 or (any(t in url for t in CONTACT_TERMS) and names_here):
-                match = re.search(ORG_LABEL + r"\s*[:.#-]?\s*((?:\d[\s.]*){9})(?!\d)|" + MVA, text, re.I)
+                match = re.search(ORG_LABEL + r"\s*[:.#-]{0,3}\s*((?:\d[\s.]*){9})(?!\d)|" + MVA, text, re.I)
                 return snapshot, {"text_quote": match.group(0) if match else org, "page_role": "home" if i == 0 else "contact_or_about"}, "labelled_organisation_number"
         for node in jsonld_nodes(snapshot["text"]):
             if any(t in ("Organization", "LocalBusiness", "Corporation", "Store", "ProfessionalService") for t in node_types(node)) and org in jsonld_org_ids(node):
@@ -858,7 +858,7 @@ def declared_domain_legal_statement(org, legal_name, pages):
         numbers = set(labelled_numbers(text))
         if not name or org not in numbers or len(numbers) > 3:
             continue
-        match = re.search(re.escape(name) + r"(?:\s+(?:AS|ASA|SA|DA|ANS|NUF|KS|BA))?[\s,;:()\-–]{0,6}" + ORG_LABEL + r"\s*[:.#-]?\s*(?:NO\s*)?((?:\d[\s.]*){9})(?!\d)", text, re.I)
+        match = re.search(re.escape(name) + r"(?:\s+(?:AS|ASA|SA|DA|ANS|NUF|KS|BA))?[\s,;:()\-–]{0,6}" + ORG_LABEL + r"\s*[:.#-]{0,3}\s*(?:NO\s*)?((?:\d[\s.]*){9})(?!\d)", text, re.I)
         if match and re.sub(r"\D", "", match.group(1)) == org:
             return snapshot, {"text_quote": match.group(0), "page_role": "legal_statement"}, "legal_name_adjacent_organisation_number"
     return None

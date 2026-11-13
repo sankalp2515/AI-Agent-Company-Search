@@ -308,3 +308,11 @@ def test_osm_hint_is_a_candidate_only_and_skips_housing():
     assert isinstance(osm_websites("BAKERIET I LOM AS", "AS"), list)
     assert osm_websites("BAKERIET I LOM AS", "BRL") == []
     assert osm_websites("", "AS") == []
+
+
+def test_org_label_allows_stacked_punctuation_and_english_variant():
+    from orglens.core import identity_proof, labelled_numbers
+    assert identity_proof("935174961", "Et merkevare av WOODSPORT AS (org.nr.: 935174961).")
+    assert labelled_numbers("Organisasjons nr.: 812 220 012") == ["812220012"]
+    assert labelled_numbers("Organizational number: 930 870 048") == ["930870048"]
+    assert labelled_numbers("Telefon 23 30 07 74 og 812 220 012") == []

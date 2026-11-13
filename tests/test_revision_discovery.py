@@ -323,3 +323,29 @@ def test_wikidata_hint_is_keyed_by_exact_org_number():
     assert any("bahr.no" in u for u in wikidata_websites("919513063"))
     assert wikidata_websites("000000000") == []
     assert not any("kommune.no" in u for u in wikidata_websites("990363013"))
+
+
+def test_workplace_homepages_come_back_from_the_locations_record(monkeypatch):
+    import json
+    import orglens.core as core
+    body = {"_embedded": {"underenheter": [
+        {"organisasjonsnummer": "111111111", "overordnetEnhet": "922222222", "navn": "A", "hjemmeside": "www.a-shop.no"},
+        {"organisasjonsnummer": "333333333", "overordnetEnhet": "922222222", "navn": "B", "hjemmeside": "www.a-shop.no"},
+        {"organisasjonsnummer": "444444444", "overordnetEnhet": "999999999", "navn": "Other", "hjemmeside": "other.no"}]}}
+    snap = {"id": "s1", "source_url": "https://data.brreg.no/x", "status": 200, "text": json.dumps(body), "source_class": "official_registry"}
+    monkeypatch.setattr(core, "fetch_official", lambda transport, url: snap)
+    monkeypatch.setattr(core, "attach", lambda row, s: None)
+    monkeypatch.setattr(core, "claim", lambda *a, **k: None)
+    row = {"organisation_number": "922222222", "availability": {}, "errors": [], "claims": []}
+    assert core.official(row, None, "locations") == ["www.a-shop.no"]
+
+
+def test_workplace_homepage_is_tried_after_the_company_homepage_with_registry_rules(monkeypatch):
+    import orglens.core as core
+    tried = []
+    monkeypatch.setattr(core, "crawl_site", lambda row, body, transport, page_limit, origin, url: tried.append((origin, url)) or False)
+    monkeypatch.setattr(core, "wikidata_websites", lambda org: [])
+    row = {"organisation_number": "922222222", "availability": {}, "errors": []}
+    core.research_website(row, {"navn": "A AS", "hjemmeside": "a.no"}, object(), guesses=False, branch=["www.a-shop.no", "a.no"])
+    assert tried == [("registry", "https://a.no"), ("registry_branch", "https://www.a-shop.no")]
+    assert "registry_branch" in core.REGISTRY_DECLARED and "registry_branch" in core.SELF_DECLARED_ORIGINS

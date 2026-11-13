@@ -428,13 +428,19 @@ def official(row, transport, module):
                     claim(row, "leadership", {"name": display, "role": (role.get("type") or {}).get("beskrivelse"),
                           "last_changed": group.get("sistEndret")}, snap, {"json_pointer": f"/rollegrupper/{i}/roller/{j}"})
     else:
+        homepages = []
         for i, unit in enumerate((body.get("_embedded") or {}).get("underenheter", [])):
             if str(unit.get("overordnetEnhet")) != org:
                 continue
             claim(row, "locations", {"organisation_number": unit.get("organisasjonsnummer"), "name": unit.get("navn"),
                   "address": unit.get("beliggenhetsadresse")}, snap, {"json_pointer": f"/_embedded/underenheter/{i}"})
+            if unit.get("hjemmeside"):
+                # A website the company declared for its own registered workplace: a candidate
+                # for the company's site, still verified on the site itself before publishing.
+                homepages.append(unit["hjemmeside"])
         if (body.get("page") or {}).get("totalPages", 1) > 1:
             row["errors"].append({"module": "locations", "message": "First 100 workplaces only; further pages not fetched"})
+        return list(dict.fromkeys(homepages))[:3]
 
 
 def soup_text(html):
@@ -489,7 +495,7 @@ SOCIAL = {"linkedin.com": "linkedin", "facebook.com": "facebook", "instagram.com
 CONTACT_TERMS = ("kontakt", "contact", "om-oss", "om_oss", "omoss", "about", "personvern", "privacy", "vilkar", "salgsbetingelser", "impressum")
 MORE_TERMS = ("career", "karriere", "jobb", "jobs", "stilling", "ledig", "news", "nyhet", "aktuelt", "blogg", "blog", "presse")
 MVA = r"\bNO[\s-]*((?:\d[\s.]*){9})\s*MVA\b"
-TRUSTED_ORIGINS = {"registry", "nav_employer"}
+TRUSTED_ORIGINS = {"registry", "registry_branch", "nav_employer"}
 
 
 def labelled_numbers(text):
@@ -756,7 +762,7 @@ def fetch_robots(row, base, host, transport):
     return None, availability(robot_snap)
 
 
-SELF_DECLARED_ORIGINS = {"registry", "registry_email", "nav_employer", "previous"}
+SELF_DECLARED_ORIGINS = {"registry", "registry_branch", "registry_email", "nav_employer", "previous"}
 
 
 def alternate_addresses(url, origin=None):
@@ -916,6 +922,10 @@ def site_sitemap(row, base, robot, transport, site_host, max_files=4):
     return pages
 
 
+REGISTRY_DECLARED = {"registry", "registry_branch"}
+DECLARED_BY = {"registry": "Enhetsregisteret hjemmeside", "registry_branch": "Enhetsregisteret hjemmeside of a registered workplace (underenhet)"}
+
+
 def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, _address_fallback=False):
     """Verify one candidate site; on proof publish website and site-derived facts. Returns True when verified."""
     from .names import is_aggregator, registrable, domain_covers_name, domain_matches_name, text_contains_name, domain_is_full_name, domain_spells_name, NO_GUESS_FORMS, national_mismatch
@@ -980,7 +990,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
     legal_name = body.get('navn','')
     publisher_labels = [n.get_text(' ',strip=True) for n in soup.select('title,h1')]
     publisher_labels += [n.get('content','') for n in soup.select('meta[property="og:site_name"]')]
-    if (origin == 'registry' and page_limit >= 3 and not domain_is_full_name(home['source_url'],legal_name)
+    if (origin in REGISTRY_DECLARED and page_limit >= 3 and not domain_is_full_name(home['source_url'],legal_name)
             and not any(text_contains_name(label,legal_name) for label in publisher_labels)):
         # A registered URL can become a group portal. Follow an explicitly linked
         # complete-name domain, then independently prove that target's identity.
@@ -1033,13 +1043,13 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
     managed = form in NO_GUESS_FORMS or national_mismatch(home["source_url"], legal)
     if not proof and not conflict and not managed:
         proof = corroborated(body, pages, row, domain_is_full_name(home["source_url"], legal))
-    if not proof and not conflict and not managed and origin == "registry":
+    if not proof and not conflict and not managed and origin in REGISTRY_DECLARED:
         # The company's own Enhetsregisteret homepage declaration, with the complete core name on the domain or page.
         # The domain itself must carry the name: a declared parent/group domain (e.g. a brand page on the
         # international parent's site) is not the Norwegian entity's own website.
         if (domain_is_full_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels)) or (
                 domain_matches_name(home["source_url"], legal) and any(text_contains_name(t, legal) for _, _, t in pages)):
-            proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
+            proof = home, {"declared_by": DECLARED_BY[origin], "declared_value": raw_url,
                            "name_check": "complete core legal name in domain or page text"}, "registry_declared_homepage"
     # Some companies put their legal identifier only in a privacy/legal page.
     # Spend bounded extra identity work only when the first contact pages fail.
@@ -1050,7 +1060,7 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         conflict = conflicting_number(org, pages)
         if not proof and not conflict and not managed:
             proof = corroborated(body, pages, row, domain_is_full_name(home['source_url'], legal))
-    if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
+    if not proof and not conflict and not managed and origin in {*REGISTRY_DECLARED, "registry_email"}:
         proof = declared_domain_legal_statement(org, legal, pages)
     sitemap_pages = None
     named_domain = domain_is_full_name(home["source_url"], legal)
@@ -1085,12 +1095,12 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
                 proof = corroborated(body, pages, row, named_domain)
             if not proof and not conflict and not managed and spelled_domain:
                 proof = registered_officers_on_pages(row, pages)
-            if not proof and not conflict and not managed and origin in {"registry", "registry_email"}:
+            if not proof and not conflict and not managed and origin in {*REGISTRY_DECLARED, "registry_email"}:
                 proof = declared_domain_legal_statement(org, legal, pages)
-    declared = origin == "registry" and not managed
+    declared = origin in REGISTRY_DECLARED and not managed
     if not proof and not conflict and declared and domain_covers_name(home["source_url"], legal) and page_names_company(legal, pages, publisher_labels):
         # The company declared this address against its exact organisation number, and the domain carries its name.
-        proof = home, {"declared_by": "Enhetsregisteret hjemmeside", "declared_value": raw_url,
+        proof = home, {"declared_by": DECLARED_BY[origin], "declared_value": raw_url,
                        "name_check": "at least two words of the legal name in the domain"}, "registry_declared_homepage"
     if not proof:
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
@@ -1732,8 +1742,8 @@ def wikidata_websites(org):
     return list(_WIKIDATA_HINTS.get(str(org), []))[:2]
 
 
-def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False):
-    """Candidate ladder: registry homepage, NAV-verified employer homepage, previous verified site, name guesses."""
+def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False, branch=()):
+    """Candidate ladder: registry homepage, workplace homepages, NAV employer homepage, previous verified site, name guesses."""
     from .names import guess_domains, resolves, registrable
     candidates, seen = [], set()
 
@@ -1751,6 +1761,8 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
         seen.update(registrable(urllib.parse.urlsplit(c["url"]).hostname) for c in row.get("website_research", {}).get("candidates", []))
     else:
         add(body.get("hjemmeside"), "registry")
+    for url in branch:
+        add(url, "registry_branch")
     for url in extra:
         add(url, "nav_employer")
     if not only_extra:
@@ -2292,6 +2304,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 share = remaining / pending
                 depth = max(2, min(pages, int(share) - 2))
                 research_website(row, body, transport, depth, extra=nav_homepages.get(row["organisation_number"], ()),
+                                 branch=branch_homepages.get(row["organisation_number"], ()),
                                  guesses=guesses and share >= (3 if strategy == "balanced" else 6), max_guess_fetches=3 if share >= 15 else 2 if share >= 10 else 1)
             elif module == "website_retry":
                 retry_timed_out_candidates(row, bodies[row["organisation_number"]], transport, pages)
@@ -2301,6 +2314,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                 # Second, bounded pass: NAV employer homepages exist only after the jobs phase.
                 body = bodies[row["organisation_number"]]
                 research_website(row, body, transport, max(2, min(pages, 4)), extra=nav_homepages.get(row["organisation_number"], ()),
+                                 branch=branch_homepages.get(row["organisation_number"], ()),
                                  guesses=False, only_extra=True)
             elif module in {"jobs", "jobs_depth"}:
                 if jobs_source is None:
@@ -2332,7 +2346,9 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                     charged = getattr(discovery.local, "calls", 0) - calls_before
                     row["operations"]["third_party_cost_usd"] = float(discovery.unit_cost * charged)
             else:
-                official(row, transport, module)
+                found = official(row, transport, module)
+                if module == "locations" and found:
+                    branch_homepages[row["organisation_number"]] = found
         except Exception as exc:
             field = "legal_identity" if module == "identity" else "official_website" if module in {"website", "discovery"} else module
             if field in FIELDS:
@@ -2342,6 +2358,7 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
         row["operations"]["requests"] += getattr(transport.local, "requests", 0) - before_requests
 
     nav_homepages, nav_thread = {}, None
+    branch_homepages = {}
     stage_metrics = []
     food_inspections = FoodInspections()
     if strategy == "balanced":
@@ -2436,7 +2453,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
             stage_metrics.append({"stage": "website_resume", "requests": transport.requests-stage_begin, "companies": len(unfinished),
                                   "seconds": round(time.monotonic()-stage_clock, 1), "request_ceiling": transport.limit,
                                   "time_ceiling_seconds": round(max(0, transport.deadline-started), 3)})
-        hinted = [r for r in rows if r["organisation_number"] in bodies and nav_homepages.get(r["organisation_number"])
+        hinted = [r for r in rows if r["organisation_number"] in bodies
+                  and (nav_homepages.get(r["organisation_number"]) or branch_homepages.get(r["organisation_number"]))
                   and r["availability"].get("official_website") != "available"]
         if strategy == "balanced" and hinted and not replay and time.monotonic() < network_deadline - 30:
             stage_begin = transport.requests

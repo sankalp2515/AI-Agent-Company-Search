@@ -1107,6 +1107,16 @@ def crawl_site(row, body, transport, page_limit=4, origin="registry", url=None, 
         site_fail(row, "ambiguous", f"{final_host}: " + ("site shows a different organisation number" if conflict else "no exact organisation-number proof on company pages"))
         return False
     proof_snap, proof_locator, method = proof
+    if method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
+        # A shared site can have an exact subsidiary contact page while its
+        # title and company-wide profiles still belong to a different entity.
+        proof_soup = next((parsed for snap, parsed, _ in pages if snap is proof_snap), None)
+        title = proof_soup.title.get_text(" ", strip=True) if proof_soup and proof_soup.title else ""
+        lead = re.split(r"\s+[|–—-]\s+", title, maxsplit=1)[0]
+        company_label = re.fullmatch(r"([\w& .'-]+?\s+(?:AS|ASA|ANS|DA|SA|NUF))", lead, re.I)
+        if company_label and not text_contains_name(company_label[1], legal):
+            site_fail(row, "ambiguous", f"{final_host}: contact evidence is hosted by a different legal publisher")
+            return False
     if legal_suffix_guess and method in {"legal_name_and_registered_phone", "legal_name_and_registered_address"}:
         # A suffix in the domain is only a hint. Require the full legal label,
         # including AS, in the actual source for either corroborated proof.

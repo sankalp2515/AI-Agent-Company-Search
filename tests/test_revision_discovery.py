@@ -316,3 +316,10 @@ def test_org_label_allows_stacked_punctuation_and_english_variant():
     assert labelled_numbers("Organisasjons nr.: 812 220 012") == ["812220012"]
     assert labelled_numbers("Organizational number: 930 870 048") == ["930870048"]
     assert labelled_numbers("Telefon 23 30 07 74 og 812 220 012") == []
+
+
+def test_wikidata_hint_is_keyed_by_exact_org_number():
+    from orglens.core import wikidata_websites
+    assert any("bahr.no" in u for u in wikidata_websites("919513063"))
+    assert wikidata_websites("000000000") == []
+    assert not any("kommune.no" in u for u in wikidata_websites("990363013"))

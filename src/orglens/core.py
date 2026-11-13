@@ -1715,6 +1715,23 @@ def osm_websites(legal_name, legal_form_code=None):
     return found[:2]
 
 
+_WIKIDATA_HINTS = None
+
+
+def wikidata_websites(org):
+    """Official websites Wikidata lists for an item carrying exactly this organisation number (CC0).
+
+    A hint only: the site must still pass the normal identity proof before anything is published."""
+    global _WIKIDATA_HINTS
+    if _WIKIDATA_HINTS is None:
+        path = Path(__file__).with_name("data") / "wikidata_websites.json.gz"
+        try:
+            _WIKIDATA_HINTS = json.loads(gzip.decompress(path.read_bytes()))["hints"]
+        except (OSError, ValueError, KeyError):
+            _WIKIDATA_HINTS = {}
+    return list(_WIKIDATA_HINTS.get(str(org), []))[:2]
+
+
 def research_website(row, body, transport, page_limit=4, extra=(), guesses=True, max_guess_fetches=2, only_extra=False):
     """Candidate ladder: registry homepage, NAV-verified employer homepage, previous verified site, name guesses."""
     from .names import guess_domains, resolves, registrable
@@ -1746,7 +1763,10 @@ def research_website(row, body, transport, page_limit=4, extra=(), guesses=True,
             # A registered contact domain is a hypothesis, never publisher proof.
             # Accountants, managers and group domains must still pass crawl_site.
             add('https://' + domain.lower() + '/', 'registry_email')
-    research = row.setdefault("website_research", {"candidates": []})
+    if not only_extra:
+        for url in wikidata_websites(row["organisation_number"]):
+            add(url, "wikidata")
+    research =row.setdefault("website_research", {"candidates": []})
     for field in SITE_FIELDS:
         row["availability"].setdefault(field, "not_available")
     for url, origin in candidates:

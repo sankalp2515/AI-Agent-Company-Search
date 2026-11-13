@@ -42,3 +42,7 @@ Food safety inspection results come from Mattilsynet's open Smilefjes dataset (`
 
 `src/orglens/data/osm_websites.json.gz` holds names and websites of Norwegian businesses from OpenStreetMap, retrieved through the Overpass API on 13 November 2026 and rebuilt with `scripts/build_osm_hints.py`. Data (c) OpenStreetMap contributors, available under the Open Database Licence (ODbL 1.0). It is only a discovery hint: a matched website is published only after the normal identity proof, and chains, brands and housing associations are excluded. The file is a declared external cache.
 
+
+## Wikidata website hints
+
+`src/orglens/data/wikidata_websites.json.gz` lists the official website (P856) of Wikidata items that carry a Norwegian organisation number (P2333), retrieved from the Wikidata Query Service on 14 November 2026 and rebuilt with `scripts/build_wikidata_hints.py`. Wikidata content is available under CC0 1.0. It is only a discovery hint keyed by the exact organisation number: a listed website is published only after the normal identity proof, and municipality sites are excluded. The file is a declared external cache.

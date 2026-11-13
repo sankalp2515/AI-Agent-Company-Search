@@ -22,6 +22,10 @@ Elenergi's [website](https://elenergi-as.no/) shows organisation number 92667893
 
 The 300-company article audit found three unrelated stories from Radio Grenland. The current gate requires media-company stories to name the entity as the subject in the headline. Food safety records and awards have dedicated output fields. The earlier 300-company run contained eight company article candidates, three of which the final media gate rejects on replay. Builderr determines whether public awards earn recall credit.
 
+The scale audit found a hosting directory and four ambiguous legal publishers among the six targeted cases. The final identity replay withheld those five and kept the verified RAK Arkitektur site. It also retained both legal-suffix discoveries in a separate replay. The locked test suite passed 242 tests with the stricter gates.
+
 Further probes found no qualifying new posts from nine advertised WordPress APIs. The NTB pressroom sitemap gave two name/domain overlaps across the archived 300 and 1,100 cohorts. One was a franchise parent match and the other was Frelsesarmeen. Jobbnorge's 1,218 public listings produced an exact normalized employer-name match for Frelsesarmeen only. The public index did not expose employer organisation numbers, so these jobs were not published. The TED exact-identifier probe returned no rows and the Norway control also returned no rows, so it establishes no estimate of TED coverage.
+
+The NTB release sitemap test compared 33,888 release URLs across 12 months with 888 eligible names. Three URL slugs matched. Reading the releases resolved those to a building address, a technology term, and a Swiss company, so no exact Norwegian-company news was recovered.
 
 For reproducibility, use the evaluator command in the repository README. Local run reports, review notes and browser logs are in the ignored `out/awards-evaluation` directory. The branch contains code and reproduction scripts. The raw external responses and any HTML that may contain embedded tokens stay in the ignored directories.

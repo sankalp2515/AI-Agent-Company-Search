@@ -227,8 +227,7 @@ list();show();chart();if(typeof addEventListener==='function')addEventListener('
 $id('search').oninput=()=>{list();show()};$id('filter').onchange=()=>{list();show()};$id('compare').onclick=()=>{comparing=!comparing&&selected.size===2;show()};
 if($id('export'))$id('export').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';const head=['organisation_number','name','municipality','industry','website','latest_revenue_nok','employees','facts'];
 const lines=[head.join(',')].concat(matches().map(r=>{const i=r.legal_identity||{};const rev=years(r).revenue||{};const ys=Object.keys(rev).sort();const site=claims(r,'official_website')[0];return [r.organisation_number,name(r),i.municipality||'',(i.industry||{}).beskrivelse||'',site?site.value:'',ys.length?rev[ys.at(-1)].value.amount:'',i.employees||'',(r.claims||[]).length].map(q).join(',')}));
-const u=URL.createObjectURL(new Blob(['﻿'+lines.join('
-')],{type:'text/csv'}));const a=el('a');a.href=u;a.download='signalpost-companies.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+const u=URL.createObjectURL(new Blob([String.fromCharCode(65279)+lines.join(String.fromCharCode(10))],{type:'text/csv'}));const a=el('a');a.href=u;a.download='signalpost-companies.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 $id('download').onclick=()=>{const a=el('a');a.href='envelopes.jsonl';a.download='envelopes.jsonl';a.click()};
 const R=document.documentElement;if(R){try{if(localStorage.getItem('sp-theme')==='night')R.dataset.theme='night'}catch(e){}}
 if($id('theme'))$id('theme').onclick=()=>{if(!R)return;const n=R.dataset.theme==='night';R.dataset.theme=n?'':'night';$id('theme').textContent=n?'NIGHT':'DAY';try{localStorage.setItem('sp-theme',n?'day':'night')}catch(e){}};

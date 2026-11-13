@@ -1817,6 +1817,23 @@ def parsed_date(value):
         return datetime.min.replace(tzinfo=timezone.utc)
 
 
+def financial_health(latest):
+    """Two standard ratios from one period's filed figures, with the claims they rest on.
+
+    Operating margin needs positive revenue. Equity ratio needs positive total assets. Nothing is
+    estimated: a ratio appears only when both of its figures were filed for the same period."""
+    amount = lambda key: (latest.get(key) or {}).get("value", {}).get("amount")
+    said, used = [], []
+    revenue, operating, equity, assets = amount("revenue"), amount("operating_result"), amount("equity"), amount("assets")
+    if isinstance(revenue, (int, float)) and isinstance(operating, (int, float)) and revenue > 0:
+        said.append(f"operating margin {operating / revenue:.1%}")
+        used += [latest["revenue"], latest["operating_result"]]
+    if isinstance(equity, (int, float)) and isinstance(assets, (int, float)) and assets > 0:
+        said.append(f"equity ratio {equity / assets:.1%}" + (", so liabilities exceed assets" if equity < 0 else ""))
+        used += [latest["equity"], latest["assets"]]
+    return said, used
+
+
 def synthesize(row):
     """Deterministic, evidence-cited narrative. Every statement renders only verified claims."""
     by = {}
@@ -1895,6 +1912,9 @@ def synthesize(row):
             moved += [latest[key], earlier[key]]
         if moves:
             say(f"Change from {previous_year} to {year}: " + "; ".join(moves) + ".", moved, "financial_change")
+        health, used = financial_health(latest)
+        if health:
+            say(f"Financial position in {year}: " + "; ".join(health) + ". Calculated from the filed figures above.", used, "financial_health")
         if registry_year and year and registry_year > year:
             first_claim = next((c for c in row["claims"] if c["field"] == "latest_accounts_year"), None)
             say(f"The register records a {registry_year} annual-accounts filing, but Regnskapsregisteret did not return its figures at retrieval time; {year} figures are shown and are not the latest filing.",

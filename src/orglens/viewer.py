@@ -105,7 +105,7 @@ footer{border-top:1px solid var(--ink);padding:20px 0 50px;color:var(--muted);fo
 </style></head>
 <body><a class="skip" href="#detail">Skip to the company</a>
 <header class="top"><div class="wrap bar"><div class="logo"><svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="13" cy="13" r="2.4" fill="#B0146A"/><path d="M13 0v5M13 21v5M0 13h5M21 13h5" stroke="currentColor" stroke-width="1.8"/></svg>Signalpost</div>
-<span class="sp"></span><button class="btn" id="compare">Compare (0/2)</button><button class="btn" id="download">Download JSONL</button><button class="btn" id="theme" aria-label="Switch between day and night chart">NIGHT</button></div></header>
+<span class="sp"></span><button class="btn" id="compare">Compare (0/2)</button><button class="btn" id="export">Export list (CSV)</button><button class="btn" id="download">Download JSONL</button><button class="btn" id="theme" aria-label="Switch between day and night chart">NIGHT</button></div></header>
 <main class="wrap">
 <section class="hero"><div><div class="eyebrow">Norwegian companies · charted from public sources</div><h1>Every fact has a <em>way back.</em></h1></div>
 <div><p class="lede">Find a company, compare two, and press the magenta mark beside any figure to see exactly where it came from. What nobody could confirm stays marked as unsurveyed.</p>
@@ -225,6 +225,10 @@ function start(data){rows=data;rows.sort((a,b)=>((b.availability||{}).official_w
 const h=(location&&location.hash||'').slice(1);if(h.startsWith('compare=')){h.slice(8).split(',').forEach(o=>rows.some(r=>r.organisation_number===o)&&selected.add(o));if(selected.size===2){comparing=true;$id('compare').textContent='Compare (2/2)'}}else if(h){const f=rows.find(r=>r.organisation_number===h);if(f)current=f}
 list();show();chart();if(typeof addEventListener==='function')addEventListener('resize',()=>chart())}
 $id('search').oninput=()=>{list();show()};$id('filter').onchange=()=>{list();show()};$id('compare').onclick=()=>{comparing=!comparing&&selected.size===2;show()};
+if($id('export'))$id('export').onclick=()=>{const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';const head=['organisation_number','name','municipality','industry','website','latest_revenue_nok','employees','facts'];
+const lines=[head.join(',')].concat(matches().map(r=>{const i=r.legal_identity||{};const rev=years(r).revenue||{};const ys=Object.keys(rev).sort();const site=claims(r,'official_website')[0];return [r.organisation_number,name(r),i.municipality||'',(i.industry||{}).beskrivelse||'',site?site.value:'',ys.length?rev[ys.at(-1)].value.amount:'',i.employees||'',(r.claims||[]).length].map(q).join(',')}));
+const u=URL.createObjectURL(new Blob(['﻿'+lines.join('
+')],{type:'text/csv'}));const a=el('a');a.href=u;a.download='signalpost-companies.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 $id('download').onclick=()=>{const a=el('a');a.href='envelopes.jsonl';a.download='envelopes.jsonl';a.click()};
 const R=document.documentElement;if(R){try{if(localStorage.getItem('sp-theme')==='night')R.dataset.theme='night'}catch(e){}}
 if($id('theme'))$id('theme').onclick=()=>{if(!R)return;const n=R.dataset.theme==='night';R.dataset.theme=n?'':'night';$id('theme').textContent=n?'NIGHT':'DAY';try{localStorage.setItem('sp-theme',n?'day':'night')}catch(e){}};

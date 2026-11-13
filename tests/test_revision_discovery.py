@@ -291,3 +291,13 @@ def test_declared_domain_needs_the_company_named_on_the_page():
     assert not page_names_company("IVRE AS", [(None, None, "Arkivrelatert innhold")], [])
     assert parked_page("Ingen nettside")
     assert parked_page("Hosted by one.com")
+
+
+def test_financial_health_uses_only_filed_figures_of_one_period():
+    from orglens.core import financial_health
+    c = lambda amount: {"value": {"amount": amount, "currency": "NOK"}}
+    said, used = financial_health({"revenue": c(1000), "operating_result": c(-50), "equity": c(-20), "assets": c(400)})
+    assert said == ["operating margin -5.0%", "equity ratio -5.0%, so liabilities exceed assets"]
+    assert len(used) == 4
+    assert financial_health({"revenue": c(0), "operating_result": c(10)}) == ([], [])
+    assert financial_health({"equity": c(10)}) == ([], [])

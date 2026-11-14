@@ -14,6 +14,41 @@ from .navjobs import NavJobs
 from .viewer import render
 
 
+def emergency_output(orgs, output, run_id, exc):
+    """Last-resort delivery: keep every row already researched and mark the rest as failed, never empty."""
+    from .core import FIELDS, envelope, finish, now, write_json
+    import traceback
+    output.mkdir(parents=True, exist_ok=True)
+    print("orglens: batch error, writing safe envelopes:\n" + traceback.format_exc(), file=sys.stderr)
+    saved = {}
+    checkpoint = output / "checkpoint.jsonl"
+    if checkpoint.exists():
+        for line in checkpoint.read_text(encoding="utf-8", errors="replace").splitlines():
+            try:
+                row = json.loads(line)
+                saved[row["organisation_number"]] = row
+            except (ValueError, KeyError, TypeError):
+                continue
+    rows = []
+    for org in orgs:
+        row = saved.get(org)
+        if row is None:
+            row = envelope(org, run_id)
+            row["availability"] = {f: "failed" for f in FIELDS}
+        row.setdefault("errors", []).append({"module": "batch", "message": f"{type(exc).__name__}: {exc}"})
+        try:
+            finish(row)
+        except Exception:
+            row["run"]["completed_at"] = now()
+        rows.append(row)
+    write_rows(output / "envelopes.jsonl", rows)
+    report = {"run_id": run_id, "completed_at": now(), "companies": len(orgs), "envelopes": len(rows),
+              "validation": {"passed": False, "note": "emergency output after a batch error"},
+              "error": f"{type(exc).__name__}: {exc}"}
+    write_json(output / "run-report.json", report)
+    return rows, report
+
+
 def main():
     from .agent import load_env
     load_env()
@@ -142,19 +177,23 @@ def main():
             from .discovery import build_discovery_from_env
             discovery = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0,
                                                  max_cost=args.max_api_cost or 0.0, max_queries=args.max_search_queries, query_policy=args.search_policy)
-        rows, report = run_batch(read_inputs(args.input), args.output, run_id=args.run_id,
-                                 requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
-                                 previous=previous, pages=args.pages, modules=modules,
-                                 registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent,
-                                 jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess, strategy=args.strategy, quote_selector=quote_selector)
+        orgs = read_inputs(args.input)
+        try:
+            rows, report = run_batch(orgs, args.output, run_id=args.run_id,
+                                     requests=args.max_requests, seconds=args.max_seconds, workers=args.workers,
+                                     previous=previous, pages=args.pages, modules=modules,
+                                     registry=args.registry, registry_retrieved_at=args.registry_retrieved_at, replay=args.replay, discovery=discovery, agent=agent,
+                                     jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess, strategy=args.strategy, quote_selector=quote_selector)
+        except Exception as exc:  # never leave the harness without readable output
+            rows, report = emergency_output(orgs, Path(args.output), args.run_id, exc)
         if ai_unavailable:
             from .core import write_json
             report["quote_selector"] = {"requested": True, "executed": False,
                                         "reason": "no model credential configured; literal-text extraction used"}
             write_json(Path(args.output) / "run-report.json", report)
-        render(rows, Path(args.output) / "index.html")
         written = Path(args.output) / "envelopes.jsonl"
         import shutil
+        # Deliver the machine-readable output first; the human viewer is optional and may never block it.
         for target in (envelope_file, Path(args.profiles_output) if args.profiles_output else None):
             if target is not None:
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -162,10 +201,14 @@ def main():
         if args.report:
             Path(args.report).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(Path(args.output) / "run-report.json", args.report)
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+        try:
+            render(rows, Path(args.output) / "index.html")
+        except Exception as exc:
+            print(f"orglens: viewer not rendered ({type(exc).__name__}: {exc}); envelopes are complete", file=sys.stderr)
+        print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
         # A complete batch (one envelope per input) is always delivered with exit 0 so a harness never
         # discards it; validation findings stay in the report. Only a missing envelope fails the run.
-        complete = len(rows) == len(read_inputs(args.input))
+        complete = len(rows) == len(orgs)
         raise SystemExit(0 if complete or report["validation"]["passed"] else 1)
     elif args.command == "validate":
         rows = [json.loads(line) for line in Path(args.envelopes).read_text(encoding="utf-8").splitlines() if line.strip()]

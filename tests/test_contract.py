@@ -107,3 +107,28 @@ def test_cli_writes_envelopes_to_a_jsonl_output_path(tmp_path, monkeypatch):
     assert done.value.code == 0  # complete batch is delivered even when a validation note fails
     assert out.is_file() and json.loads(out.read_text())["organisation_number"] == "923609016"
     assert report.is_file()
+
+
+def test_batch_crash_still_writes_one_envelope_per_company(tmp_path, monkeypatch):
+    import json, sys
+    import orglens.cli as cli
+    inp = tmp_path / "in.jsonl"
+    inp.write_text('{"organisation_number": "923609016"}\n{"organisation_number": "941009697"}\n')
+    out = tmp_path / "evaluation"
+    out.mkdir()
+    # One company finished before the crash and sits in the checkpoint; it must be kept.
+    done = finish(envelope("923609016", "official"))
+    (out / "checkpoint.jsonl").write_text(json.dumps(done) + "\n")
+
+    def boom(*a, **k):
+        raise RuntimeError("simulated late failure")
+    monkeypatch.setattr(cli, "run_batch", boom)
+    monkeypatch.setattr(cli, "render", lambda rows, path: (_ for _ in ()).throw(RuntimeError("viewer broke")))
+    monkeypatch.setattr(sys, "argv", ["orglens", "run", "--input", str(inp), "--output", str(out), "--no-discover"])
+    with pytest.raises(SystemExit) as code:
+        cli.main()
+    assert code.value.code == 0
+    rows = [json.loads(l) for l in (out / "envelopes.jsonl").read_text().splitlines()]
+    assert [r["organisation_number"] for r in rows] == ["923609016", "941009697"]
+    assert rows[1]["availability"]["legal_identity"] == "failed"
+    assert json.loads((out / "run-report.json").read_text())["envelopes"] == 2

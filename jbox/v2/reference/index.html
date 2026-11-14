@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signalpost — design reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,wght@1,400&family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFCFA;--water:#DCECF1;--shoal:#C3DFE8;--land:#F4E8C3;--card:#FFFFFF;
+  --ink:#0E2A36;--muted:#48626D;--line:#B4CAD2;--mark:#B0146A;--good:#0B6B57;--warn:#8A5A00;--bad:#B3261E;--hatch:#9DB9C2;
+  --sans:"Schibsted Grotesk",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;--note:"Newsreader",Georgia,serif;
+}
+:root[data-theme="night"]{
+  --paper:#071821;--water:#0C2632;--shoal:#123746;--land:#2B2918;--card:#0B202A;
+  --ink:#E6F0F2;--muted:#9CB6BF;--line:#25495A;--mark:#FF86BE;--good:#5FD0B5;--warn:#E6B85C;--bad:#F2938B;--hatch:#3C6070;
+}
+*{box-sizing:border-box}
+
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.note{font-family:var(--note);font-style:italic;color:var(--muted)}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--mark);outline-offset:3px}
+
+/* header */
+header{border-bottom:1px solid var(--line);position:sticky;top:0;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(6px);z-index:20}
+.bar{display:flex;align-items:center;gap:24px;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.02em;text-decoration:none}
+nav{margin-left:auto;display:flex;gap:4px;align-items:center}
+nav a{padding:12px 12px;font-size:15px;text-decoration:none;color:var(--muted)}
+nav a:hover{color:var(--ink)}
+.toggle{border:1px solid var(--line);background:none;border-radius:3px;height:36px;padding:0 12px;font:500 12px var(--mono);letter-spacing:.06em;cursor:pointer}
+
+/* hero */
+.hero{padding:56px 0 20px;display:grid;grid-template-columns:1fr;gap:28px}
+h1{font-size:clamp(40px,7.2vw,92px);line-height:.95;letter-spacing:-.045em;font-weight:800;margin:14px 0 0;max-width:12ch}
+h1 em{font-family:var(--note);font-weight:400;letter-spacing:-.02em;color:var(--mark)}
+.lede{font-size:19px;max-width:52ch;color:var(--muted);margin:0}
+.herotop{display:grid;grid-template-columns:1.2fr 1fr;gap:40px;align-items:end}
+.search{display:flex;border:1.5px solid var(--ink);background:var(--card);border-radius:3px;height:60px;align-items:center;padding:0 16px;gap:12px}
+.search input{border:0;background:none;flex:1;font:500 18px var(--sans);color:var(--ink);outline:none;min-width:0}
+.search kbd{font:500 12px var(--mono);border:1px solid var(--line);padding:2px 7px;border-radius:3px;color:var(--muted)}
+.try{margin-top:10px;font-size:14px;color:var(--muted)}
+.try a{font-family:var(--mono);font-size:13px;margin-right:14px}
+
+/* the chart */
+.chart{position:relative;margin-top:8px;border:1px solid var(--ink);background:var(--water);height:min(62vh,560px);min-height:380px;overflow:hidden}
+.chart #sv{position:absolute;inset:0;width:100%;height:100%}
+.chart .frame{position:absolute;inset:8px;border:1px solid var(--ink);pointer-events:none}
+.snd{font:500 11px var(--mono);fill:var(--ink);opacity:.8;cursor:pointer;text-anchor:middle}
+.snd.ring{opacity:.55}
+.snd:hover,.snd.on{opacity:1;fill:var(--mark);font-size:15px;font-weight:500}
+.axis{font:500 10px var(--mono);letter-spacing:.1em;fill:var(--muted);text-transform:uppercase}
+.contour{fill:none;stroke:var(--shoal);stroke-width:1.2}
+.contour.b{stroke:var(--line);stroke-width:.8}
+.unsv{fill:url(#hatch)}
+.legend{position:absolute;left:64px;bottom:96px;background:var(--card);border:1px solid var(--ink);padding:10px 12px;max-width:250px;font-size:13px;line-height:1.35}
+.legend b{display:block;font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--ink);border-left:3px solid var(--mark);padding:10px 12px;min-width:220px;font-size:13px;display:none;z-index:5}
+.tip strong{display:block;font-size:15px;letter-spacing:-.01em}
+.tip .mono{font-size:12px;color:var(--muted)}
+.rose{position:absolute;right:26px;bottom:54px;width:92px;height:92px;opacity:.75;pointer-events:none}
+.counts{display:flex;gap:40px;padding:18px 0 0;flex-wrap:wrap}
+.counts div{font-size:13px;color:var(--muted)}
+.counts b{display:block;font:500 26px var(--mono);color:var(--ink);letter-spacing:-.02em}
+
+section{padding:72px 0 0}
+h2{font-size:clamp(26px,3.4vw,40px);letter-spacing:-.035em;line-height:1.05;margin:8px 0 20px;font-weight:800}
+.rule{border-top:1px solid var(--ink);padding-top:12px;display:flex;justify-content:space-between;align-items:baseline}
+
+/* list rows */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.chip{border:1px solid var(--line);background:var(--card);height:40px;padding:0 14px;border-radius:3px;font-size:14px;cursor:pointer}
+.chip[aria-pressed=true]{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.row{display:grid;grid-template-columns:44px 1.6fr 1fr 130px 110px;gap:16px;align-items:center;border-bottom:1px solid var(--line);padding:14px 0}
+.row .nm{font-weight:700;font-size:17px;letter-spacing:-.01em;text-decoration:none}
+.row .nm:hover{text-decoration:underline;text-decoration-color:var(--mark);text-underline-offset:4px}
+.row small{display:block;color:var(--muted);font-size:13px}
+.row .fig{text-align:right;font-family:var(--mono);font-size:14px}
+.cmp{border:1px solid var(--line);background:none;height:40px;border-radius:3px;font-size:13px;cursor:pointer}
+
+/* fix mark */
+.fix{all:unset;cursor:pointer;display:inline-grid;place-items:center;width:28px;height:28px;margin:-6px 0 -6px 2px;vertical-align:middle;position:relative}
+.fix::before{content:"";width:13px;height:13px;border:1.6px solid var(--mark);border-radius:50%;transition:transform .16s}
+.fix::after{content:"";position:absolute;width:3.5px;height:3.5px;border-radius:50%;background:var(--mark)}
+.fix:hover::before{transform:scale(1.35);background:color-mix(in srgb,var(--mark) 16%,transparent)}
+
+/* profile */
+.profile{display:grid;grid-template-columns:1fr 400px;gap:0;border:1px solid var(--ink);background:var(--card);position:relative}
+.pmain{padding:28px;min-width:0}
+.tablebox{overflow-x:auto}
+.pname{font-size:clamp(34px,5vw,60px);font-weight:800;letter-spacing:-.04em;line-height:1;margin:6px 0 4px}
+.meta{font:500 13px var(--mono);color:var(--muted)}
+.glance{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink);margin-top:22px}
+.glance>div{padding:14px 14px 14px 0;border-bottom:1px solid var(--line)}
+.glance label{display:block;font-size:12px;color:var(--muted)}
+.glance .v{font:500 19px var(--mono);letter-spacing:-.02em;white-space:nowrap}
+.delta{font:500 12px var(--mono)}
+.up{color:var(--good)}.down{color:var(--bad)}
+table{border-collapse:collapse;width:100%;margin-top:20px}
+th,td{padding:11px 8px;border-bottom:1px solid var(--line);text-align:right;font:400 14px var(--mono);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;font-family:var(--sans);font-weight:500}
+thead th{font:500 12px var(--mono);color:var(--muted);border-bottom:1px solid var(--ink)}
+.spark{width:74px;height:22px;vertical-align:middle}
+.spark path{fill:none;stroke:var(--ink);stroke-width:1.5}
+.spark circle{fill:var(--mark)}
+.unsurveyed{background:repeating-linear-gradient(135deg,transparent 0 6px,var(--hatch) 6px 7px);border:1px dashed var(--muted);padding:10px;margin-top:18px}
+.unsurveyed span{background:var(--card);padding:3px 8px;font-size:14px}
+.unsurveyed b{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-right:8px}
+
+/* source panel */
+.panel{border-left:3px solid var(--mark);background:var(--paper);padding:26px 24px;position:relative}
+.panel h3{margin:6px 0 2px;font-size:15px;font-weight:500;color:var(--muted)}
+.panel .big{font:500 30px var(--mono);letter-spacing:-.03em}
+.panel dl{margin:18px 0 0}
+.panel dt{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:14px}
+.panel dd{margin:3px 0 0;font-size:15px;overflow-wrap:anywhere}
+.panel{min-width:0}
+.btn{display:inline-flex;align-items:center;height:48px;padding:0 18px;background:var(--ink);color:var(--paper);border:0;border-radius:3px;font-weight:700;margin-top:22px;text-decoration:none;cursor:pointer}
+.bearing{position:absolute;left:-180px;top:163px;width:180px;border-top:1.5px dashed var(--mark);transform-origin:left;animation:draw .52s ease-out both}
+@keyframes draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* survey ring */
+.ring{width:36px;height:36px}
+.ring path{stroke:var(--line);stroke-width:4;fill:none}
+.ring path.f{stroke:var(--ink)}
+.ring path.m{stroke:var(--mark)}
+
+/* compare */
+.compare{border:1px solid var(--ink);background:var(--card)}
+.chead{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--ink);position:sticky;top:60px;background:var(--card)}
+.chead div{padding:14px 18px;font-weight:800;font-size:clamp(16px,2.4vw,24px);letter-spacing:-.02em}
+.chead div:first-child{border-right:1px solid var(--ink);text-align:right}
+.crow{padding:12px 18px 14px;border-bottom:1px solid var(--line)}
+.crow label{display:block;text-align:center;font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.bf{display:grid;grid-template-columns:1fr 1px 1fr;gap:0;align-items:center}
+.bf .l{display:flex;flex-direction:column;align-items:flex-end;padding-right:12px}
+.bf .r{display:flex;flex-direction:column;align-items:flex-start;padding-left:12px}
+.bf i{display:block;width:1px;height:46px;background:var(--ink)}
+.bf .v{font:500 clamp(13px,1.9vw,17px) var(--mono);white-space:nowrap}
+.bar2{height:10px;background:var(--ink);margin-top:5px;transition:width .52s}
+.bar2.loss{background:repeating-linear-gradient(135deg,var(--bad) 0 3px,transparent 3px 6px);border:1px solid var(--bad)}
+footer{margin-top:96px;border-top:1px solid var(--ink);padding:24px 0 60px;font-size:13px;color:var(--muted)}
+
+@media (max-width:860px){
+  .wrap{padding:0 16px}
+  .herotop{grid-template-columns:1fr;gap:18px}
+  .hero{padding-top:32px}
+  .legend{display:none}
+  .rose{width:60px;height:60px;right:16px}
+  .row{grid-template-columns:36px 1fr 84px;gap:10px}
+  .row .hide{display:none}
+  .profile{grid-template-columns:1fr}
+  .panel{border-left:0;border-top:3px solid var(--mark)}
+  .bearing{display:none}
+  .glance{grid-template-columns:repeat(2,1fr)}
+  .tablebox{overflow-x:auto}
+  nav a{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="wrap bar">
+  <a class="logo" href="#"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="13" cy="13" r="2.4" fill="var(--mark)"/><path d="M13 0v5M13 21v5M0 13h5M21 13h5" stroke="currentColor" stroke-width="1.8"/></svg>Signalpost</a>
+  <nav><a href="#find">Find</a><a href="#compare">Compare</a><a href="#method">How it works</a>
+  <button class="toggle" id="theme" aria-label="Switch between day chart and night chart">NIGHT CHART</button></nav>
+</div></header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="herotop">
+      <div>
+        <div class="eyebrow">Norwegian companies · charted from public sources</div>
+        <h1>Every fact has a <em>way back.</em></h1>
+      </div>
+      <div>
+        <p class="lede">Find a Norwegian company, compare two, and tap any figure to see exactly where it came from. What nobody could confirm stays marked as unsurveyed.</p>
+        <label class="search" style="margin-top:18px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" placeholder="Company name, number, town or industry" aria-label="Find a company"><kbd>/</kbd></label>
+        <div class="try">Try <a href="#">Melbye</a><a href="#">941 009 697</a><a href="#">Lillestrøm</a></div>
+      </div>
+    </div>
+
+    <div class="chart" id="chart" role="img" aria-label="Chart of every researched company by founding year and revenue">
+      <svg id="sv" preserveAspectRatio="none"><defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="7" stroke="var(--hatch)" stroke-width="1.4"/></pattern></defs></svg>
+      <div class="frame"></div>
+      <div class="legend"><b>How to read this chart</b>Each number is one company: its employee count, placed by founding year and revenue. Tap one to open it.</div>
+      <svg class="rose" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="var(--mark)" stroke-width="1"/><circle cx="50" cy="50" r="34" fill="none" stroke="var(--mark)" stroke-width=".6" stroke-dasharray="1 4.9"/><path d="M50 2 L55 50 L50 98 L45 50Z" fill="none" stroke="var(--mark)" stroke-width="1"/><path d="M2 50 L50 45 L98 50 L50 55Z" fill="none" stroke="var(--mark)" stroke-width="1"/><text x="50" y="-3" text-anchor="middle" font-size="9" fill="var(--mark)" font-family="IBM Plex Mono">N</text></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="counts" id="counts"></div>
+  </div>
+
+  <section id="find">
+    <div class="rule"><span class="eyebrow">01 · Find</span><span class="note">Website first, then depth of research</span></div>
+    <h2>Find a company</h2>
+    <div class="filters"><button class="chip" aria-pressed="true">All</button><button class="chip" aria-pressed="false">Verified website</button><button class="chip" aria-pressed="false">Hiring now</button><button class="chip" aria-pressed="false">Has news</button><button class="chip" aria-pressed="false">Municipality ▾</button><button class="chip" aria-pressed="false">Industry ▾</button></div>
+    <div id="rows"></div>
+  </section>
+
+  <section id="trace">
+    <div class="rule"><span class="eyebrow">02 · Read and trace</span><span class="note">Tap the fix mark. Follow the bearing.</span></div>
+    <h2>One company, every figure checkable</h2>
+    <div class="profile">
+      <div class="pmain">
+        <div class="eyebrow">Company research · last checked 12 Nov 2026</div>
+        <div class="pname">Melbye AS</div>
+        <div class="meta">941 009 697 · Limited company (Aksjeselskap) · Lillestrøm · founded 1986</div>
+        <div class="glance">
+          <div><label>Revenue 2025</label><span class="v">353.7 m</span><button class="fix" aria-label="Check the source of Revenue 2025"></button><div class="delta down">−0.1% on 2024</div></div>
+          <div><label>Net result 2025</label><span class="v">23.6 m</span><button class="fix" aria-label="Check the source of Net result"></button><div class="delta up">+272.9% on 2024</div></div>
+          <div><label>Employees</label><span class="v">51</span><button class="fix" aria-label="Check the source of Employees"></button></div>
+          <div><label>Website</label><span class="v" style="font-size:15px">melbye.no ↗</span><button class="fix" aria-label="Check the source of Website"></button></div>
+        </div>
+        <div class="tablebox"><table>
+          <thead><tr><th>Filed accounts, NOK</th><th>Trend</th><th>2025</th><th>2024</th><th>2023</th></tr></thead>
+          <tbody>
+            <tr><td>Revenue</td><td><svg class="spark" viewBox="0 0 74 22"><path d="M3 15 L37 4 L71 5"/><circle cx="71" cy="5" r="2.6"/></svg></td><td>353,709,793<button class="fix" aria-label="Check the source of Revenue 2025"></button></td><td>354,040,451<button class="fix" aria-label="source"></button></td><td>347,803,921<button class="fix" aria-label="source"></button></td></tr>
+            <tr><td>Operating result</td><td><svg class="spark" viewBox="0 0 74 22"><path d="M3 8 L37 19 L71 3"/><circle cx="71" cy="3" r="2.6"/></svg></td><td>30,860,499<button class="fix" aria-label="source"></button></td><td>9,439,255<button class="fix" aria-label="source"></button></td><td>25,187,462<button class="fix" aria-label="source"></button></td></tr>
+            <tr><td>Net result</td><td><svg class="spark" viewBox="0 0 74 22"><path d="M3 7 L37 19 L71 3"/><circle cx="71" cy="3" r="2.6"/></svg></td><td>23,598,927<button class="fix" aria-label="source"></button></td><td>6,327,920<button class="fix" aria-label="source"></button></td><td>20,200,708<button class="fix" aria-label="source"></button></td></tr>
+            <tr><td>Equity</td><td><svg class="spark" viewBox="0 0 74 22"><path d="M3 9 L37 18 L71 3"/><circle cx="71" cy="3" r="2.6"/></svg></td><td>84,265,550<button class="fix" aria-label="source"></button></td><td>76,266,623<button class="fix" aria-label="source"></button></td><td>80,153,001<button class="fix" aria-label="source"></button></td></tr>
+          </tbody></table></div>
+        <div class="unsurveyed"><span><b>Unsurveyed</b>Job ads: we looked and found nothing.</span></div>
+      </div>
+      <aside class="panel" aria-label="Source of Revenue 2025">
+        <div class="bearing"></div>
+        <div class="eyebrow" style="color:var(--mark)">⊙ Position confirmed</div>
+        <h3>Revenue 2025 · Melbye AS</h3>
+        <div class="big">NOK 353,709,793</div>
+        <dl>
+          <dt>Where it came from</dt><dd>Regnskapsregisteret (annual accounts)</dd>
+          <dt>Retrieved</dt><dd class="mono">12 Nov 2026, 23:40 UTC</dd>
+          <dt>Reporting period</dt><dd class="mono">2025-01-01 to 2025-12-31</dd>
+          <dt>Exact place in the source</dt><dd>Field <span class="mono">/2/resultatregnskapResultat/driftsresultat/driftsinntekter/sumDriftsinntekter</span></dd>
+          <dt>Why this is the right company</dt><dd>Looked up directly by organisation number in the official register</dd>
+          <dt>Fingerprint of the saved source</dt><dd class="mono">9c22456f15d6db11</dd>
+        </dl>
+        <a class="btn" href="#">Open the original source ↗</a>
+      </aside>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="rule"><span class="eyebrow">03 · Compare</span><span class="note">Both bars in a row share one scale</span></div>
+    <h2>Two companies, one centre line</h2>
+    <div class="compare">
+      <div class="chead"><div>Melbye AS</div><div>Coromatic AS</div></div>
+      <div class="crow"><label>Revenue 2025</label><div class="bf"><div class="l"><span class="v">353,709,793<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:98.2%"></div></div><i></i><div class="r"><span class="v">360,177,057<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:100%"></div></div></div></div>
+      <div class="crow"><label>Net result 2025</label><div class="bf"><div class="l"><span class="v">23,598,927<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:100%"></div></div><i></i><div class="r"><span class="v" style="color:var(--bad)">−17,626,428<button class="fix" aria-label="source"></button></span><div class="bar2 loss" style="width:74.7%"></div></div></div></div>
+      <div class="crow"><label>Employees</label><div class="bf"><div class="l"><span class="v">51<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:65.4%"></div></div><i></i><div class="r"><span class="v">78<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:100%"></div></div></div></div>
+      <div class="crow"><label>Operating result 2025</label><div class="bf"><div class="l"><span class="v">30,860,499<button class="fix" aria-label="source"></button></span><div class="bar2" style="width:100%"></div></div><i></i><div class="r"><span class="v" style="color:var(--bad)">−29,324,504<button class="fix" aria-label="source"></button></span><div class="bar2 loss" style="width:95%"></div></div></div></div>
+    </div>
+  </section>
+
+  <footer id="method">Design reference only, built from the 1,000-company research file. Research by OrgLens. Contains data under the Norwegian Licence for Open Government Data (NLOD) made available by Brønnøysundregistrene.</footer>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const root=document.documentElement;
+$('#theme').onclick=()=>{const n=root.dataset.theme==='night';root.dataset.theme=n?'':'night';$('#theme').textContent=n?'NIGHT CHART':'DAY CHART'};
+document.addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement!==$('#q')){e.preventDefault();$('#q').focus()}});
+const fmt=n=>n==null||n===''?null:(Math.abs(n)>=1e9?(n/1e9).toFixed(1)+' bn':Math.abs(n)>=1e6?(n/1e6).toFixed(1)+' m':Math.round(n/1e3)+' k');
+function ring(c){ // eight sectors: website, profiles, news, description, jobs, accounts, leadership, workplaces
+  const keys=['state_official_website','state_owned_profiles','state_activity','state_description','state_jobs','state_financials','state_leadership','state_locations'];
+  let out='<svg class="ring" viewBox="0 0 36 36" role="img" aria-label="'+keys.filter(k=>c[k]==='available').length+' of 8 areas found">';
+  keys.forEach((k,i)=>{const a0=(i*45-90+5)*Math.PI/180,a1=((i+1)*45-90-5)*Math.PI/180,r=13;
+    out+=`<path class="${c[k]==='available'?(i<5?'m':'f'):''}" d="M${18+r*Math.cos(a0)} ${18+r*Math.sin(a0)} A${r} ${r} 0 0 1 ${18+r*Math.cos(a1)} ${18+r*Math.sin(a1)}"/>`});
+  return out+'</svg>';
+}
+fetch('../../site-data-v2/index.json').then(r=>r.json()).then(data=>{
+  // rows
+  $('#rows').innerHTML=data.slice(0,7).map(c=>`<div class="row">${ring(c)}<div><a class="nm" href="#">${c.name.replace(/\b([A-ZÆØÅ])([A-ZÆØÅ]+)\b/g,(m,a,b)=>m==='AS'||m==='ASA'?m:a+b.toLowerCase())}</a><small class="mono">${c.org_number.replace(/(\d{3})(\d{3})(\d{3})/,'$1 $2 $3')} · ${c.municipality.charAt(0)+c.municipality.slice(1).toLowerCase()}</small></div><div class="hide"><small>${c.industry}</small></div><div class="fig">${fmt(c.revenue)?'NOK '+fmt(c.revenue):'<span class="note">not filed</span>'}<small>${c.fact_count} facts</small></div><button class="cmp hide">+ Compare</button></div>`).join('');
+  // counts
+  const sites=data.filter(c=>c.website).length,facts=data.reduce((s,c)=>s+c.fact_count,0);
+  $('#counts').innerHTML=`<div><b>${data.length.toLocaleString()}</b>companies charted</div><div><b>${facts.toLocaleString()}</b>facts, each with a source</div><div><b>${sites}</b>verified websites</div><div><b>0</b>guesses published</div>`;
+  draw(data);addEventListener('resize',()=>draw(data));
+});
+function draw(data){
+  const box=$('#chart'),W=box.clientWidth,H=box.clientHeight,sv=$('#sv');
+  sv.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const padL=70,padR=24,padT=26,band=64,padB=34,y0=H-padB-band; // revenue area ends at y0, band below is unsurveyed
+  const small=W<700,pts=small?data.filter((_,i)=>i%3===0):data;
+  const x=(yr,j)=>yr<1970?padL+(j%23)*0.9:padL+22+(Math.min(2026,yr)-1970)/56*(W-padL-padR-22);
+  const y=rev=>y0-(Math.log10(Math.max(1e4,Math.min(2e10,rev)))-4)/(10.3-4)*(y0-padT);
+  let h='<defs>'+sv.querySelector('defs').innerHTML+'</defs>';
+  // contours
+  for(let i=0;i<7;i++){const yy=padT+40+i*(y0-padT)/7;let d=`M0 ${yy}`;for(let px=0;px<=W;px+=W/8){d+=` S${px-W/16} ${yy+Math.sin(i*1.7+px/190)*26} ${px} ${yy+Math.cos(i+px/260)*18}`}h+=`<path class="contour ${i%2?'b':''}" d="${d}"/>`}
+  h+=`<rect class="unsv" x="0" y="${y0+8}" width="${W}" height="${band}"/><text class="axis" x="${padL}" y="${y0+24}">Unsurveyed · no revenue filed</text>`;
+  [1970,1980,1990,2000,2010,2020].forEach(v=>h+=`<text class="axis" x="${x(v)}" y="${H-14}" text-anchor="middle">${v===1970?'≤1970':v}</text>`);
+  [[1e5,'100 k'],[1e6,'1 m'],[1e7,'10 m'],[1e8,'100 m'],[1e9,'1 bn']].forEach(([v,l])=>h+=`<text class="axis" x="20" y="${y(v)+3}">${l}</text>`);
+  h+=`<text class="axis" x="${W-padR}" y="${H-14}" text-anchor="end">Founded →</text>`;
+  // Thin the soundings as a chart does: biggest employers keep their figure, anything that would overlap becomes a ring.
+  const taken=new Set(),cell=(px,py,w)=>{const out=[];for(let gx=Math.floor((px-w/2)/6);gx<=Math.floor((px+w/2)/6);gx++)for(let gy=Math.floor((py-9)/6);gy<=Math.floor(py/6);gy++)out.push(gx+','+gy);return out};
+  const order=pts.slice().sort((a,b)=>(b.employees||0)-(a.employees||0));
+  order.forEach(c=>{const yr=+String(c.founded_on||'').slice(0,4)||2000;let hsh=0;for(const ch of c.org_number)hsh=(hsh*31+ch.charCodeAt(0))%997;
+    const px=x(yr,hsh)+(hsh%11-5),py=c.revenue>0?y(c.revenue):y0+20+(hsh%(band-26));
+    const label=c.employees?String(c.employees):'',w=label.length*6.8+2,cells=label?cell(px,py,w):[];
+    const fits=label&&cells.every(k=>!taken.has(k));
+    if(fits)cells.forEach(k=>taken.add(k));
+    h+=`<text class="snd${fits?'':' ring'}" data-i="${data.indexOf(c)}" x="${px.toFixed(1)}" y="${py.toFixed(1)}" tabindex="-1">${fits?label:'∘'}</text>`});
+  sv.innerHTML=h;
+  const tip=$('#tip');
+  sv.onmousemove=e=>{const t=e.target.closest('.snd');if(!t){tip.style.display='none';return}const c=data[t.dataset.i];
+    tip.innerHTML=`<strong>${c.name}</strong><span class="mono">${c.municipality} · founded ${String(c.founded_on).slice(0,4)}</span><br>${c.revenue>0?'Revenue NOK '+fmt(c.revenue):'<span class="note">No revenue filed</span>'} · ${c.employees||'no'} employees<br><span class="note">${c.fact_count} facts, each with a source</span>`;
+    tip.style.display='block';const r=box.getBoundingClientRect();let lx=e.clientX-r.left+14,ly=e.clientY-r.top+14;if(lx+240>W)lx-=260;if(ly+110>H)ly-=120;tip.style.left=lx+'px';tip.style.top=ly+'px'};
+  sv.onmouseleave=()=>tip.style.display='none';
+}
+</script>
+</body>
+</html>

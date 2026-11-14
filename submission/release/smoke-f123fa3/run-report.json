@@ -1,0 +1,172 @@
+{
+  "run_id": "official",
+  "completed_at": "2026-11-14T18:23:34.219830Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "dropped_snapshots": 0,
+  "requests": 1671,
+  "bytes": 199567339,
+  "runtime_seconds": 489.156,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 2000,
+    "seconds": 2700
+  },
+  "p50_company_ms": 11590,
+  "p95_company_ms": 80356,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 10,
+    "description": 8,
+    "jobs": 0,
+    "activity": 100,
+    "owned_profiles": 4,
+    "contact": 39,
+    "public_awards": 10
+  },
+  "states": {
+    "ambiguous": 21,
+    "failed": 27,
+    "blocked": 0,
+    "available": 571,
+    "not_applicable": 0,
+    "not_available": 481
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 10,
+    "social_links": 4,
+    "news": 2,
+    "job_postings": 0,
+    "careers_page": 1,
+    "description": 8,
+    "public_awards": 10,
+    "public_inspections": 0
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 4,
+    "unique_urls": 286,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 100,
+      "seconds": 11.1,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 100,
+      "seconds": 10.7,
+      "request_ceiling": 1900,
+      "time_ceiling_seconds": 599.309
+    },
+    {
+      "stage": "website",
+      "requests": 558,
+      "seconds": 113.8,
+      "request_ceiling": 1280,
+      "time_ceiling_seconds": 1129.78
+    },
+    {
+      "stage": "financials",
+      "requests": 100,
+      "seconds": 10.8,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 878.396
+    },
+    {
+      "stage": "locations",
+      "requests": 100,
+      "seconds": 10.7,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 1255.196
+    },
+    {
+      "stage": "awards",
+      "requests": 100,
+      "seconds": 10.9,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2364.0
+    },
+    {
+      "stage": "food_inspections",
+      "requests": 0,
+      "seconds": 0.2,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "jobs",
+      "requests": 464,
+      "seconds": 237.2,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "jobs_depth",
+      "companies": 14,
+      "requests": 135,
+      "seconds": 18.5,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "website_hints",
+      "requests": 0,
+      "companies": 2,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "website_retry",
+      "requests": 14,
+      "companies": 7,
+      "recovered": 0,
+      "seconds": 24.0,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 513.922
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": {
+    "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
+    "state": "loaded",
+    "window_days": 186,
+    "feed_pages": 357,
+    "detail_requests": 137,
+    "cache_hits": 162,
+    "max_candidate_details": 12,
+    "max_detail_requests": 274,
+    "completed_segments": 6,
+    "total_segments": 6,
+    "error": null,
+    "indexed_active_employers": 6101,
+    "indexed_active_ads": 9949,
+    "token": "NAV published public token"
+  },
+  "website_methods": {
+    "labelled_organisation_number": 5,
+    "registry_declared_homepage": 2,
+    "full_name_domain_and_registered_operating_head": 2,
+    "legal_name_and_registered_address": 1
+  },
+  "discovery": null
+}

@@ -67,6 +67,12 @@ def post_json(url, key, body, timeout):
 DEFAULT_PROVIDER_ORDER = "openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral"
 # Minimum seconds between calls to one provider: free tiers are rate limited, paid APIs are not.
 FREE_TIER_PACING = {"groq": 3.2, "cohere": 3.2}
+# Default models, cheapest first; used only when no *_MODEL variable names one.
+MODEL_FALLBACKS = {
+    "openai": ["gpt-4.1-mini", "gpt-5-mini", "gpt-4o-mini"],
+    "anthropic": ["claude-haiku-5-5", "claude-sonnet-5-5"],
+    "gemini": ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-2.5-flash"],
+}
 
 
 def _chat_url(base):
@@ -90,10 +96,10 @@ def providers_from_env(order, require=True):
     openai_url = _chat_url(os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1")
     available = {
         # Any OpenAI-compatible endpoint: OPENAI_API_KEY, optional OPENAI_BASE_URL and OPENAI_MODEL.
-        "openai": (openai_url, os.getenv("OPENAI_API_KEY") if openai_url else None, "gpt-4.1-mini"),
-        "anthropic": ("https://api.anthropic.com/v1/chat/completions", os.getenv("ANTHROPIC_API_KEY"), "claude-haiku-5-5"),
+        "openai": (openai_url, os.getenv("OPENAI_API_KEY") if openai_url else None, MODEL_FALLBACKS["openai"][0]),
+        "anthropic": ("https://api.anthropic.com/v1/chat/completions", os.getenv("ANTHROPIC_API_KEY"), MODEL_FALLBACKS["anthropic"][0]),
         "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                   os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"), "gemini-2.5-flash"),
+                   os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"), MODEL_FALLBACKS["gemini"][0]),
         "groq": ("https://api.groq.com/openai/v1/chat/completions", os.getenv("GROQ_API_KEY"), "openai/gpt-oss-20b"),
         "nvidia": ("https://integrate.api.nvidia.com/v1/chat/completions", os.getenv("NVIDIA_API_KEY") or os.getenv("NVDIA_API_KEY"), "openai/gpt-oss-20b"),
         "cloudflare": (f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1/chat/completions", (os.getenv("CLOUDFLARE_API_KEY") or os.getenv("Cloudflare_API_KEY")) if account else None, "@cf/meta/llama-3.1-8b-instruct-fp8-fast"),
@@ -106,8 +112,12 @@ def providers_from_env(order, require=True):
             raise ValueError("Unknown model provider")
         url, key, model = available[name]
         if key and key.strip():
-            result.append({"name": name, "url": url, "key": key.strip(),
-                           "model": (os.getenv(name.upper() + "_MODEL") or model).strip()})
+            chosen = (os.getenv(name.upper() + "_MODEL") or "").strip()
+            entry = {"name": name, "url": url, "key": key.strip(), "model": chosen or model}
+            if not chosen and name in MODEL_FALLBACKS:
+                # Retired default models are replaced by the next current one instead of failing the provider.
+                entry["fallback_models"] = list(MODEL_FALLBACKS[name][1:])
+            result.append(entry)
     if not result and require:
         raise ValueError("AI mode requires a configured model provider")
     return result
@@ -133,7 +143,20 @@ def chat_body(provider, messages, max_tokens, json_mode=True):
 
 
 def call_chat(provider, messages, max_tokens, caller, timeout, json_mode=True):
-    """One chat call; a 400 naming an unsupported parameter is retried once without it."""
+    """One chat call; a 400 naming an unsupported parameter is retried once without it,
+    and a retired default model (404) moves to the next default model."""
+    while True:
+        try:
+            return _call_adapting(provider, messages, max_tokens, caller, timeout, json_mode)
+        except ProviderError as exc:
+            if exc.status == 404 and provider.get("fallback_models"):
+                provider["model"] = provider["fallback_models"].pop(0)
+                provider.pop("adapted", None)
+                continue
+            raise
+
+
+def _call_adapting(provider, messages, max_tokens, caller, timeout, json_mode):
     try:
         return caller(provider["url"], provider["key"], chat_body(provider, messages, max_tokens, json_mode), timeout)
     except ProviderError as exc:
@@ -220,8 +243,18 @@ class ModelRouter:
         self.cooldowns = {}
         self.disabled = set()
         self.next_at = {}
+        self.intervals = {}
 
     def decide(self, state, transport, trace):
+        # A rate-limited provider is retried after its short cooldown, within the stage deadline.
+        for attempt in range(4):
+            try:
+                return self._decide_once(state, transport, trace)
+            except RuntimeError as exc:
+                if "currently available" not in str(exc) or attempt == 3 or time.monotonic() >= transport.deadline - 3:
+                    raise
+
+    def _decide_once(self, state, transport, trace):
         # Wait for a cooldown instead of skipping the rest of a batch in milliseconds.
         # Bounded by the evaluator deadline; never wait if every provider is disabled.
         wait_until = min(transport.deadline, time.monotonic() + 65)
@@ -250,7 +283,7 @@ class ModelRouter:
                     raise RuntimeError("Model attempt cap exhausted")
                 transport.reserve(provider["url"])
                 self.calls += 1
-                self.next_at[name] = now + FREE_TIER_PACING.get(name, .3)
+                self.next_at[name] = now + self.intervals.get(name, FREE_TIER_PACING.get(name, .3))
             event = {"provider": name, "model": provider["model"], "status": "failed"}
             began = time.monotonic()
             try:
@@ -285,7 +318,13 @@ class ModelRouter:
                     if exc.status in {401, 403, 404, 410, 402}:
                         self.disabled.add(name)
                     else:
-                        self.cooldowns[name] = time.monotonic() + (60 if exc.status == 429 else 15)
+                        if exc.status == 429:
+                            # Rate limited: slow this provider down for the rest of the run, retry soon.
+                            slower = min(8.0, max(1.0, 2 * self.intervals.get(name, FREE_TIER_PACING.get(name, .3))))
+                            self.intervals[name] = slower
+                            self.cooldowns[name] = time.monotonic() + 2 * slower
+                        else:
+                            self.cooldowns[name] = time.monotonic() + 15
             except (ValueError, KeyError, TypeError, IndexError):
                 event["status"] = "invalid_model_output"
                 with self.lock:

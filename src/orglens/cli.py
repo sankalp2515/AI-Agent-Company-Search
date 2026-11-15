@@ -187,6 +187,9 @@ def main():
         if want_agent and models and search_chain:
             agent = ResearchAgent(ModelRouter(models, args.max_model_calls),
                                   ChainSearch(search_chain.providers, args.max_search_queries, shared=search_chain), args.agent_steps)
+            if discovery is not None:
+                # Discovery may use 70% of the shared search cap; the rest is kept for the agent's own searches.
+                discovery.max_queries = max(1, int(args.max_search_queries * .7))
         elif args.ai and args.keys != "off":
             print("orglens: --ai needs a model key and a search key (SerpAPI or Tavily); continuing without the research agent", file=sys.stderr)
         if args.discover_brave and args.keys != "off":

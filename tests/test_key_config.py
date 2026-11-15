@@ -121,7 +121,8 @@ def test_official_command_with_keys_uses_all_of_them(clean_env, tmp_path):
     clean_env.setenv("SERPAPI_API_KEY", "s" * 20)
     clean_env.setenv("GEMINI_API_KEY", "g" * 20)
     seen = _run_cli(clean_env, tmp_path, ["--strategy", "balanced"])
-    assert seen["discovery"] is not None and seen["discovery"].max_queries == 4  # 2 per company
+    assert seen["discovery"] is not None and seen["discovery"].max_queries == 2  # 70% of 2 per company, rest for the agent
+    assert seen["agent"].search.max_queries == 4
     assert seen["agent"] is not None and seen["agent"].router.max_calls == 6      # 3 per company
     assert seen["quote_selector"] is not None and seen["quote_selector"].provider["name"] == "gemini"
 
@@ -186,3 +187,26 @@ def test_tool_use_failure_is_retried_with_tools_disabled():
 
     call_chat(provider, [], 50, caller, 5)
     assert bodies[-1]["tool_choice"] == "none"
+
+
+def test_retired_default_model_moves_to_the_next_one(clean_env):
+    clean_env.setenv("GEMINI_API_KEY", "g")
+    provider = providers_from_env("gemini")[0]
+    first = provider["model"]
+    seen = []
+
+    def caller(url, key, body, timeout):
+        seen.append(body["model"])
+        if body["model"] == first:
+            raise ProviderError(404, ["model"])
+        return {"choices": [{"message": {"content": "{}"}}]}
+
+    call_chat(provider, [], 50, caller, 5)
+    assert seen[0] == first and seen[1] != first and provider["model"] == seen[1]
+
+
+def test_explicit_model_has_no_silent_fallback(clean_env):
+    clean_env.setenv("GEMINI_API_KEY", "g")
+    clean_env.setenv("GEMINI_MODEL", "my-model")
+    provider = providers_from_env("gemini")[0]
+    assert provider["model"] == "my-model" and "fallback_models" not in provider

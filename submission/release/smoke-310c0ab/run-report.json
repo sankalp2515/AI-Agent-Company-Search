@@ -1,0 +1,183 @@
+{
+  "run_id": "official",
+  "completed_at": "2026-11-15T13:09:10.650206Z",
+  "companies": 100,
+  "envelopes": 100,
+  "validation": {
+    "passed": true,
+    "errors": [],
+    "envelopes": 100
+  },
+  "dropped_snapshots": 0,
+  "requests": 1664,
+  "bytes": 213410362,
+  "runtime_seconds": 455.187,
+  "third_party_cost_usd": 0,
+  "limits": {
+    "requests": 2000,
+    "seconds": 2700
+  },
+  "p50_company_ms": 12357,
+  "p95_company_ms": 80683,
+  "coverage": {
+    "legal_identity": 100,
+    "financials": 100,
+    "leadership": 100,
+    "locations": 100,
+    "official_website": 8,
+    "description": 6,
+    "jobs": 0,
+    "activity": 100,
+    "owned_profiles": 3,
+    "contact": 38,
+    "public_awards": 10
+  },
+  "states": {
+    "not_applicable": 0,
+    "available": 565,
+    "ambiguous": 21,
+    "not_available": 484,
+    "blocked": 3,
+    "failed": 27
+  },
+  "score": null,
+  "score_note": "Operational smoke test; no hidden labels or official competition score",
+  "registry_snapshot": null,
+  "external_footprint_coverage": {
+    "website": 8,
+    "social_links": 3,
+    "news": 2,
+    "job_postings": 0,
+    "careers_page": 0,
+    "description": 6,
+    "public_awards": 10,
+    "public_inspections": 0
+  },
+  "strategy": "balanced",
+  "company_source_cache": {
+    "scope": "this run only",
+    "hits": 5,
+    "unique_urls": 270,
+    "note": "Shared observations retain their original retrieval time and exact bytes; refresh fetches again."
+  },
+  "stages": [
+    {
+      "stage": "identity",
+      "requests": 100,
+      "seconds": 10.7,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "leadership",
+      "requests": 100,
+      "seconds": 10.8,
+      "request_ceiling": 1900,
+      "time_ceiling_seconds": 599.038
+    },
+    {
+      "stage": "website",
+      "requests": 554,
+      "seconds": 119.4,
+      "request_ceiling": 1280,
+      "time_ceiling_seconds": 1129.616
+    },
+    {
+      "stage": "financials",
+      "requests": 100,
+      "seconds": 10.7,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 881.906
+    },
+    {
+      "stage": "locations",
+      "requests": 100,
+      "seconds": 11.7,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 1257.773
+    },
+    {
+      "stage": "awards",
+      "requests": 100,
+      "seconds": 10.8,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2364.0
+    },
+    {
+      "stage": "food_inspections",
+      "requests": 1,
+      "seconds": 6.5,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "jobs",
+      "requests": 462,
+      "seconds": 202.5,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "jobs_depth",
+      "companies": 14,
+      "requests": 133,
+      "seconds": 17.6,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "website_hints",
+      "requests": 0,
+      "companies": 2,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 2484.0
+    },
+    {
+      "stage": "website_retry",
+      "requests": 14,
+      "companies": 7,
+      "recovered": 0,
+      "seconds": 24.0,
+      "request_ceiling": 2000,
+      "time_ceiling_seconds": 490.578
+    }
+  ],
+  "mode": "live",
+  "replay_source": null,
+  "agent": null,
+  "quote_selector": null,
+  "jobs_source": {
+    "source": "NAV Job Vacancy Feed (pam-stilling-feed.nav.no)",
+    "state": "loaded",
+    "window_days": 186,
+    "feed_pages": 355,
+    "detail_requests": 136,
+    "cache_hits": 164,
+    "max_candidate_details": 12,
+    "max_detail_requests": 276,
+    "completed_segments": 6,
+    "total_segments": 6,
+    "error": null,
+    "indexed_active_employers": 6081,
+    "indexed_active_ads": 9932,
+    "token": "NAV published public token"
+  },
+  "website_methods": {
+    "labelled_organisation_number": 4,
+    "registry_declared_homepage": 2,
+    "full_name_domain_and_registered_operating_head": 1,
+    "legal_name_and_registered_address": 1
+  },
+  "discovery": null,
+  "external_services": {
+    "keys_mode": "auto",
+    "search_providers": [],
+    "model_providers": [],
+    "search_discovery": false,
+    "research_agent": false,
+    "quote_selection": false,
+    "search_query_cap": 0,
+    "model_call_cap": 0,
+    "note": "Keyless official sources always run; keyed services only add candidates that pass the same exact-company verification."
+  }
+}

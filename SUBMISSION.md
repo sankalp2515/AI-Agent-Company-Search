@@ -10,10 +10,10 @@ Prepared 4 November 2026. It builds on version 3 (`e5d5a01`, Builderr's audit of
 | Install | `uv sync --frozen` |
 | One command | `uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700` |
 | Frozen registry | Append `--bulk <registry file>`. `--registry` is the same option. `--registry-retrieved-at <timestamp>` is optional; without it, the file's own time is recorded and labelled as such. |
-| Models / search | None. The command is keyless. Optional `--discover` / `--extract-ai` modes exist but are not used. |
+| Models / search | None required. Without keys the command is keyless. If Builderr provides search keys (SerpAPI, Tavily) or a model key (OpenAI-compatible, Claude, Gemini and others) as environment variables, the same command uses them automatically within per-company caps; see [README, Optional keys](README.md#optional-keys). |
 | APIs | Brønnøysundregistrene (Enhetsregisteret entities, roles, subunits; Regnskapsregisteret accounts), NAV Job Vacancy Feed (published public token), Mattilsynet Smilefjes inspections (CC BY 4.0), and verified company websites under robots.txt |
 | Licences | MIT application; beautifulsoup4/soupsieve MIT; certifi MPL-2.0; data-source terms in [SOURCE-RIGHTS.md](SOURCE-RIGHTS.md) |
-| Cost | $0 external API cost |
+| Cost | $0 external API cost without keys. With keys: at most 2 search queries and 3 short model calls per company by default (about 4 KB of input and a 20-token answer per call). |
 | Contact | Sankalp Wanjari — wanjarisankalp@gmail.com |
 
 ## Changes in version 4

@@ -27,6 +27,12 @@ EXCLUDED = AGGREGATORS | {
     "youtube.com", "wikipedia.org", "vexter.no", "kredittsjekk.no", "allabolag.se",
     "forvalt.no", "regnskapstall.no", "bedriftsdatabasen.no", "eniro.no", "firmview.no",
     "rocketreach.co", "leadiq.com", "tracxn.com", "zoominfo.com", "signalhire.com", "apollo.io",
+    # Company directories, map and lead sites seen in live search results: never a company's own site.
+    "allebedrifter.no", "cvrapi.dk", "verif.com", "cylex.no", "firmadatabasen.no", "nabonytt.no",
+    "mapquest.com", "firmavy.no", "norscout.com", "bygg.se", "offerta.se", "bestilleelektriker.no",
+    "finansavisen.no", "kvantil.no", "styrerommet.no", "regnskapstall.no", "oppslagsverket.no",
+    "enirofinans.no", "finn.no", "mittanbud.no", "anbudstorget.no", "bedriftsregisteret.no", "dnb.no",
+    "google.com", "google.no", "bing.com", "duckduckgo.com",
 }
 
 
@@ -38,6 +44,12 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def _open(req, timeout, ctx):
     return urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPSHandler(context=ctx)).open(req, timeout=timeout)
+
+
+def _is_search_redirect(url):
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower()
+    return bool(re.fullmatch(r"(www\.)?google\.[a-z.]+", host)) and parts.path in {"/goto", "/url"}
 
 
 def candidate_roots(body, preserve_paths=False, limit=3):
@@ -60,6 +72,12 @@ def candidate_roots(body, preserve_paths=False, limit=3):
         for item in items:
             if isinstance(item, dict):
                 u = item.get("url") or item.get("link")
+                if isinstance(u, str) and _is_search_redirect(u):
+                    # SerpAPI may return only Google redirect links; the result's own host is in displayed_link.
+                    shown = str(item.get("displayed_link") or "").split()
+                    u = shown[0] if shown and shown[0].startswith(("http://", "https://")) else None
+                    if u:
+                        u = urllib.parse.urlunsplit(("https", urllib.parse.urlsplit(u).netloc, "/", "", ""))
                 if u:
                     urls.append(u)
             elif isinstance(item, str):

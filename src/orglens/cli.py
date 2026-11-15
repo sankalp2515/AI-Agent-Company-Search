@@ -9,6 +9,7 @@ import sys
 import math
 from pathlib import Path
 
+from .agent import DEFAULT_PROVIDER_ORDER
 from .core import read_inputs, run_batch, validate, write_rows
 from .navjobs import NavJobs
 from .viewer import render
@@ -74,16 +75,25 @@ def main():
     run.add_argument("--requests-per-company", type=int, help="Request budget per input company (Builderr: 20, i.e. 2,000 per 100); overrides --max-requests")
     run.add_argument("--registry-retrieved-at", help="Actual timestamp of supplied registry snapshot")
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
-    run.add_argument("--discover", action="store_true", help="Opt-in search discovery (SerpAPI, Tavily) using keys from the environment; not part of the evaluator command")
+    run.add_argument("--keys", choices=("auto", "off"), default=os.environ.get("ORGLENS_KEYS", "auto"),
+                     help="auto (default): use any search/model keys found in the environment, keyless otherwise; off: never call keyed services")
+    run.add_argument("--search-queries-per-company", type=float, default=float(os.environ.get("ORGLENS_SEARCH_QUERIES_PER_COMPANY", 2)),
+                     help="Search API query budget per input company when a search key is present")
+    run.add_argument("--model-calls-per-company", type=float, default=float(os.environ.get("ORGLENS_MODEL_CALLS_PER_COMPANY", 3)),
+                     help="Model call budget per input company when a model key is present")
+    run.add_argument("--no-ai", action="store_true", help="Do not use model keys even when present")
+    run.add_argument("--discover", action="store_true", help="Search discovery (SerpAPI, Tavily); already automatic with --keys auto when a key is present")
     run.add_argument("--no-discover", action="store_true", help="Force-disable search discovery")
     run.add_argument("--discover-brave", action="store_true", help="Opt-in search; BRAVE_API_KEY and declared costs required")
     run.add_argument("--search-cost-per-request", type=float)
     run.add_argument("--max-api-cost", type=float, default=0)
-    run.add_argument("--ai", action="store_true", help="Model-directed research with Tavily; API usage consumes account allowances")
-    run.add_argument("--extract-ai", action="store_true", help="Bounded model selection of literal description quotes from already verified sites")
-    run.add_argument("--providers", default="groq,nvidia,cloudflare,cohere", help="Ordered fallback chain; Mistral opt-in until its quota is available")
-    run.add_argument("--max-model-calls", type=int, default=100)
-    run.add_argument("--max-search-queries", type=int, default=25)
+    run.add_argument("--ai", action="store_true", help="Model-directed website research; already automatic with --keys auto when model and search keys are present")
+    run.add_argument("--extract-ai", action="store_true", help="Model selection of literal description quotes; already automatic with --keys auto when a model key is present")
+    run.add_argument("--providers", default=os.environ.get("ORGLENS_MODEL_PROVIDERS", DEFAULT_PROVIDER_ORDER), help="Ordered model fallback chain; providers without a key are skipped")
+    run.add_argument("--max-model-calls", type=int, default=int(os.environ["ORGLENS_MAX_MODEL_CALLS"]) if os.environ.get("ORGLENS_MAX_MODEL_CALLS") else None,
+                     help="Absolute model call cap (default: --model-calls-per-company x companies)")
+    run.add_argument("--max-search-queries", type=int, default=int(os.environ["ORGLENS_MAX_SEARCH_QUERIES"]) if os.environ.get("ORGLENS_MAX_SEARCH_QUERIES") else None,
+                     help="Absolute search query cap (default: --search-queries-per-company x companies)")
     run.add_argument("--search-policy", choices=('broad','precise'), default='broad', help="Experimental exact-name search and directory exclusions")
     run.add_argument("--agent-steps", type=int, default=6)
     sample = sub.add_parser("sample", help="Create a reproducible local test sample, never used in official evaluation")
@@ -142,29 +152,44 @@ def main():
         if set(modules) - {"financials", "leadership", "locations", "jobs", "website", "awards"}:
             parser.error("Unknown module")
         previous = [json.loads(line) for line in Path(args.previous).read_text(encoding="utf-8").splitlines() if line.strip()] if args.previous else None
-        discovery = None
-        agent = None
-        quote_selector = None
+        discovery, agent, quote_selector = None, None, None
         ai_unavailable = False
-        if args.extract_ai:
-            if args.replay:parser.error('Model quote selection cannot be used in offline replay')
-            from .agent import providers_from_env
+        companies = len(read_inputs(args.input))
+        if args.max_model_calls is None:
+            args.max_model_calls = max(1, int(args.model_calls_per_company * companies))
+        if args.max_search_queries is None:
+            args.max_search_queries = max(1, int(args.search_queries_per_company * companies))
+        if min(args.max_model_calls, args.max_search_queries, args.agent_steps) < 1 or args.agent_steps > 12:
+            parser.error("Model and search caps must be positive and --agent-steps at most 12")
+        auto = args.keys == "auto"
+        live = not args.replay and args.keys != "off"
+        if args.keys == "off" and (args.discover or args.ai or args.extract_ai or args.discover_brave):
+            print("orglens: --keys off overrides --discover/--ai/--extract-ai; running keyless", file=sys.stderr)
+        want_search = live and not args.no_discover and not args.discover_brave and (auto or args.discover or args.ai)
+        want_quotes = live and not args.no_ai and (auto or args.extract_ai)
+        want_agent = live and not args.no_ai and not args.discover_brave and (auto or args.ai)
+        from .agent import ChainSearch, ModelRouter, ResearchAgent, providers_from_env
+        from .discovery import build_discovery_from_env
+        models = providers_from_env(args.providers, require=False) if (want_quotes or want_agent) else []
+        search_chain = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0, max_cost=args.max_api_cost or 0.0,
+                                                max_queries=args.max_search_queries, query_policy=args.search_policy) if want_search or want_agent else None
+        if want_search and search_chain and (auto or args.discover) and not args.no_discover:
+            discovery = search_chain
+        if want_quotes:
             from .quotes import QuoteSelector
-            try:
-                quote_selector = QuoteSelector(providers_from_env(args.providers.split(','))[0], args.max_model_calls)
-            except ValueError:
-                # A missing evaluator credential must never fail the batch: fall back to literal-text extraction.
+            usable = [m for m in models if m["name"] != "cohere"]
+            if usable:
+                quote_selector = QuoteSelector(usable[0], max(1, min(args.max_model_calls, companies)))
+            elif args.extract_ai:
+                # A missing credential must never fail the batch: literal-text extraction is used instead.
                 print("orglens: --extract-ai requested but no model credential is configured; continuing without AI extraction", file=sys.stderr)
                 ai_unavailable = True
-        if args.ai:
-            if args.replay or args.discover_brave:
-                parser.error("AI mode cannot be combined with offline replay or Brave discovery")
-            if min(args.max_model_calls, args.max_search_queries, args.agent_steps) < 1 or args.agent_steps > 12:
-                parser.error("AI caps must be positive and steps <=12")
-            from .agent import ModelRouter, TavilySearch, ResearchAgent, providers_from_env
-            agent = ResearchAgent(ModelRouter(providers_from_env(args.providers.split(",")), args.max_model_calls),
-                                  TavilySearch(os.environ.get("TAVILY_API_KEY"), args.max_search_queries), args.agent_steps)
-        if args.discover_brave:
+        if want_agent and models and search_chain:
+            agent = ResearchAgent(ModelRouter(models, args.max_model_calls),
+                                  ChainSearch(search_chain.providers, args.max_search_queries, shared=search_chain), args.agent_steps)
+        elif args.ai and args.keys != "off":
+            print("orglens: --ai needs a model key and a search key (SerpAPI or Tavily); continuing without the research agent", file=sys.stderr)
+        if args.discover_brave and args.keys != "off":
             if args.replay:
                 parser.error("Paid discovery cannot be used in offline replay")
             rate = args.search_cost_per_request
@@ -172,11 +197,16 @@ def main():
                 parser.error("Provide positive finite --search-cost-per-request and --max-api-cost")
             from .discovery import BraveDiscovery
             discovery = BraveDiscovery(os.environ.get("BRAVE_API_KEY"), rate, args.max_api_cost)
-        elif args.discover and not args.no_discover and not args.replay:
-            # Opt-in only: the evaluator command must stay keyless and reproducible.
-            from .discovery import build_discovery_from_env
-            discovery = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0,
-                                                 max_cost=args.max_api_cost or 0.0, max_queries=args.max_search_queries, query_policy=args.search_policy)
+        # Names only; key values never reach the report, logs or envelopes.
+        external = {"keys_mode": args.keys,
+                    "search_providers": [getattr(p, "label", "search") for p in (search_chain.providers if search_chain else [])],
+                    "model_providers": [{"provider": m["name"], "model": m["model"]} for m in models],
+                    "search_discovery": discovery is not None, "research_agent": agent is not None,
+                    "quote_selection": quote_selector is not None,
+                    "search_query_cap": args.max_search_queries if (discovery or agent) else 0,
+                    "model_call_cap": args.max_model_calls if agent else (quote_selector.max_calls if quote_selector else 0),
+                    "note": "Keyless official sources always run; keyed services only add candidates that pass the same exact-company verification."}
+        print("orglens: external services " + json.dumps({k: external[k] for k in ("keys_mode", "search_providers", "model_providers", "search_discovery", "research_agent", "quote_selection")}), file=sys.stderr)
         orgs = read_inputs(args.input)
         try:
             rows, report = run_batch(orgs, args.output, run_id=args.run_id,
@@ -186,11 +216,15 @@ def main():
                                      jobs_source=NavJobs(days=args.nav_days) if "jobs" in modules and not args.replay else None, guesses=not args.no_guess, strategy=args.strategy, quote_selector=quote_selector)
         except Exception as exc:  # never leave the harness without readable output
             rows, report = emergency_output(orgs, Path(args.output), args.run_id, exc)
+        from .core import write_json
         if ai_unavailable:
-            from .core import write_json
             report["quote_selector"] = {"requested": True, "executed": False,
                                         "reason": "no model credential configured; literal-text extraction used"}
+        report["external_services"] = external
+        try:
             write_json(Path(args.output) / "run-report.json", report)
+        except Exception as exc:
+            print(f"orglens: report not rewritten ({type(exc).__name__})", file=sys.stderr)
         written = Path(args.output) / "envelopes.jsonl"
         import shutil
         # Deliver the machine-readable output first; the human viewer is optional and may never block it.

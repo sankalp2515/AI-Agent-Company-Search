@@ -2441,6 +2441,8 @@ def run_batch(orgs, output, *, run_id, requests=1800, seconds=2400, workers=12, 
                             if candidate in inspected:
                                 continue
                             inspected.add(candidate)
+                            row.setdefault("website_research", {"candidates": []}).setdefault("candidates", []).append(
+                                {"url": candidate, "origin": "search"})
                             crawl_site(row, body, transport, pages, origin="search", url=candidate)
                             if row["availability"].get("official_website") == "available":
                                 break

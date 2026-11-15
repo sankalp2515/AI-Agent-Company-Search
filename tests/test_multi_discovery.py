@@ -195,7 +195,7 @@ def test_build_discovery_from_env(monkeypatch):
     assert disc.providers[1].label == "tavily"
 
 
-def test_evaluator_command_stays_keyless_even_when_keys_exist(monkeypatch, tmp_path):
+def test_search_keys_are_used_automatically_and_off_disables_them(monkeypatch, tmp_path):
     import sys
     import orglens.cli as cli
     seen = {}
@@ -204,13 +204,16 @@ def test_evaluator_command_stays_keyless_even_when_keys_exist(monkeypatch, tmp_p
         seen["discovery"] = kwargs.get("discovery")
         return [], {"validation": {"passed": True}}
 
+    for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY", "NVIDIA_API_KEY",
+                "NVDIA_API_KEY", "COHERE_API_KEY", "CLOUDFLARE_API_KEY", "Cloudflare_API_KEY", "MISTRAL_API_KEY", "ORGLENS_KEYS"):
+        monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SERPAPI_API_KEY", "x" * 20)
     monkeypatch.setenv("TAVILY_API_KEY", "y" * 20)
     monkeypatch.setattr(cli, "run_batch", fake_run_batch)
     monkeypatch.setattr(cli, "render", lambda rows, path: None)
     source = tmp_path / "in.txt"
     source.write_text("123456789\n", encoding="utf-8")
-    for extra, expected in (([], None), (["--discover"], "multi")):
+    for extra, expected in (([], "multi"), (["--discover"], "multi"), (["--keys", "off"], None), (["--no-discover"], None)):
         monkeypatch.setattr(sys, "argv", ["orglens", "run", "--input", str(source), "--output", str(tmp_path / "o"), *extra])
         try:
             cli.main()

@@ -29,7 +29,7 @@ Evidence-first research agent for Norwegian companies. Give it a batch of organi
 
 Every claim carries a source URL, retrieval time, SHA-256 of the exact response bytes, an evidence locator and an identity method. Unknowns are explicit states (`available`, `not_available`, `blocked`, `not_applicable`, `ambiguous`, `failed`) and are never turned into zero.
 
-The evaluator command needs no credentials and has **$0 external API cost**. See the [cost declaration](SUBMISSION.md).
+The evaluator command needs no credentials and has **$0 external API cost** without keys. If the environment provides search or model keys, the same command uses them automatically ([optional keys](#optional-keys)). See the [cost declaration](SUBMISSION.md).
 
 ## Install (clean machine)
 
@@ -43,11 +43,11 @@ uv sync --frozen
 ## One evaluator command
 
 ```sh
-uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700 --no-discover
+uv run --frozen orglens run --input input.jsonl --output out/evaluation --run-id official --strategy balanced --pages 8 --requests-per-company 20 --max-seconds 2700
 ```
 
 - Input: JSONL objects with `organisation_number`, a JSON array, or a text file with one number per line. Batch size is inferred from the input.
-- Credentials: none. This command makes no paid API calls. [SUBMISSION.md](SUBMISSION.md) declares costs and the optional hybrid command for organizer-approved credentials.
+- Credentials: none required. Without keys the command makes no paid API calls. With keys in the environment it adds bounded search and model steps; see [Optional keys](#optional-keys).
 - Public awards: the State Aid Register is queried by the exact recipient organisation number. Each lookup counts against the run budget. Use `--modules financials,leadership,locations,jobs,website` to omit awards.
 - Budgets: `--max-requests` and `--max-seconds` constrain HTTP requests. The values above are Builderr's published budget of 20 requests per company and 45 minutes. A larger batch makes research shallower; returning all envelopes does not mean every company received complete research. DNS and final output processing are not strictly bounded by the HTTP deadline.
 - Frozen registry snapshot: if Builderr supplies one, append `--registry registry.jsonl --registry-retrieved-at <actual timestamp>`. This saves one request per company.
@@ -100,9 +100,28 @@ The agent runs in phases. Each phase covers every company before the next phase 
 5. **Site facts** come only from verified sites, under robots.txt. They are the description (meta, OpenGraph or JSON-LD), public brand, outbound social profile links, email and phone, JSON-LD job postings, RSS/Atom items, JSON-LD articles, and dated items on news pages.
 6. **Synthesis.** A fixed set of templates builds a cited narrative: what the company does, its latest filed numbers (profit or loss, negative equity), leaders, footprint, hiring, latest activity, changes since the last run and what remains unknown. Every statement lists its evidence IDs. No model writes facts.
 
-Optional `--ai` mode (model-directed search with Tavily) from the earlier version is still available. It needs personal keys and is not part of the evaluator command.
+## Optional keys
 
-For local candidate experiments, `--strategy balanced --pages 8` prioritizes external research and bounds NAV detail work. Optional `--discover --max-search-queries 60` enables bounded search; `--extract-ai --providers groq --max-model-calls 60` lets a model select existing source quotations when descriptions lack structured metadata. These options preserve exact-company publication checks. Provider credentials must be supplied through the environment; their remaining allowance and actual billing are not established by a zero configured rate. An official revision needs organizer-supported credentials and the supplied official budgets.
+The same evaluator command runs with or without keys. At start-up it reads documented environment variables and turns on each keyed step whose key is present. Anything missing is skipped, and an exhausted or rejected key switches itself off mid-run while the keyless research continues. The run report's `external_services` section lists which providers and models ran (names only, never key values).
+
+| Variable | Service | What it adds |
+| --- | --- | --- |
+| `SERPAPI_API_KEY` (and optional `SERPAPI_API_KEY_2`) | SerpAPI Google search, Norway | Website candidates for companies the keyless pass could not resolve |
+| `TAVILY_API_KEY` | Tavily search | Same, tried after SerpAPI |
+| `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (https only) and `OPENAI_MODEL` | OpenAI or any OpenAI-compatible endpoint | Model-directed research and quote selection (below) |
+| `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` | Claude (OpenAI-compatible endpoint) | Same |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY`, optional `GEMINI_MODEL` | Gemini (OpenAI-compatible endpoint) | Same |
+| `GROQ_API_KEY`, `NVIDIA_API_KEY`, `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`, `COHERE_API_KEY`, `MISTRAL_API_KEY` | Other model APIs | Same, as fallbacks |
+
+What each key does:
+
+- **Search key:** after the keyless website pass, companies still without a verified site get up to two search queries. Every result is only a candidate. It is fetched from the company's own site and must pass the same exact-company proof (organisation number, or legal name with registered address, phone or leader) before anything is published. Search snippets are never stored or used as evidence.
+- **Model key:** picks a literal paragraph from an already verified site as the company description. The model chooses an index; it never writes text.
+- **Model key plus search key:** a bounded research loop. The model chooses the next search or which candidate to inspect, and code checks identity. A model cannot publish a fact, URL or number.
+
+Budgets scale with the batch: by default 2 search queries and 3 model calls per company (`--search-queries-per-company`, `--model-calls-per-company`). Absolute caps can be set with `ORGLENS_MAX_SEARCH_QUERIES` and `ORGLENS_MAX_MODEL_CALLS`. Keyed calls also count against `--requests-per-company`. Model order is `ORGLENS_MODEL_PROVIDERS` (default `openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral`). `--keys off` (or `ORGLENS_KEYS=off`) ignores every key; `--no-discover` and `--no-ai` turn off one kind.
+
+Credentialed requests never follow redirects, a custom `OPENAI_BASE_URL` must be plain https, and keys are read only from the environment (or a local `.env` file that is never committed).
 
 The audit's identity findings are fixed and covered by regression tests: JSON-LD identifiers must be exact 9-digit organisation numbers, conflicting identifiers veto publication, and phone matches are bounded tokens.
 

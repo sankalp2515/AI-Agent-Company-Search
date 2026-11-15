@@ -64,11 +64,36 @@ def post_json(url, key, body, timeout):
         raise ProviderError() from None
 
 
-def providers_from_env(order):
+DEFAULT_PROVIDER_ORDER = "openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral"
+# Minimum seconds between calls to one provider: free tiers are rate limited, paid APIs are not.
+FREE_TIER_PACING = {"groq": 3.2, "cohere": 3.2}
+
+
+def _chat_url(base):
+    """A configured OpenAI-compatible base URL must be plain https; credentials never go elsewhere."""
+    import urllib.parse
+    value = (base or "").strip()
+    parts = urllib.parse.urlsplit(value)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:
+        return None
+    value = value.rstrip("/")
+    return value if value.endswith("/chat/completions") else value + "/chat/completions"
+
+
+def providers_from_env(order, require=True):
+    """Model providers whose keys are present in the environment, in the requested order."""
+    if isinstance(order, str):
+        order = [n.strip() for n in order.split(",") if n.strip()]
     account = os.getenv("CLOUDFLARE_ACCOUNT_ID") or os.getenv("AccountID", "")
     if account and not re.fullmatch(r"[a-fA-F0-9]{32}", account):
-        raise ValueError("Invalid Cloudflare account ID format")
+        account = ""
+    openai_url = _chat_url(os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1")
     available = {
+        # Any OpenAI-compatible endpoint: OPENAI_API_KEY, optional OPENAI_BASE_URL and OPENAI_MODEL.
+        "openai": (openai_url, os.getenv("OPENAI_API_KEY") if openai_url else None, "gpt-4.1-mini"),
+        "anthropic": ("https://api.anthropic.com/v1/chat/completions", os.getenv("ANTHROPIC_API_KEY"), "claude-haiku-5-5"),
+        "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                   os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"), "gemini-2.5-flash"),
         "groq": ("https://api.groq.com/openai/v1/chat/completions", os.getenv("GROQ_API_KEY"), "openai/gpt-oss-20b"),
         "nvidia": ("https://integrate.api.nvidia.com/v1/chat/completions", os.getenv("NVIDIA_API_KEY") or os.getenv("NVDIA_API_KEY"), "openai/gpt-oss-20b"),
         "cloudflare": (f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1/chat/completions", (os.getenv("CLOUDFLARE_API_KEY") or os.getenv("Cloudflare_API_KEY")) if account else None, "@cf/meta/llama-3.1-8b-instruct-fp8-fast"),
@@ -80,12 +105,90 @@ def providers_from_env(order):
         if name not in available:
             raise ValueError("Unknown model provider")
         url, key, model = available[name]
-        if key:
-            result.append({"name": name, "url": url, "key": key,
-                           "model": os.getenv(name.upper() + "_MODEL", model)})
-    if not result:
+        if key and key.strip():
+            result.append({"name": name, "url": url, "key": key.strip(),
+                           "model": (os.getenv(name.upper() + "_MODEL") or model).strip()})
+    if not result and require:
         raise ValueError("AI mode requires a configured model provider")
     return result
+
+
+def chat_body(provider, messages, max_tokens, json_mode=True):
+    """Request body each provider family accepts; adapted once if a provider rejects a parameter."""
+    name, model = provider["name"], provider["model"]
+    reasoning_model = name == "openai" and bool(re.match(r"(gpt-5|o[1-9])", model.split("/")[-1]))
+    body = {"model": model, "messages": messages}
+    if reasoning_model or provider.get("completion_tokens"):
+        body["max_completion_tokens"] = max_tokens * 6
+    else:
+        body["max_tokens"] = max_tokens * (6 if name == "gemini" else 1)
+        body["temperature"] = 0
+    if not provider.get("no_reasoning_effort") and (name in {"groq", "nvidia", "gemini"} or reasoning_model):
+        body["reasoning_effort"] = "low"
+    if json_mode and not provider.get("no_json_mode") and name in {"groq", "cohere", "cloudflare", "openai", "gemini", "mistral"}:
+        body["response_format"] = {"type": "json_object"}
+    if name == "groq" or provider.get("tool_choice_none"):
+        body["tool_choice"] = "none"
+    return body
+
+
+def call_chat(provider, messages, max_tokens, caller, timeout, json_mode=True):
+    """One chat call; a 400 naming an unsupported parameter is retried once without it."""
+    try:
+        return caller(provider["url"], provider["key"], chat_body(provider, messages, max_tokens, json_mode), timeout)
+    except ProviderError as exc:
+        hints = set(exc.hints)
+        if exc.status not in {400, 422} or provider.get("adapted") or not hints & {"max_tokens", "temperature", "reasoning_effort", "json", "tool_use_failed"}:
+            raise
+        provider["adapted"] = True
+        if hints & {"max_tokens", "temperature"}:
+            provider["completion_tokens"] = True
+        if "reasoning_effort" in hints:
+            provider["no_reasoning_effort"] = True
+        if "json" in hints:
+            provider["no_json_mode"] = True
+        if "tool_use_failed" in hints:
+            provider["tool_choice_none"] = True
+        return caller(provider["url"], provider["key"], chat_body(provider, messages, max_tokens, json_mode), timeout)
+
+
+def reply_text(provider, payload):
+    if provider["name"] == "cohere":
+        text = "".join(c.get("text", "") for c in payload.get("message", {}).get("content", []))
+    else:
+        text = payload["choices"][0]["message"].get("content") or ""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
+    return text
+
+
+class ChainSearch:
+    """Agent search across the configured discovery providers (SerpAPI, Tavily); first answer wins."""
+    def __init__(self, providers, max_queries=25, shared=None):
+        # shared: the discovery chain whose query cap this search also draws from.
+        self.providers, self.max_queries, self.shared = list(providers), max_queries, shared
+        self.calls = 0
+        self.credits = 0
+        self.lock = shared.lock if shared is not None else threading.Lock()
+
+    def search(self, query, transport):
+        for provider in self.providers:
+            if getattr(provider, "disabled", False):
+                continue
+            with self.lock:
+                used = self.shared.calls if self.shared is not None else self.calls
+                if used >= self.max_queries:
+                    raise RuntimeError("Search query cap exhausted")
+                transport.reserve(getattr(provider, "endpoint", "search"))
+                if self.shared is not None:
+                    self.shared.calls += 1
+                self.calls += 1
+                self.credits += 1
+            found = provider.search(query, min(12, max(.1, transport.deadline - time.monotonic())))
+            if found:
+                return found
+        return []
 
 
 SYSTEM = """You are an evidence-first Norwegian company research agent.
@@ -147,22 +250,13 @@ class ModelRouter:
                     raise RuntimeError("Model attempt cap exhausted")
                 transport.reserve(provider["url"])
                 self.calls += 1
-                self.next_at[name] = now + (3.2 if name in {"groq", "cohere"} else 1.2)
+                self.next_at[name] = now + FREE_TIER_PACING.get(name, .3)
             event = {"provider": name, "model": provider["model"], "status": "failed"}
             began = time.monotonic()
             try:
-                body = {"model": provider["model"], "messages": messages, "max_tokens": 384, "temperature": 0}
-                if name in {"groq", "nvidia"}:
-                    body["reasoning_effort"] = "low"
-                if name in {"groq", "cohere", "cloudflare"}:
-                    body["response_format"] = {"type": "json_object"}
-                if name == "groq":
-                    body["tool_choice"] = "none"
-                payload = self.caller(provider["url"], provider["key"], body,
-                                      min(20, max(.1, transport.deadline - time.monotonic())))
-                text = "".join(c.get("text", "") for c in payload.get("message", {}).get("content", [])) if name == "cohere" else payload["choices"][0]["message"].get("content", "")
-                if text.startswith("```"):
-                    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+                payload = call_chat(provider, messages, 384, self.caller,
+                                    min(20, max(.1, transport.deadline - time.monotonic())))
+                text = reply_text(provider, payload)
                 event["usage"] = payload.get("usage", {})
                 action = json.loads(text)
                 if not isinstance(action, dict) or action.get("action") not in {"search", "inspect", "finish"}:

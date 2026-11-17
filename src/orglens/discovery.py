@@ -46,6 +46,29 @@ def _open(req, timeout, ctx):
     return urllib.request.build_opener(_NoRedirect(), urllib.request.HTTPSHandler(context=ctx)).open(req, timeout=timeout)
 
 
+_LEGAL_WORDS = {"as", "asa", "ans", "da", "sa", "ba", "enk", "nuf", "ks", "iks", "sf", "stiftelsen", "holding", "invest", "norge", "norway"}
+
+
+def _fold(text):
+    text = text.lower().replace("æ", "ae").replace("ø", "o").replace("å", "a").replace("aa", "a")
+    return re.sub(r"[^a-z0-9]", "", text)
+
+
+def name_ranked(candidates, legal_name):
+    """Stable order: candidates whose host contains a distinctive word of the legal name first.
+
+    Ordering only; every candidate still has to pass the same exact-company verification."""
+    words = {_fold(w) for w in re.split(r"[\s\-&/.,]+", legal_name or "")}
+    words = {w for w in words if len(w) >= 4 and w not in _LEGAL_WORDS}
+    if not words:
+        return list(candidates)
+
+    def matches(url):
+        host = _fold((urllib.parse.urlsplit(url).hostname or "").removeprefix("www.").rsplit(".", 1)[0])
+        return any(w in host for w in words)
+    return [c for c in candidates if matches(c)] + [c for c in candidates if not matches(c)]
+
+
 def _is_search_redirect(url):
     parts = urllib.parse.urlsplit(url)
     host = (parts.hostname or "").lower()
@@ -237,7 +260,21 @@ class MultiSearchDiscovery:
         return next(self.discover_batches(company, transport), [])
 
     def discover_batches(self, company, transport):
-        """Try another provider only if the caller rejects the preceding hints."""
+        """Ask every provider once (within the caps) and yield one interleaved batch.
+
+        Providers rank differently: one provider's top results can all be directories while the
+        company's own site is another provider's second hit. Interleaving puts each provider's best
+        candidates first, before the per-company request budget is spent on one provider's list."""
+        lists = [batch for batch in self._provider_batches(company, transport) if batch]
+        merged = []
+        for rank in range(max((len(b) for b in lists), default=0)):
+            for batch in lists:
+                if rank < len(batch) and batch[rank] not in merged:
+                    merged.append(batch[rank])
+        if merged:
+            yield name_ranked(merged, company.get("navn") or company.get("legal_name") or "")
+
+    def _provider_batches(self, company, transport):
         query = make_company_query(company, self.query_policy)
         if not query:
             return

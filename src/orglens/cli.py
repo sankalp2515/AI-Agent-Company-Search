@@ -77,7 +77,7 @@ def main():
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
     run.add_argument("--keys", choices=("auto", "off"), default=os.environ.get("ORGLENS_KEYS", "auto"),
                      help="auto (default): use any search/model keys found in the environment, keyless otherwise; off: never call keyed services")
-    run.add_argument("--search-queries-per-company", type=float, default=float(os.environ.get("ORGLENS_SEARCH_QUERIES_PER_COMPANY", 2)),
+    run.add_argument("--search-queries-per-company", type=float, default=float(os.environ.get("ORGLENS_SEARCH_QUERIES_PER_COMPANY", 3)),
                      help="Search API query budget per input company when a search key is present")
     run.add_argument("--model-calls-per-company", type=float, default=float(os.environ.get("ORGLENS_MODEL_CALLS_PER_COMPANY", 3)),
                      help="Model call budget per input company when a model key is present")
@@ -188,8 +188,10 @@ def main():
             agent = ResearchAgent(ModelRouter(models, args.max_model_calls),
                                   ChainSearch(search_chain.providers, args.max_search_queries, shared=search_chain), args.agent_steps)
             if discovery is not None:
-                # Discovery may use 70% of the shared search cap; the rest is kept for the agent's own searches.
-                discovery.max_queries = max(1, int(args.max_search_queries * .7))
+                # Discovery may use two thirds of the shared cap (by default one query per search provider and
+                # company, so a second provider is tried when the first one's results fail verification);
+                # the last third is kept for the agent's own searches.
+                discovery.max_queries = max(1, args.max_search_queries - max(1, args.max_search_queries // 3))
         elif args.ai and args.keys != "off":
             print("orglens: --ai needs a model key and a search key (SerpAPI or Tavily); continuing without the research agent", file=sys.stderr)
         if args.discover_brave and args.keys != "off":

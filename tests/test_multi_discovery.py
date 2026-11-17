@@ -15,7 +15,7 @@ from orglens.discovery import (
 )
 
 
-def test_rejected_hints_can_fall_back_without_eagerly_buying_all_searches():
+def test_every_provider_is_asked_once_and_results_are_interleaved():
     class Provider:
         disabled = False
         endpoint = 'https://search.test/'
@@ -28,15 +28,17 @@ def test_rejected_hints_can_fall_back_without_eagerly_buying_all_searches():
         limit = 100
         deadline = time.monotonic()+60
         def reserve(self, url):self.requests += 1
-    wrong, right = Provider('https://namesake.test/'), Provider('https://company.test/')
-    discovery = MultiSearchDiscovery([wrong,right],max_queries=2)
-    batches = discovery.discover_batches({'navn':'Company AS'},Transport())
-    assert next(batches) == ['https://namesake.test/']
-    assert right.calls == 0
-    # The caller found no identity proof, so it requests the next provider.
-    assert next(batches) == ['https://company.test/']
-    assert discovery.calls == 2
-    assert list(batches) == []
+    class ListProvider(Provider):
+        def search(self, query, timeout):
+            self.calls += 1
+            return self.url
+    first = ListProvider(['https://dir1.test/', 'https://dir2.test/', 'https://shared.test/'])
+    second = ListProvider(['https://shared.test/', 'https://company.test/'])
+    discovery = MultiSearchDiscovery([first, second], max_queries=2)
+    batches = list(discovery.discover_batches({'navn':'Acme AS'},Transport()))
+    # Each provider's best hits come first; the company's site is not left behind three directories.
+    assert batches == [['https://dir1.test/', 'https://shared.test/', 'https://dir2.test/', 'https://company.test/']]
+    assert first.calls == second.calls == 1 and discovery.calls == 2
 
 
 def test_fallback_after_rejected_hints_still_respects_global_search_cap():
@@ -142,7 +144,7 @@ def test_multi_search_fallback_on_failure():
     assert p2.called == 2
 
 
-def test_multi_search_stops_when_first_provider_succeeds():
+def test_multi_search_puts_the_first_providers_top_hit_first():
     class DummyTransport:
         requests = 0
         limit = 100
@@ -166,7 +168,7 @@ def test_multi_search_stops_when_first_provider_succeeds():
             self.called = 0
         def search(self, query, timeout):
             self.called += 1
-            return ["https://should-not-be-called.no/"]
+            return ["https://second-opinion.no/"]
 
     p1 = FirstProvider()
     p2 = SecondProvider()
@@ -174,10 +176,11 @@ def test_multi_search_stops_when_first_provider_succeeds():
 
     transport = DummyTransport()
     roots = discovery.discover({"navn": "Acme AS"}, transport)
-    assert roots == ["https://primary-match.no/"]
+    # The first provider's top hit is still inspected first; the second provider's follows it.
+    assert roots == ["https://primary-match.no/", "https://second-opinion.no/"]
     assert p1.called == 1
-    assert p2.called == 0
-    assert discovery.calls == 1
+    assert p2.called == 1
+    assert discovery.calls == 2
 
 
 def test_build_discovery_from_env(monkeypatch):

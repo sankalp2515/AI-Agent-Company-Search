@@ -288,7 +288,7 @@ class ModelRouter:
             began = time.monotonic()
             try:
                 payload = call_chat(provider, messages, 384, self.caller,
-                                    min(20, max(.1, transport.deadline - time.monotonic())))
+                                    min(45, max(.1, transport.deadline - time.monotonic())))  # free tiers can take 20-40 s
                 text = reply_text(provider, payload)
                 event["usage"] = payload.get("usage", {})
                 action = json.loads(text)

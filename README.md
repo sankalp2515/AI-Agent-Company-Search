@@ -119,7 +119,7 @@ What each key does:
 - **Model key:** picks a literal paragraph from an already verified site as the company description. The model chooses an index; it never writes text.
 - **Model key plus search key:** a bounded research loop. The model chooses the next search or which candidate to inspect, and code checks identity. A model cannot publish a fact, URL or number.
 
-Budgets scale with the batch: by default 2 search queries and 3 model calls per company (`--search-queries-per-company`, `--model-calls-per-company`). Absolute caps can be set with `ORGLENS_MAX_SEARCH_QUERIES` and `ORGLENS_MAX_MODEL_CALLS`. Keyed calls also count against `--requests-per-company`. Model order is `ORGLENS_MODEL_PROVIDERS` (default `openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral`). `--keys off` (or `ORGLENS_KEYS=off`) ignores every key; `--no-discover` and `--no-ai` turn off one kind.
+Budgets scale with the batch: by default 3 search queries (2 for website discovery, so a second search provider can be tried, and 1 for the research agent) and 3 model calls per company (`--search-queries-per-company`, `--model-calls-per-company`). Absolute caps can be set with `ORGLENS_MAX_SEARCH_QUERIES` and `ORGLENS_MAX_MODEL_CALLS`. Keyed calls also count against `--requests-per-company`. Model order is `ORGLENS_MODEL_PROVIDERS` (default `openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral`). `--keys off` (or `ORGLENS_KEYS=off`) ignores every key; `--no-discover` and `--no-ai` turn off one kind.
 
 Credentialed requests never follow redirects, a custom `OPENAI_BASE_URL` must be plain https, and keys are read only from the environment (or a local `.env` file that is never committed).
 

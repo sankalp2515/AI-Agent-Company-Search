@@ -37,3 +37,11 @@ def test_acquired_company_mention_and_shared_phone_do_not_prove_publisher():
     html='<title>ABS Entreprenør AS</title><h1>Om ABS Entreprenør AS</h1><p>ABS Entreprenør AS kjøpte opp Hans Sylte AS i 2017.</p><p>Hans: 913 54 831</p>'
     parsed,text=soup_text(html)
     assert corroborated({'navn':'HANS SYLTE AS','telefon':'91354831'},[(snapshot(html,'https://absentreprenor.no/'),parsed,text)]) is None
+
+
+def test_parent_page_without_any_publisher_label_does_not_prove_the_subsidiary():
+    # No title, h1 or site name: the group's name sits in a plain div, the subsidiary only on a contact line.
+    html=('<div>Fjordbakst Group</div><p>Our bakeries: Fjordbakst Vest AS, org.nr 912345678, '
+          'Strandgaten 1, 5013 Bergen. Tel 22334455</p>')
+    parsed,text=soup_text(html)
+    assert corroborated({'navn':'FJORDBAKST VEST AS','telefon':'22334455'},[(snapshot(html),parsed,text)]) is None

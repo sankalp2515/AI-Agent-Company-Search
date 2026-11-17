@@ -710,7 +710,8 @@ def corroborated(body, pages, row=None, domain_named=False):
         primary = pages[0][1]
         publisher_labels = [n.get_text(' ', strip=True) for n in primary.select('title, h1')]
         publisher_labels += [n.get('content', '') for n in primary.select('meta[property="og:site_name"]')]
-        if any(publisher_labels) and not any(text_contains_name(label, legal) for label in publisher_labels):
+        if not any(text_contains_name(label, legal) for label in publisher_labels):
+            # No title, heading or site name naming the company is no proof either (abstain, never fail open).
             # A subsidiary/acquisition mention plus a shared address or contact
             # cannot turn the parent's whole website into the requested company.
             return None

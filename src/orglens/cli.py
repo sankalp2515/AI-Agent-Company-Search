@@ -75,14 +75,14 @@ def main():
     run.add_argument("--requests-per-company", type=int, help="Request budget per input company (Builderr: 20, i.e. 2,000 per 100); overrides --max-requests")
     run.add_argument("--registry-retrieved-at", help="Actual timestamp of supplied registry snapshot")
     run.add_argument("--replay", help="Offline extraction from a previous run directory; not a fresh live run")
-    run.add_argument("--keys", choices=("auto", "off"), default=os.environ.get("ORGLENS_KEYS", "auto"),
+    run.add_argument("--keys", choices=("auto", "off"), default=(os.environ.get("ORGLENS_KEYS") or "auto").strip().lower() if (os.environ.get("ORGLENS_KEYS") or "auto").strip().lower() in {"auto", "off"} else "auto",
                      help="auto (default): use any search/model keys found in the environment, keyless otherwise; off: never call keyed services")
     run.add_argument("--search-queries-per-company", type=float, default=float(os.environ.get("ORGLENS_SEARCH_QUERIES_PER_COMPANY", 3)),
                      help="Search API query budget per input company when a search key is present")
     run.add_argument("--model-calls-per-company", type=float, default=float(os.environ.get("ORGLENS_MODEL_CALLS_PER_COMPANY", 3)),
                      help="Model call budget per input company when a model key is present")
     run.add_argument("--no-ai", action="store_true", help="Do not use model keys even when present")
-    run.add_argument("--discover", action="store_true", help="Search discovery (SerpAPI, Tavily); already automatic with --keys auto when a key is present")
+    run.add_argument("--discover", action="store_true", help="Search discovery (SerpAPI, Tavily, or a model key's web search); already automatic with --keys auto when a key is present")
     run.add_argument("--no-discover", action="store_true", help="Force-disable search discovery")
     run.add_argument("--discover-brave", action="store_true", help="Opt-in search; BRAVE_API_KEY and declared costs required")
     run.add_argument("--search-cost-per-request", type=float)
@@ -172,7 +172,9 @@ def main():
         from .discovery import build_discovery_from_env
         models = providers_from_env(args.providers, require=False) if (want_quotes or want_agent) else []
         search_chain = build_discovery_from_env(unit_cost=args.search_cost_per_request or 0.0, max_cost=args.max_api_cost or 0.0,
-                                                max_queries=args.max_search_queries, query_policy=args.search_policy) if want_search or want_agent else None
+                                                max_queries=args.max_search_queries, query_policy=args.search_policy,
+                                                # A model key's built-in web search also discovers candidates (OpenAI, Anthropic, Gemini).
+                                                model_search=not args.no_ai) if want_search or want_agent else None
         if want_search and search_chain and (auto or args.discover) and not args.no_discover:
             discovery = search_chain
         if want_quotes:
@@ -192,7 +194,10 @@ def main():
                 # company, so a second provider is tried when the first one's results fail verification);
                 # the last third is kept for the agent's own searches.
                 discovery.max_queries = max(1, args.max_search_queries - max(1, args.max_search_queries // 3))
-        elif args.ai and args.keys != "off":
+        if discovery is not None and hasattr(discovery, "per_company"):
+            # Each company gets its share of the discovery cap (by default 2 with the agent, 3 without).
+            discovery.per_company = max(1, discovery.max_queries // max(1, companies))
+        if not (want_agent and models and search_chain) and args.ai and args.keys != "off":
             print("orglens: --ai needs a model key and a search key (SerpAPI or Tavily); continuing without the research agent", file=sys.stderr)
         if args.discover_brave and args.keys != "off":
             if args.replay:

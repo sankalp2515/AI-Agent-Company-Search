@@ -208,7 +208,7 @@ class ChainSearch:
                     self.shared.calls += 1
                 self.calls += 1
                 self.credits += 1
-            found = provider.search(query, min(12, max(.1, transport.deadline - time.monotonic())))
+            found = provider.search(query, min(float(getattr(provider, "timeout", 12)), max(.1, transport.deadline - time.monotonic())))
             if found:
                 return found
         return []

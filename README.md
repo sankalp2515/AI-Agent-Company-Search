@@ -108,18 +108,18 @@ The same evaluator command runs with or without keys. At start-up it reads docum
 | --- | --- | --- |
 | `SERPAPI_API_KEY` (and optional `SERPAPI_API_KEY_2`) | SerpAPI Google search, Norway | Website candidates for companies the keyless pass could not resolve |
 | `TAVILY_API_KEY` | Tavily search | Same, tried after SerpAPI |
-| `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (https only) and `OPENAI_MODEL` | OpenAI or any OpenAI-compatible endpoint | Model-directed research and quote selection (below) |
-| `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` | Claude (OpenAI-compatible endpoint) | Same |
-| `GEMINI_API_KEY` or `GOOGLE_API_KEY`, optional `GEMINI_MODEL` | Gemini (OpenAI-compatible endpoint) | Same |
+| `OPENAI_API_KEY`, optional `OPENAI_BASE_URL` (https only) and `OPENAI_MODEL` | OpenAI or any OpenAI-compatible endpoint | Model-directed research and quote selection (below); on OpenAI's own endpoint also its built-in web search for website candidates |
+| `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` | Claude | Same, including Claude's built-in web search |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY`, optional `GEMINI_MODEL` | Gemini | Same, including Grounding with Google Search |
 | `GROQ_API_KEY`, `NVIDIA_API_KEY`, `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`, `COHERE_API_KEY`, `MISTRAL_API_KEY` | Other model APIs | Same, as fallbacks |
 
 What each key does:
 
 - **Search key:** after the keyless website pass, companies still without a verified site get up to two search queries. Every result is only a candidate. It is fetched from the company's own site and must pass the same exact-company proof (organisation number, or legal name with registered address, phone or leader) before anything is published. Search snippets are never stored or used as evidence.
-- **Model key:** picks a literal paragraph from an already verified site as the company description. The model chooses an index; it never writes text.
+- **Model key:** picks a literal paragraph from an already verified site as the company description. The model chooses an index; it never writes text. An OpenAI, Claude or Gemini key also turns on that provider's built-in web search as a search provider, after any SerpAPI or Tavily key, so a model key alone still finds website candidates. Only the URLs it returns are used, as candidates under the same proof rules as any search result; the model's answer text is never evidence.
 - **Model key plus search key:** a bounded research loop. The model chooses the next search or which candidate to inspect, and code checks identity. A model cannot publish a fact, URL or number.
 
-Budgets scale with the batch: by default 3 search queries (2 for website discovery, so a second search provider can be tried, and 1 for the research agent) and 3 model calls per company (`--search-queries-per-company`, `--model-calls-per-company`). Absolute caps can be set with `ORGLENS_MAX_SEARCH_QUERIES` and `ORGLENS_MAX_MODEL_CALLS`. Keyed calls also count against `--requests-per-company`. Model order is `ORGLENS_MODEL_PROVIDERS` (default `openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral`). `--keys off` (or `ORGLENS_KEYS=off`) ignores every key; `--no-discover` and `--no-ai` turn off one kind.
+Budgets scale with the batch: by default 3 search queries (2 for website discovery, so a second search provider can be tried, and 1 for the research agent; each company gets its own share, so early companies cannot spend the whole cap) and 3 model calls per company (`--search-queries-per-company`, `--model-calls-per-company`). Absolute caps can be set with `ORGLENS_MAX_SEARCH_QUERIES` and `ORGLENS_MAX_MODEL_CALLS`. Keyed calls also count against `--requests-per-company`. Model order is `ORGLENS_MODEL_PROVIDERS` (default `openai,anthropic,gemini,groq,nvidia,cloudflare,cohere,mistral`). `--keys off` (or `ORGLENS_KEYS=off`) ignores every key; `--no-discover` and `--no-ai` turn off one kind.
 
 Credentialed requests never follow redirects, a custom `OPENAI_BASE_URL` must be plain https, and keys are read only from the environment (or a local `.env` file that is never committed).
 

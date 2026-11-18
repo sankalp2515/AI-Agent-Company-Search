@@ -239,6 +239,171 @@ class TavilyProvider:
             return []
 
 
+_URL_IN_TEXT = re.compile(r"https?://[^\s<>()\[\]\"']+")
+
+
+def _domain_like(text):
+    text = (text or "").strip().lower().removeprefix("www.")
+    return text if re.fullmatch(r"[a-z0-9æøå-]+(\.[a-z0-9æøå-]+)*\.[a-z]{2,}", text) else None
+
+
+def model_search_prompt(company, query):
+    """One short instruction; the company record is data, the answer is only candidate URLs."""
+    orgnr = company.get("organisasjonsnummer") or company.get("organisation_number") or ""
+    name = (company.get("navn") or company.get("legal_name") or query or "").strip()
+    addr = company.get("forretningsadresse") or company.get("postadresse") or {}
+    place = (addr.get("kommune") or company.get("municipality") or "").strip()
+    who = name + (f", organisation number {orgnr}" if orgnr else "") + (f", {place}, Norway" if place else ", Norway")
+    return ("Search the web for the official website of this Norwegian company: " + who + ". "
+            "Return only the company's own website URL (not directories, social media, registries or a parent "
+            "group's site). If you cannot find one, answer NONE.")
+
+
+class ModelWebSearchProvider:
+    """A model API's built-in web search (OpenAI, Anthropic or Gemini) used only to discover candidate URLs.
+
+    Only URLs the provider returns as search sources, citations or in its answer become candidates, and every
+    candidate still has to pass the same exact-company verification as any other search hit. Keys are sent
+    only to the provider's fixed https endpoint and redirects are never followed."""
+    timeout = 40.0
+    families = ("openai", "anthropic", "gemini")
+
+    def __init__(self, family, key, model, label=None):
+        if family not in self.families:
+            raise ValueError("Unknown model search family")
+        self.family, self.key, self.model = family, key, model
+        self.label = label or f"{family}-web-search"
+        self.disabled = False
+        self.cooldown_until = 0.0
+        self.ctx = ssl.create_default_context(cafile=certifi.where())
+        self.endpoint = {
+            "openai": "https://api.openai.com/v1/responses",
+            "anthropic": "https://api.anthropic.com/v1/messages",
+            "gemini": "https://generativelanguage.googleapis.com/v1beta/models/" + urllib.parse.quote(model, safe="") + ":generateContent",
+        }[family]
+
+    def request(self, prompt):
+        if self.family == "openai":
+            body = {"model": self.model, "input": prompt, "tools": [{"type": "web_search"}],
+                    "include": ["web_search_call.action.sources"], "max_output_tokens": 800}
+            headers = {"Authorization": f"Bearer {self.key}"}
+        elif self.family == "anthropic":
+            body = {"model": self.model, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}],
+                    "tools": [{"type": "web_search_20250305", "name": "web_search", "max_uses": 1,
+                               "blocked_domains": ["proff.no", "purehelp.no", "1881.no", "gulesider.no", "brreg.no",
+                                                   "facebook.com", "linkedin.com"],
+                               "user_location": {"type": "approximate", "country": "NO"}}]}
+            headers = {"x-api-key": self.key, "anthropic-version": "2023-06-01"}
+        else:
+            body = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}]}
+            headers = {"x-goog-api-key": self.key}
+        return body, headers
+
+    @staticmethod
+    def urls_from(family, data):
+        """Source and citation URLs first, then URLs or domains written in the answer text."""
+        sources, text = [], []
+        if family == "openai":
+            for item in data.get("output") or []:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "web_search_call":
+                    for src in ((item.get("action") or {}).get("sources") or []):
+                        if isinstance(src, dict) and isinstance(src.get("url"), str):
+                            sources.append(src["url"])
+                for part in item.get("content") or []:
+                    if not isinstance(part, dict):
+                        continue
+                    for ann in part.get("annotations") or []:
+                        if isinstance(ann, dict) and ann.get("type") == "url_citation" and isinstance(ann.get("url"), str):
+                            sources.append(ann["url"])
+                    if isinstance(part.get("text"), str):
+                        text.append(part["text"])
+        elif family == "anthropic":
+            for block in data.get("content") or []:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "web_search_tool_result" and isinstance(block.get("content"), list):
+                    for res in block["content"]:
+                        if isinstance(res, dict) and isinstance(res.get("url"), str):
+                            sources.append(res["url"])
+                elif block.get("type") == "text":
+                    for cit in block.get("citations") or []:
+                        if isinstance(cit, dict) and isinstance(cit.get("url"), str):
+                            sources.append(cit["url"])
+                    if isinstance(block.get("text"), str):
+                        text.append(block["text"])
+        else:
+            for cand in data.get("candidates") or []:
+                if not isinstance(cand, dict):
+                    continue
+                for chunk in ((cand.get("groundingMetadata") or {}).get("groundingChunks") or []):
+                    web = chunk.get("web") if isinstance(chunk, dict) else None
+                    if isinstance(web, dict):
+                        # Gemini returns redirect links; the source's own domain is its title.
+                        host = _domain_like(web.get("title"))
+                        if host:
+                            sources.append("https://" + host + "/")
+                for part in ((cand.get("content") or {}).get("parts") or []):
+                    if isinstance(part, dict) and isinstance(part.get("text"), str):
+                        text.append(part["text"])
+        answer = " ".join(text)
+        found = [u.rstrip(".,;:!?") for u in _URL_IN_TEXT.findall(answer)]
+        found += ["https://" + d + "/" for d in (_domain_like(w.strip(".,;:!?()*`")) for w in answer.split()) if d]
+        # The model's own answer names the site it picked; put it ahead of the other sources it read.
+        return found + sources
+
+    def search_company(self, company, query, timeout):
+        if self.disabled or not self.key or time.monotonic() < self.cooldown_until:
+            return []
+        body, headers = self.request(model_search_prompt(company, query))
+        req = urllib.request.Request(self.endpoint, data=json.dumps(body).encode("utf-8"), method="POST",
+                                     headers={**headers, "Content-Type": "application/json", "Accept": "application/json",
+                                              "User-Agent": "OrgLens/0.2 discovery"})
+        try:
+            with _open(req, timeout, self.ctx) as resp:
+                raw = resp.read(4_000_001)
+            if len(raw) > 4_000_000:
+                return []
+            data = json.loads(raw.decode("utf-8", errors="replace"))
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = exc.read(4000).decode("utf-8", errors="replace").lower()
+            except OSError:
+                detail = ""
+            if exc.code == 429 and not any(t in detail for t in ("insufficient_quota", "billing", "exceeded your current quota")):
+                self.cooldown_until = time.monotonic() + 30
+            elif exc.code in {400, 401, 402, 403, 404, 429}:
+                # Wrong key, no quota, or a model/endpoint without web search: keyless research continues.
+                self.disabled = True
+            return []
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError):
+            return []
+        if not isinstance(data, dict):
+            return []
+        return candidate_roots(self.urls_from(self.family, data), preserve_paths=False, limit=4)
+
+    def search(self, query, timeout):
+        return self.search_company({}, query, timeout)
+
+
+def model_search_providers_from_env():
+    """Model web search for each model key in the environment; a third-party OpenAI-compatible base URL is skipped."""
+    from .agent import MODEL_FALLBACKS
+    providers = []
+    base = (os.environ.get("OPENAI_BASE_URL") or "").strip().rstrip("/")
+    openai_key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if openai_key and base in {"", "https://api.openai.com/v1", "https://api.openai.com"}:
+        providers.append(ModelWebSearchProvider("openai", openai_key, (os.environ.get("OPENAI_MODEL") or "").strip() or MODEL_FALLBACKS["openai"][0]))
+    anthropic_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    if anthropic_key:
+        providers.append(ModelWebSearchProvider("anthropic", anthropic_key, (os.environ.get("ANTHROPIC_MODEL") or "").strip() or MODEL_FALLBACKS["anthropic"][0]))
+    gemini_key = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+    if gemini_key:
+        providers.append(ModelWebSearchProvider("gemini", gemini_key, (os.environ.get("GEMINI_MODEL") or "").strip() or MODEL_FALLBACKS["gemini"][0]))
+    return providers
+
+
 class MultiSearchDiscovery:
     """Ordered fallback chain across search providers with strict budgets and caps."""
     def __init__(self, providers, unit_cost=0.0, max_cost=0.0, max_queries=100, query_policy="broad"):
@@ -249,6 +414,9 @@ class MultiSearchDiscovery:
         self.unit_cost = Decimal(str(unit_cost))
         self.max_cost = Decimal(str(max_cost))
         self.max_queries = max_queries
+        # Per-company share of the run cap; without it the first companies in a parallel run can spend
+        # every query before later companies are searched at all.
+        self.per_company = None
         self.spent = Decimal("0")
         self.calls = 0
         self.lock = threading.Lock()
@@ -279,13 +447,16 @@ class MultiSearchDiscovery:
         if not query:
             return
 
+        asked = 0
         for provider in self.providers:
-            if getattr(provider, "disabled", False):
+            if getattr(provider, "disabled", False) or time.monotonic() < getattr(provider, "cooldown_until", 0.0):
                 continue
+            if self.per_company is not None and asked >= self.per_company:
+                return
             remaining_time = transport.deadline - time.monotonic() - 15
             if transport.requests >= transport.limit or remaining_time <= 1:
                 return
-            timeout = min(12.0, remaining_time)
+            timeout = min(float(getattr(provider, "timeout", 12.0)), remaining_time)
             with self.lock:
                 if self.calls >= self.max_queries:
                     return
@@ -296,7 +467,11 @@ class MultiSearchDiscovery:
                 self.spent += self.unit_cost
                 self.calls += 1
                 self.local.calls = getattr(self.local, "calls", 0) + 1
-            candidates = provider.search(query, timeout)
+            asked += 1
+            if hasattr(provider, "search_company"):
+                candidates = provider.search_company(company, query, timeout)
+            else:
+                candidates = provider.search(query, timeout)
             if candidates:
                 yield candidates
 
@@ -340,7 +515,7 @@ class BraveDiscovery:
         return candidate_roots(payload)
 
 
-def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100, query_policy="broad"):
+def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100, query_policy="broad", model_search=False):
     """Instantiate ordered provider chain from environment variables."""
     providers = []
     # 1. Primary: SerpAPI Key 1 (highest Norwegian entity precision)
@@ -357,6 +532,10 @@ def build_discovery_from_env(unit_cost=0.0, max_cost=0.0, max_queries=100, query
     tk = os.environ.get("TAVILY_API_KEY")
     if tk:
         providers.append(TavilyProvider(tk, label="tavily", query_policy=query_policy))
+
+    # 4. Model web search (OpenAI, Anthropic, Gemini): a supplied model key alone still finds candidates.
+    if model_search:
+        providers.extend(model_search_providers_from_env())
 
     if not providers:
         return None

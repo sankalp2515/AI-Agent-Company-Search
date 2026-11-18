@@ -127,10 +127,21 @@ def test_official_command_with_keys_uses_all_of_them(clean_env, tmp_path):
     assert seen["quote_selector"] is not None and seen["quote_selector"].provider["name"] == "gemini"
 
 
-def test_model_key_alone_selects_quotes_but_no_agent(clean_env, tmp_path):
+def test_model_key_alone_uses_its_web_search_for_discovery(clean_env, tmp_path):
     clean_env.setenv("OPENAI_API_KEY", "o" * 20)
     seen = _run_cli(clean_env, tmp_path)
-    assert seen["discovery"] is None and seen["agent"] is None and seen["quote_selector"] is not None
+    assert seen["quote_selector"] is not None
+    assert [p.label for p in seen["discovery"].providers] == ["openai-web-search"]
+    # --no-ai keeps a model key out of every stage, search included.
+    seen = _run_cli(clean_env, tmp_path, ["--no-ai"])
+    assert seen["discovery"] is None and seen["agent"] is None
+
+
+def test_third_party_openai_compatible_endpoint_gets_no_web_search(clean_env, tmp_path):
+    clean_env.setenv("OPENAI_API_KEY", "o" * 20)
+    clean_env.setenv("OPENAI_BASE_URL", "https://llm.example.org/v1")
+    seen = _run_cli(clean_env, tmp_path)
+    assert seen["discovery"] is None and seen["agent"] is None
 
 
 def test_keys_off_ignores_present_keys(clean_env, tmp_path):
@@ -161,7 +172,7 @@ def test_report_lists_services_but_never_key_values(clean_env, tmp_path):
         cli.main()
     text = (tmp_path / "o" / "run-report.json").read_text(encoding="utf-8")
     report = json.loads(text)
-    assert report["external_services"]["search_providers"] == ["tavily"]
+    assert report["external_services"]["search_providers"] == ["tavily", "anthropic-web-search"]
     assert report["external_services"]["model_providers"][0]["provider"] == "anthropic"
     assert "secret-value" not in text
 
@@ -210,3 +221,11 @@ def test_explicit_model_has_no_silent_fallback(clean_env):
     clean_env.setenv("GEMINI_MODEL", "my-model")
     provider = providers_from_env("gemini")[0]
     assert provider["model"] == "my-model" and "fallback_models" not in provider
+
+
+@pytest.mark.parametrize("value,expected", [("", "auto"), ("  ", "auto"), ("OFF", "off"), ("bogus", "auto")])
+def test_blank_or_unknown_orglens_keys_falls_back_to_auto(clean_env, tmp_path, value, expected):
+    clean_env.setenv("ORGLENS_KEYS", value)
+    clean_env.setenv("TAVILY_API_KEY", "t" * 20)
+    seen = _run_cli(clean_env, tmp_path)
+    assert (seen["discovery"] is not None) is (expected == "auto")
